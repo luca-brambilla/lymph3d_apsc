@@ -3,20 +3,14 @@ OBJS=$(SRCS:.f90=.o)
 
 COMP=mpif90
 
-COMP_FC_FLAGS=-O5 -g -c -cpp -ffree-form -ffree-line-length-none -fopenmp -fbounds-check -DPETSC_AVOID_MPIF_H
+COMP_FC_FLAGS=-O5 -g -c -cpp -ffree-form -ffree-line-length-none -fopenmp -fbounds-check 
 COMP_LD_FLAGS=-O5  -fopenmp
 
-METIS_FC_FLAGS=-I/mnt/c/Users/fulvi/Desktop/Thesis/LYMPH3D_elasticity/fmetis/build/include
-METIS_LD_FLAGS=-L/mnt/c/Users/fulvi/Desktop/Thesis/LYMPH3D_elasticity/fmetis/build/lib -lfmetis -lmetis
+METIS_FC_FLAGS=-I/home/ilario/Scrivania/LYMPH3D/lymph3d/fmetis/build/include
+METIS_LD_FLAGS=-L/home/ilario/Scrivania/LYMPH3D/lymph3d/fmetis/build/lib -lfmetis -lmetis
 
-#METIS_FC_FLAGS=-I/u/gorlezza/LYMPH3D_elasticity/fmetis/build/include
-#METIS_LD_FLAGS=-L/u/gorlezza/LYMPH3D_elasticity/fmetis/build/lib -lfmetis -L/u/sw/pkgs/toolchains/gcc-glibc/9/pkgs/metis/5/lib -lmetis
-
-PETSC_FC_FLAGS=-I/mnt/c/Users/fulvi/Desktop/Thesis/petsc/arch-linux-c-debug/include -I/mnt/c/Users/fulvi/Desktop/Thesis/petsc/include
-PETSC_LD_FLAGS=-L/mnt/c/Users/fulvi/Desktop/Thesis/petsc/arch-linux-c-debug/lib -Wl,-rpath=/mnt/c/Users/fulvi/Desktop/Thesis/petsc/arch-linux-c-debug/lib -lpetsc
-
-#PETSC_LD_FLAGS=-L/usr/lib/petsc/lib -lpetsc
-#PETSC_FC_FLAGS=-I/usr/lib/petsc/include
+PETSC_LD_FLAGS=-L/usr/lib/petsc/lib -lpetsc
+PETSC_FC_FLAGS=-I/usr/lib/petsc/include
 
 #PETSC_LD_FLAGS=$(shell pkg-config --libs PETSc)
 #PETSC_FC_FLAGS=$(shell pkg-config --cflags PETSc)
