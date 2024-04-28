@@ -6,11 +6,11 @@ COMP=mpif90
 COMP_FC_FLAGS=-O5 -g -c -cpp -ffree-form -ffree-line-length-none -fopenmp -fbounds-check 
 COMP_LD_FLAGS=-O5  -fopenmp
 
-METIS_FC_FLAGS=-I/home/ilario/Scrivania/LYMPH3D/lymph3d/fmetis/build/include
-METIS_LD_FLAGS=-L/home/ilario/Scrivania/LYMPH3D/lymph3d/fmetis/build/lib -lfmetis -lmetis
+METIS_FC_FLAGS=-I/home/luca/fmetis/build/include -I/home/luca/metis-5.1.0/build/Linux-x86_64/include
+METIS_LD_FLAGS=-L/home/luca/fmetis/build/lib -lfmetis -L/home/luca/metis-5.1.0/build/Linux-x86_64/libmetis -lmetis
 
-PETSC_LD_FLAGS=-L/usr/lib/petsc/lib -lpetsc
-PETSC_FC_FLAGS=-I/usr/lib/petsc/include
+PETSC_LD_FLAGS=-L/home/luca/petsc/arch-linux-c-debug/lib -Wl,-rpath=/home/luca/petsc/arch-linux-c-debug/lib -lpetsc
+PETSC_FC_FLAGS=-I/home/luca/petsc/arch-linux-c-debug/include -I/home/luca/petsc/include
 
 #PETSC_LD_FLAGS=$(shell pkg-config --libs PETSc)
 #PETSC_FC_FLAGS=$(shell pkg-config --cflags PETSc)

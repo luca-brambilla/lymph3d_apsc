@@ -48,3 +48,9 @@ Thumbs.db
 *.mov
 *.wmv
 
+# Fortran compilation objects
+*.o
+*.mod
+
+# Executable
+Lymph3D
