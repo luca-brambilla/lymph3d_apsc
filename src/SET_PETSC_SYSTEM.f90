@@ -40,7 +40,7 @@ module SET_PETSC_SYSTEM
         ! Set matrix stiff in AIJ (compressed sparse row) format 
         ! Let PETSc automatically decide how to distribute the matrix among processes with PETSC_DECIDE
         ! (otherwise set local_dof by yourself, it is better for parallel computation)
-        PetscCall(MatCreateAIJ(PETSC_COMM_WORLD,local_dof,local_dof,global_dof,global_dof,nrows,PETSC_NULL_INTEGER,nrows,PETSC_NULL_INTEGER,petsc_mat,mpi_ierr))
+        PetscCall(MatCreateAIJ(PETSC_COMM_WORLD,local_dof,local_dof,global_dof,global_dof,nrows,PETSC_NULL_INTEGER_ARRAY,nrows,PETSC_NULL_INTEGER_ARRAY,petsc_mat,mpi_ierr))
     
         ! Allows us to configure various options for the matrix through command-line arguments or a configuration file
         PetscCall(MatSetFromOptions(petsc_mat, mpi_ierr))
