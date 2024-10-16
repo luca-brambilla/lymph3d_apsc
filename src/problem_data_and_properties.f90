@@ -13,19 +13,45 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: p
         real(kind=8) :: alpha, theta, c
         real(kind=8) :: lambda, mu
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0) 
+        real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
 
         call set_properties(alpha, theta, c)
 
         ! r(1) = 0
         ! r(2) = 0
         ! r(3) = - 9.8 * 2400
-
         r(1) = 3*pi**2*cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(lambda + 2*mu)
         r(2) = 3*pi**2*cos(pi*p(2))*sin(pi*p(1))*sin(pi*p(3))*(lambda + 2*mu)
         r(3) = 3*pi**2*cos(pi*p(3))*sin(pi*p(1))*sin(pi*p(2))*(lambda + 2*mu)
 
+
     end function f
+
+    ! Forcing term depending on time
+    function f_time(lambda, mu, p, time, rho)result(r)
+
+        implicit none
+
+        real(kind=8) :: time, rho
+
+        real(kind=8), dimension(3) :: r
+        real(kind=8), dimension(3) :: p
+        real(kind=8) :: alpha, theta, c
+        real(kind=8) :: lambda, mu
+        real(kind=8), parameter :: pi = 4.d0*datan(1.d0), sqrt2 = sqrt(2.)
+
+        call set_properties(alpha, theta, c)
+
+        ! r(1) = 0
+        ! r(2) = 0
+        ! r(3) = - 9.8 * 2400
+        
+        r(1) = (-rho + 3.0*(lambda+2.0*mu))*pi**2 * sin(sqrt2*pi*time) *cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))
+        r(2) = (-rho + 3.0*(lambda+2.0*mu))*pi**2 * sin(sqrt2*pi*time) *sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
+        r(3) = (-rho + 3.0*(lambda+2.0*mu))*pi**2 * sin(sqrt2*pi*time) *sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+
+
+    end function f_time
        
     ! Dirichlet boundary data
     function gd(p,tag)result(r)
@@ -54,6 +80,36 @@ module problem_data_and_properties
         endif
 
     end function gd
+
+    ! Dirichlet boundary data
+    function gd_time(p,tag,time)result(r)
+    
+        real(kind=8) :: time
+
+        integer(kind=4) :: tag
+        real(kind=8), dimension(3) :: r
+        real(kind=8), dimension(3) :: p
+        real(kind=8), parameter :: pi = 4.d0*datan(1.d0), sqrt2 = sqrt(2.)
+
+        ! r = 0.0
+
+        if(tag==1) then
+            r(1) = sin(sqrt2*pi*time) * cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
+            r(2) = sin(sqrt2*pi*time) * sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
+            r(3) = sin(sqrt2*pi*time) * sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+        endif
+        if(tag==2) then
+            r(1) = sin(sqrt2*pi*time) *cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
+            r(2) = sin(sqrt2*pi*time) *sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
+            r(3) = sin(sqrt2*pi*time) *sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+        endif
+        if(tag==3) then
+            r(1) = sin(sqrt2*pi*time) * cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
+            r(2) = sin(sqrt2*pi*time) * sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
+            r(3) = sin(sqrt2*pi*time) * sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+        endif
+
+    end function gd_time
 
     ! Surface traction data
     function gn(lambda,mu,normal,p,tag)result(r)
@@ -121,13 +177,28 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
         real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
-
+        
         r(1) = cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
         r(2) = sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
         r(3) = sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
 
     end function uex
     
+    ! Analytical solution depenting on time
+    function uex_time(p, time)result(r)
+        
+        real(kind=8) :: time
+
+        real(kind=8), dimension(3) :: r
+        real(kind=8), dimension(3) :: p
+        real(kind=8), parameter :: pi = 4.d0*datan(1.d0), sqrt2 = sqrt(2.)
+
+        r(1) = sin(sqrt2*pi*time) * cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
+        r(2) = sin(sqrt2*pi*time) * sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
+        r(3) = sin(sqrt2*pi*time) * sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+
+    end function uex_time
+
     ! Set the properties of the numerical method
     subroutine set_properties(alpha, theta, c)
 
