@@ -54,3 +54,9 @@ Thumbs.db
 
 # Executable
 Lymph3D
+
+# folders
+src/TEST_*
+*.mpi
+petsc_uex
+*.vtk

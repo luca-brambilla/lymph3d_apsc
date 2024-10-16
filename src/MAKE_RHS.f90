@@ -1,4 +1,4 @@
-subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
+subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, time)
 
 #include<petsc/finclude/petscksp.h>
     
@@ -14,10 +14,13 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
     use Poly_data
 
     implicit none
+    
+    ! logical, intent(in) :: IsTime_dependent
+    real(kind=8), intent(in), optional :: time
 
     ! petsc_rhs is provided by SET_PETSC_VECTOR.f90
 
-    Vec petsc_rhs
+    Vec :: petsc_rhs
     PetscScalar :: val(1)
     PetscInt :: irow(1)
 
@@ -48,7 +51,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
     real(kind=8), dimension(3,3) :: Jinv
     real(kind=8), dimension(4) :: x, y, z
 
-    real(kind=8) :: lambda, mu
+    real(kind=8) :: lambda, mu, rho !!! density not used if not dynamic case
     integer(kind=4) :: mat_id
 
     integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, ipoly_glob, ipoly_loc, ipoly2_glob, ipoly2_loc
@@ -106,6 +109,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
         rhs_tet_loc = 0.0
 
         mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
+        rho = PolyData%prop_mat(mat_id,1)
         lambda = PolyData%prop_mat(mat_id,2)
         mu = PolyData%prop_mat(mat_id,3)
 
@@ -139,7 +143,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
         call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
 
         ! computation of the rhs term on the volume rhs_tet_loc (see assemble_local.f90)
-        call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc)
+        call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, IsTime_dependent, time, rho)
 
         ! this allows to assemble the local matrix correctly into the global vector
         beg=(ipoly_glob-1)*Np+1
@@ -222,7 +226,8 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
                                         PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist,Np, Fk, node_maps, nodtria2, nq2)
 
                     call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly),&
-                                        nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
+                                        nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc, &
+                                        IsTime_dependent, time)
 
                 else
 
@@ -232,7 +237,8 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
                                             PolyMesh%Poly(ipoly2_loc)%b_box, blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,&
-                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
+                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc, &
+                                            IsTime_dependent, time)
 
                     else
 
@@ -240,7 +246,8 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
                                             PolyMesh%Poly(1)%b_box, blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,&
-                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
+                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc, &
+                                            IsTime_dependent, time)
 
                     endif
 

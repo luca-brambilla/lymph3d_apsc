@@ -1,4 +1,4 @@
-subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex)
+subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex, time)
      
 #include<petsc/finclude/petscksp.h>
 
@@ -37,6 +37,9 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
     real(kind=8), dimension(3) :: exact_sol
 
     integer(kind=4) :: q, ii, jj
+
+    ! logical, intent(in) :: IsTime_dependent
+    real(kind=8), intent(in), optional :: time
 
     p = PolyMesh%Elem_loc(1)%Degree
     Npoly = PolyMesh%num_poly
@@ -105,8 +108,14 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
                         points(ii)=points(ii)+Fk(ii,jj)*nodtet3(jj,q)
                     enddo
                 enddo
+                
+                !!! NOT EFFICIENT IF ELSE - LOOP
+                if (IsTime_dependent .eqv. .false.) then
+                    exact_sol = uex(points)
+                else
+                    exact_sol = uex_time(points, time)
+                end if
 
-                exact_sol = uex(points)
                 do i=1,3
                     modal_coeff_uex(i,m) = modal_coeff_uex(i,m) + abs(Jdet)*weitet3(q)*exact_sol(i)*phi(m,q)
                 enddo

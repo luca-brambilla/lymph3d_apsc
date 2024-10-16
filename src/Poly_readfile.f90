@@ -28,12 +28,14 @@
                                  opt_out_var, damping_type, &                                 
                                  time_step, start_time, stop_time, time_restart, &
                                  num_dt_mon, Is_Restart, Is_Debug, &
-                                 depth_search_mon_lst, IS_mon_lst
+                                 depth_search_mon_lst, IS_mon_lst, &
+                                 IsTime_dependent
                                  
 
       use Poly_exit_codes
       use Poly_fail_codes
       use Poly_default_codes
+      use Poly_setup_mpi
 
       implicit none
       
@@ -43,6 +45,8 @@
 
       integer(kind=4)   :: i, status, ileft, iright, arglen, val_mon_lst
       integer(kind=4)   :: file_row = 0
+
+      integer(kind=4) :: IS_dynamic
 
 
       !Setup default values 
@@ -56,8 +60,10 @@
       IS_failoncoeffs   = IS_failoncoeffs_default
       IS_failCFL        = IS_failCFL_default
       IS_instabilitycontrol = IS_instabilitycontrol_default
+      IsTime_dependent  = IS_timedependent_default
 
-
+      if(mpi_id == 0) write(*,'(A)')  !! PRINT VARIABLES
+      
       open(40,file=header_file)
       
       do    
@@ -94,6 +100,8 @@
 
 !         write(*,*) 'Comparing ', inline(1:(ileft-2)), ', ileft=', ileft
 
+         if(mpi_id == 0) write(*,'(A)')keyword  !! PRINT READ VARIABLES
+         
          select case (keyword)
 
            case('GRIDFILE')
@@ -123,7 +131,11 @@
          
            case('STOPTIME')
             read(inline(ileft:iright),*) stop_time
-         
+
+           case('DYNAMIC')
+            read(inline(ileft:iright),*) IS_dynamic
+            if (IS_dynamic /= 0) IsTime_dependent = .true.
+
            case('RESTART')
             read(inline(ileft:iright),*) time_restart
             IS_Restart = .true.
@@ -173,6 +185,7 @@
       
       close(40)
       
+      if(mpi_id == 0) write(*,'(A)') !! PRINT VARIABLES
 
       end subroutine READ_HEADER
 

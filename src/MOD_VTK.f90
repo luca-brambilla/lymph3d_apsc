@@ -323,11 +323,13 @@ module MOD_VTK
     end subroutine
     
     ! Store the numerical solution in an appropriate file
-    subroutine WRITE_SOLUTION_VTK(nelem, PolyMesh, u, IsPoly, mpi_id)
+    subroutine WRITE_SOLUTION_VTK(nelem, PolyMesh, u, IsPoly, mpi_id, num_dt)
 
       use problem_data_and_properties
     
       implicit none
+
+      integer(kind=4), intent(in), optional :: num_dt
 
       type(Mesh_Structure), intent(inout) :: PolyMesh
       integer(kind=4), intent(in) :: nelem
@@ -375,7 +377,9 @@ module MOD_VTK
       else
 
         ! write(vtk_filename, '(A,I0,A)') 'MONITORS/sol_tet_', PolyMesh%num_tet, '.vtk'
-        vtk_filename_num = 'MONITORS/sol_tet_000000.vtk'
+        vtk_filename_num = 'MONITORS/sol_tet_000000_000000.vtk'
+
+        ! mpi_id
         if (mpi_id < 10) then            
           write(vtk_filename_num(23:23),'(i1)') mpi_id                             
         elseif (mpi_id < 100) then                                              
@@ -389,6 +393,22 @@ module MOD_VTK
         elseif (mpi_id < 1000000) then
           write(vtk_filename_num(18:23),'(i6)') mpi_id                            
         endif
+
+        ! timestep
+        if (num_dt < 10) then            
+          write(vtk_filename_num(30:30),'(i1)') num_dt                             
+        elseif (num_dt < 100) then                                              
+          write(vtk_filename_num(29:30),'(i2)') num_dt                             
+        elseif (num_dt < 1000) then                                           
+          write(vtk_filename_num(28:30),'(i3)') num_dt                              
+        elseif (num_dt < 10000) then                                              
+          write(vtk_filename_num(27:30),'(i4)') num_dt                             
+        elseif (num_dt < 100000) then                                            
+          write(vtk_filename_num(26:30),'(i5)') num_dt                         
+        elseif (num_dt < 1000000) then
+          write(vtk_filename_num(25:30),'(i6)') num_dt                            
+        endif
+
 
       endif
 

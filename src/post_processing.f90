@@ -17,12 +17,14 @@ module post_processing
     contains
 
     ! Evaluate nodal values of the solution and store them in output.vtk 
-    subroutine EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id)
+    subroutine EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
         
         use local_search ! see Poly_global.f90
         use problem_data_and_properties
 
         implicit none
+
+        integer(kind=4), intent(in), optional :: num_dt
 
         type(Mesh_Structure), intent(inout) :: PolyMesh
         real(kind=8), dimension(:,:), allocatable, intent(in) :: u
@@ -130,7 +132,7 @@ module post_processing
 
         enddo
         
-        call WRITE_SOLUTION_VTK(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly, mpi_id) ! see MOD_VTK.f90
+        call WRITE_SOLUTION_VTK(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly, mpi_id, num_dt) ! see MOD_VTK.f90
         print *,'Done exporting solution'
 
     end subroutine EXPORT_SOLUTION

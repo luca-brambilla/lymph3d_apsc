@@ -49,6 +49,8 @@
      !file found 
      logical :: IS_filefound  
      
+     !time dependence
+     logical :: IsTime_dependent
      
      !parameters
      real(kind=8), parameter :: pi = 4.d0*datan(1.d0)  !< p-greek
@@ -123,6 +125,7 @@
       
       real(kind=8), parameter :: start_time_default = 0.d0;
       
+      !!! INCONSISTENT CAPITALIZATION
       logical, parameter :: IS_mon_lst_default = .FALSE.
       logical, parameter :: IS_Restart_default = .FALSE.
       logical, parameter :: IS_Debug_default = .FALSE.
@@ -130,7 +133,8 @@
       logical, parameter :: IS_setuponly_default = .FALSE.
       logical, parameter :: IS_failCFL_default = .FALSE.
       logical, parameter :: IS_instabilitycontrol_default = .FALSE.    
-
+      
+      logical, parameter :: IS_timedependent_default = .false.
 
       end module Poly_default_codes
      
