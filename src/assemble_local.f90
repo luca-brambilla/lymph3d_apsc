@@ -97,15 +97,15 @@ subroutine MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, mass_loc)
 end subroutine MAKE_MASS_LOC
 
 ! Assemble the local rhs term rhs_tet_loc approximating the integral on the tetrahedron 
-subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, IsTime_dependent, time, rho)
+subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
 
     ! phi is provided by the subroutine basis in basis_function.f90
     ! weitet3 is provided by the subroutine mapping_quadrature_3D in Poly_ref_mappings.f90
     ! nq3 is provided by the subroutine quadrature in basis_function.f90
     ! Fk and Jdet are provided by the subroutine jacobians in Poly_ref_mappings.f90
 
-    logical, intent(in) :: IsTime_dependent
-    real(kind=8), intent(in), optional :: time, rho
+    ! density is 0 in static case
+    real(kind=8), intent(in), optional :: rho
 
     integer(kind=4), intent(in) :: nq3, Np
     real(kind=8), intent(in) :: Jdet
@@ -121,65 +121,39 @@ subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rh
 
     rhs_tet_loc = 0.0
 
-    !!! UGLY IF ELSE 
-    if (IsTime_dependent .eqv. .false.) then
-        ! loop on 3D quadrature nodes
-        do q = 1,nq3
 
-            do m=1,Np
+    ! time dependence
+    ! loop on 3D quadrature nodes
+    do q = 1,nq3
 
-                ! map the quadrature nodes from the reference tetrahedron to the physical tetrahedron 
-                do j=1,3
-                    points(j)=0.0
-                    do k=1,4
-                        points(j) = points(j) + Fk(j,k)*nodtet3(k,q)
-                    end do
+        do m=1,Np
+
+            ! map the quadrature nodes from the reference tetrahedron to the physical tetrahedron 
+            do j=1,3
+                points(j)=0.0
+                do k=1,4
+                    points(j) = points(j) + Fk(j,k)*nodtet3(k,q)
                 end do
-
-                ! f is provided by problem_data_and_properties.f90
-                forc_term = f(lambda,mu,points)
-
-                do i=1,3
-                    rhs_tet_loc(i,m) = rhs_tet_loc(i,m) + abs(Jdet)*weitet3(q)*forc_term(i)*phi(m,q)
-                enddo
-            
             end do
 
+            ! f_time is provided by problem_data_and_properties.f90
+            ! considers correct density if dynamic problem, otherwise rho=0
+            forc_term = f_time(lambda,mu,points,rho)
+
+            do i=1,3
+                rhs_tet_loc(i,m) = rhs_tet_loc(i,m) + abs(Jdet)*weitet3(q)*forc_term(i)*phi(m,q)
+            enddo
+        
         end do
 
-    else
-        ! time dependence
-        ! loop on 3D quadrature nodes
-        do q = 1,nq3
+    end do
 
-            do m=1,Np
-
-                ! map the quadrature nodes from the reference tetrahedron to the physical tetrahedron 
-                do j=1,3
-                    points(j)=0.0
-                    do k=1,4
-                        points(j) = points(j) + Fk(j,k)*nodtet3(k,q)
-                    end do
-                end do
-
-                ! f_time is provided by problem_data_and_properties.f90
-                forc_term = f_time(lambda,mu,points,time,rho)
-
-                do i=1,3
-                    rhs_tet_loc(i,m) = rhs_tet_loc(i,m) + abs(Jdet)*weitet3(q)*forc_term(i)*phi(m,q)
-                enddo
-            
-            end do
-
-        end do
-
-    end if
  
 end subroutine MAKE_RHS_TET
 
 ! Assemble the local rhs term rhs_face_bd_loc approximating the integral on the boundary faces of the tetrahedron 
 subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, Fk, nodtria2, weitria2, nq2, lambda, mu, node_maps, &
-                            phi_b, grad_b, tag, rhs_face_bd_loc, IsTime_dependent, time)
+                            phi_b, grad_b, tag, rhs_face_bd_loc)
 
     ! theta and alpha are provided by the subroutine set_properties in problem_data_and_properties.f90
     ! phi_b and grad_b are provided by the subroutine basis_boundary in basis_functions.f90
@@ -187,8 +161,6 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
     ! nq2 is provided by the subroutine quadrature in basis_function.f90
     ! Fk is provided by by the subroutine jacobians in Poly_ref_mappings.f90
 
-    logical, intent(in) :: IsTime_dependent
-    real(kind=8), intent(in), optional :: time
 
     integer(kind=4), intent(in) :: nq2, Np, p
     integer(kind=4), intent(in) :: e, E2
@@ -247,12 +219,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
                     end do
                 end do
                 
-                !!! NOT EFFICIENT IF ELSE - LOOP
-                if (IsTime_dependent .eqv. .false.) then
-                    diri_data = gd(points,tag)
-                else
-                    diri_data = gd_time(points,tag,time)
-                end if
+                diri_data = gd(points,tag)
 
                 temp(1,m) = (lambda + 2*mu)*grad_b(1,m,q,1)*diri_data(1)*normal(1) + &
                             mu*grad_b(2,m,q,1)*diri_data(1)*normal(2) + mu*grad_b(3,m,q,1)*diri_data(1)*normal(3) + &

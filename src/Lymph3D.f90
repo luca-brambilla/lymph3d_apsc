@@ -1,6 +1,6 @@
 !    Author: Lorenzo Gorlezza
 !    This file is part of the library LYMPH3D
-!
+
 !> @brief Lymph3D (Discontinuous Galerkin methods on polyhedral meshes for PDE problems) 
 
 ! Here starts the code Lymph3D
@@ -19,6 +19,8 @@
       use Poly_mesh
       use post_processing
       use SET_PETSC_SYSTEM
+
+      use MOD_MPI_CUSTOM
 
       implicit none
 
@@ -57,7 +59,6 @@
       type(Data_Structure) :: PolyData
       type(Mesh_Structure) :: PolyMesh 
 
-      ! logical :: IsTime_dependent !!! INSERT IN INPUT
       integer(kind=4) :: num_dt = 1     ! number of iteration
       real(kind=8) :: t             ! time variable
       
@@ -71,6 +72,9 @@
       allocate(mpi_stat(MPI_STATUS_SIZE))
 
       call INITIALIZATION()
+
+      call MPI_OP_CREATE(MPI_ZERO_OVERWRITE, .TRUE., MPI_ZERO_OVERWRITE_OP, mpi_user_reduction_error)
+      call MPI_OP_CREATE(MPI_OVERWRITE_BY_NEW, .FALSE., MPI_OVERWRITE_BY_NEW_OP, mpi_user_reduction_error)
 
       start = MPI_WTIME()
       
@@ -159,6 +163,13 @@
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
 !     SET PETSC VECTORS AND MATRICES 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+      !!! NOT WORKING WITH PROCESSES
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+      if (mpi_id .eq. 0) then
+            write(*,'(A)') 
+            write(*,'(A)')'--------------------Compute solution-------------------'
+      endif
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
       print *, 'SET PETSC MATRICES AND VECTORS'
 
@@ -224,21 +235,22 @@
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  
 
       call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
       print *, 'CALLING SOLVER'
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
       
       if (IsTime_dependent .eqv. .false.) then
             ! Au=f
             PetscCallA(KSPSolve(ksp, petsc_rhs, petsc_sol, mpi_ierr))
 
       else
+            if(mpi_id == 0) print *, "                   TIME LOOP START                   "
             ! initialization for time problem
             t = start_time
             num_dt = 1 !!! compute number of iteration if start not t=0?
 
             ! vectors initial conditions
-            petsc_u0 = 
-            petsc_v0 = 
+            ! petsc_u0 = 
+            ! petsc_v0 = 
 
             if(mpi_id == 0) print *, "Iteration: ", num_dt, " Time: ", t
 
@@ -247,22 +259,25 @@
             dt2 = time_step * time_step
             half_dt2 = 0.5 * dt2
             
-            ! -0.5 dt^2 A u0
+            ! petsc_tmpv = -0.5 dt^2 A u0
             PetscCallA(MatMult(petsc_stiff, petsc_u0, petsc_tmpv, mpi_ierr))
             PetscCallA(VecScale(petsc_tmpv, -half_dt2, mpi_ierr))
-            ! M u0
+            ! petsc_f = M u0
             PetscCallA(MatMult(petsc_mass, petsc_u0, petsc_f, mpi_ierr))
-            ! (M-dt^2/2*A)u_0
+            ! petsc_f = (M-dt^2/2*A)u_0
             PetscCallA(VecAXPY(petsc_f, one, petsc_tmpv, mpi_ierr))
-            ! M v0
+            ! petsc_tmpv = M v0
             PetscCallA(MatMult(petsc_mass, petsc_v0, petsc_tmpv, mpi_ierr))
-            ! (M-dt^2/2*A)u_0 + dt*M*v_0
+            ! petsc_f = (M-dt^2/2*A)u_0 + dt*M*v_0
             PetscCallA(VecAXPY(petsc_f, time_step, petsc_tmpv, mpi_ierr))
-            ! dt^2/2 * f_0
-            PetscCallA(VecCopy(petsc_rhs, petsc_tmpv, mpi_ierr))
-            PetscCallA(VecScale(petsc_tmpv, half_dt2, mpi_ierr))
-            ! (M-dt^2/2*A)u_0 + dt*M*v_0 + dt^2/2 * f_0
-            PetscCallA(VecAXPY(petsc_f, one, petsc_tmpv, mpi_ierr))
+
+            ! petsc_tmpv = dt^2/2 * f_0(x)*f'_0(t)
+            ! PetscCallA(VecCopy(petsc_rhs, petsc_tmpv, mpi_ierr))
+            ! PetscCallA(VecScale(petsc_tmpv, half_dt2*time_function(time), mpi_ierr))
+
+            !!! check if the same f'(t) applies for both forcing and BC
+            ! petsc_f = [(M-dt^2/2*A)u_0 + dt*M*v_0] + dt^2/2 * f_0(x)*f'_0(t)
+            PetscCallA(VecAXPY(petsc_f, half_dt2*time_function(t), petsc_rhs, mpi_ierr))
             ! M u1 = F
             PetscCallA(KSPSolve(ksp2, petsc_f, petsc_sol, mpi_ierr))
 
@@ -281,27 +296,29 @@
                   
                   if(mpi_id == 0) print *, "Iteration: ", num_dt, " Time: ", t
 
-                  !!! COMPUTE NEW RHS
-                  call MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, t)
-
-                  ! dt^2 A u_n
+                  ! petsc_tmpv = dt^2 A u_n
                   PetscCallA(MatMult(petsc_stiff, petsc_sol, petsc_tmpv, mpi_ierr))
                   PetscCallA(VecScale(petsc_tmpv, -dt2, mpi_ierr))
-                  ! 2M u_n
+                  ! petsc_f = 2M u_n
                   PetscCallA(MatMult(petsc_mass, petsc_sol, petsc_f, mpi_ierr))
                   PetscCallA(VecScale(petsc_f, 2.0*one, mpi_ierr))
-                  ! (2M-dt^2*A)u_0
+                  ! petsc_f = (2M-dt^2*A)u_n
                   PetscCallA(VecAXPY(petsc_f, one, petsc_tmpv, mpi_ierr))
-                  ! M v0
+                  ! petsc_tmpv = M u_{n-1}
                   PetscCallA(MatMult(petsc_mass, petsc_u0, petsc_tmpv, mpi_ierr))
-                  ! (M-dt^2/2*A)u_0 - M*u_{n-1}
+                  ! petsc_f = (M-dt^2/2*A)u_n - M*u_{n-1}
                   PetscCallA(VecAXPY(petsc_f, -one, petsc_tmpv, mpi_ierr))
-                  ! dt^2 * f_0
-                  PetscCallA(VecCopy(petsc_rhs, petsc_tmpv, mpi_ierr))
-                  PetscCallA(VecScale(petsc_tmpv, dt2, mpi_ierr))
-                  ! (M-dt^2/2*A)u_0 + dt*M*v_0 + dt^2/2 * f_0
-                  PetscCallA(VecAXPY(petsc_f, one, petsc_tmpv, mpi_ierr))
-                  ! M u1 = F
+
+                  ! Compute new RHS - keep initial RHS, muliply by time function
+                  !!! check if the same f'(t) applies for both forcing and BC
+
+                  ! petsc_tmpv = dt^2 * f_n(x)*f'_n(t)
+                  ! PetscCallA(VecCopy(petsc_rhs, petsc_tmpv, mpi_ierr))
+                  ! PetscCallA(VecScale(petsc_tmpv, time_function(t)*dt2, mpi_ierr))
+
+                  ! F = petsc_f = [(M-dt^2/2*A)u_n + dt*M*u_{n-1}] + dt^2 * f_n(x)*f'_n(t)
+                  PetscCallA(VecAXPY(petsc_f, dt2*time_function(t), petsc_rhs, mpi_ierr))
+                  ! solve linear system M u1 = F
                   PetscCallA(KSPSolve(ksp2, petsc_f, petsc_sol, mpi_ierr))
 
                   call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -375,7 +392,12 @@
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
 !     COMPUTE MODAL SOLUTION
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
+      !!! NOT WORKING WITH PROCESSES
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+      if (mpi_id == 0) then
+            write(*,'(A)')
+            write(*,'(A)')'---------------Compare with exact solution-------------'
+      endif
       call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
       print *, 'Computing modal coefficients...'
@@ -476,7 +498,7 @@
       finish = MPI_WTIME()
       call calc_time(time_hour, time_min, time_sec, int(finish-start))
       
-      if (mpi_id .eq. 0) then
+      if (mpi_id == 0) then
          write(*,'(A)') 
          write(*,'(A)')'-------------------------------------------------------'
          write(*,'(A,I2,A,I2,A,I2,A)') &

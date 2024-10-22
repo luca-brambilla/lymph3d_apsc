@@ -102,6 +102,9 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
     allocate(phi_b(Np,nq2,2))
     allocate(grad_b(3,Np,nq2,2))
 
+    ! assign 0 to density for static case
+    rho = 0.0
+
     ! loop on the tetrahedra
     do ie_loc = 1, PolyMesh%num_elem_loc
 
@@ -109,7 +112,12 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
         rhs_tet_loc = 0.0
 
         mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
-        rho = PolyData%prop_mat(mat_id,1)
+
+        !!! check if there is a better way than if in loop over elements
+        ! take correct density only for dynamic case 
+        if (IsTime_dependent .eqv. .true.) then
+            rho = PolyData%prop_mat(mat_id,1)
+        endif
         lambda = PolyData%prop_mat(mat_id,2)
         mu = PolyData%prop_mat(mat_id,3)
 
@@ -143,7 +151,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
         call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
 
         ! computation of the rhs term on the volume rhs_tet_loc (see assemble_local.f90)
-        call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, IsTime_dependent, time, rho)
+        call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
 
         ! this allows to assemble the local matrix correctly into the global vector
         beg=(ipoly_glob-1)*Np+1
@@ -226,8 +234,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
                                         PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist,Np, Fk, node_maps, nodtria2, nq2)
 
                     call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly),&
-                                        nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc, &
-                                        IsTime_dependent, time)
+                                        nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
 
                 else
 
@@ -237,8 +244,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
                                             PolyMesh%Poly(ipoly2_loc)%b_box, blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,&
-                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc, &
-                                            IsTime_dependent, time)
+                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
 
                     else
 
@@ -246,8 +252,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
                                             PolyMesh%Poly(1)%b_box, blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,&
-                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc, &
-                                            IsTime_dependent, time)
+                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
 
                     endif
 
