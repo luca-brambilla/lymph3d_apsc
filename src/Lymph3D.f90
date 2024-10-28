@@ -73,8 +73,8 @@
 
       call INITIALIZATION()
 
-      call MPI_OP_CREATE(MPI_ZERO_OVERWRITE, .TRUE., MPI_ZERO_OVERWRITE_OP, mpi_user_reduction_error)
-      call MPI_OP_CREATE(MPI_OVERWRITE_BY_NEW, .FALSE., MPI_OVERWRITE_BY_NEW_OP, mpi_user_reduction_error)
+      ! call MPI_OP_CREATE(MPI_ZERO_OVERWRITE, .TRUE., MPI_ZERO_OVERWRITE_OP, mpi_user_reduction_error)
+      ! call MPI_OP_CREATE(MPI_OVERWRITE_BY_NEW, .FALSE., MPI_OVERWRITE_BY_NEW_OP, mpi_user_reduction_error)
 
       start = MPI_WTIME()
       
@@ -281,12 +281,12 @@
             PetscCallA(VecCopy(petsc_tmpv, petsc_v0, mpi_ierr))
             
             ! print to file
-            PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_u0',viewer,mpi_ierr))
-            PetscCallA(VecView(petsc_u0,viewer,mpi_ierr))
-            PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-            PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_v0',viewer,mpi_ierr))
-            PetscCallA(VecView(petsc_v0,viewer,mpi_ierr))
-            PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_u0',viewer,mpi_ierr))
+            ! PetscCallA(VecView(petsc_u0,viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_v0',viewer,mpi_ierr))
+            ! PetscCallA(VecView(petsc_v0,viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
             
             ! compute solution with modal coeff
             ! PetscCallA(MatMult(petsc_mass_modal, petsc_u0, petsc_tmpv, mpi_ierr))
@@ -336,10 +336,13 @@
 
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
             !!! SAVE SOLUTION
-            ! ...
+            if (IsSave_output .eqv. .true.) then
+                  call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
+                  call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
+            endif
 
             ! copy old solution
-            PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
+            ! PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
 
             num_dt = num_dt + 1
             t = t + time_step
@@ -350,6 +353,10 @@
 
                   if(mpi_id == 0) print *, ""
                   if(mpi_id == 0) print *, "Iteration: ", num_dt, " Time: ", t
+
+                  !!! petsc_u0 -> u_{n-1}
+                  !!! petsc_sol -> u_n
+                  !!! at the end write on petsc_sol for u_{n+1}
 
                   ! petsc_tmpv = dt^2 A u_n
                   PetscCallA(MatMult(petsc_stiff, petsc_sol, petsc_tmpv, mpi_ierr))
@@ -373,15 +380,19 @@
 
                   ! F = petsc_f = [(M-dt^2/2*A)u_n + dt*M*u_{n-1}] + dt^2 * f_n(x)*f'_n(t)
                   PetscCallA(VecAXPY(petsc_f, dt2*time_function(t), petsc_rhs, mpi_ierr))
-                  ! solve linear system M u1 = F
+
+                  ! copy old solution before overwriting solution
+                  PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
+
+                  ! solve linear system M u_{n+1} = F
                   PetscCallA(KSPSolve(ksp2, petsc_f, petsc_sol, mpi_ierr))
 
                   call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
                   !!! SAVE SOLUTION
-                  ! ...
-
-                  ! copy old solution
-                  PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
+                  if ( (IsSave_output .eqv. .true.) .and. (mod(num_dt, num_dt_mon) == 0) ) then
+                        call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
+                        call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
+                  endif
 
                   num_dt = num_dt + 1
                   t = t + time_step
@@ -397,55 +408,55 @@
 !     STORE LOCAL NUMERATION TO RECONSTRUCT THE SOLUTION
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>       
 
-      allocate(nnod_num(local_dof))
+      ! allocate(nnod_num(local_dof))
 
-      call CREATE_LOCAL_NODE_NUM(nnod_num, local_dof)
+      ! call CREATE_LOCAL_NODE_NUM(nnod_num, local_dof)
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
       
-      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+      ! call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-      allocate(u_loc(local_dof))
-      allocate(u_glo(global_dof))
+      ! allocate(u_loc(local_dof))
+      ! allocate(u_glo(global_dof))
 
-      if(mpi_np > 1) then
+      ! if(mpi_np > 1) then
 
-            allocate(gathered_sizes(mpi_np))
+      !       allocate(gathered_sizes(mpi_np))
       
-            call MPI_AllGather(local_dof, 1, MPI_INTEGER, gathered_sizes, 1, & 
-                        MPI_INTEGER, MPI_COMM_WORLD, ierr)
+      !       call MPI_AllGather(local_dof, 1, MPI_INTEGER, gathered_sizes, 1, & 
+      !                   MPI_INTEGER, MPI_COMM_WORLD, ierr)
             
-            allocate(displacements(mpi_np))
-            displacements(1) = 0
-            do i = 2, mpi_np
-                  displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
-            end do
+      !       allocate(displacements(mpi_np))
+      !       displacements(1) = 0
+      !       do i = 2, mpi_np
+      !             displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
+      !       end do
 
-      endif
+      ! endif
 
-      print *, 'SCATTER SOLUTION'
-      PetscCallA(VecGetArrayF90(petsc_sol, sol_ptr, mpi_ierr))
-      u_loc(1:local_dof) = sol_ptr
-      if(mpi_np == 1) then
-            u_glo = u_loc
-      else
-            call MPI_ALLGATHERV(u_loc, local_dof, MPI_DOUBLE_PRECISION, &
-                        u_glo, gathered_sizes, displacements, MPI_DOUBLE_PRECISION, &
-                        MPI_COMM_WORLD, mpi_ierr)
-      endif
-      deallocate(u_loc)
+      ! print *, 'SCATTER SOLUTION'
+      ! PetscCallA(VecGetArrayF90(petsc_sol, sol_ptr, mpi_ierr))
+      ! u_loc(1:local_dof) = sol_ptr
+      ! if(mpi_np == 1) then
+      !       u_glo = u_loc
+      ! else
+      !       call MPI_ALLGATHERV(u_loc, local_dof, MPI_DOUBLE_PRECISION, &
+      !                   u_glo, gathered_sizes, displacements, MPI_DOUBLE_PRECISION, &
+      !                   MPI_COMM_WORLD, mpi_ierr)
+      ! endif
+      ! deallocate(u_loc)
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
 !     RECONSTRUCT SOLUTION MATRIX FOR POST-PROCESSING
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
  
-      allocate(u(Np, 3*PolyMesh%num_poly))    
-      u = RESHAPE(u_glo, (/Np, 3*PolyMesh%num_poly /))
-      deallocate(u_glo)
+      ! allocate(u(Np, 3*PolyMesh%num_poly))    
+      ! u = RESHAPE(u_glo, (/Np, 3*PolyMesh%num_poly /))
+      ! deallocate(u_glo)
 
-      print *,'Done with the solution'
+      ! print *,'Done with the solution'
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
 !     COMPUTE MODAL SOLUTION
@@ -468,7 +479,7 @@
       PetscCallA(KSPSolve(ksp3, petsc_modal_coeff_uex, petsc_uex, mpi_ierr))
 
       ! check time dependence
-      if (IsTime_dependent .eqv. .true.) PetscCallA(VecScale(petsc_uex, 1.0/time_function(t), mpi_ierr))
+      if (IsTime_dependent .eqv. .true.) PetscCallA(VecScale(petsc_uex, time_function(t), mpi_ierr))
 
       PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_uex',viewer,mpi_ierr))
       PetscCallA(VecView(petsc_uex,viewer,mpi_ierr))
@@ -497,7 +508,6 @@
       
       if(mpi_id == 0) print *,'Computing the errors...'
       
-      !! WHICH MASS MATRIX?
       call COMPUTE_ERROR_L2(petsc_mass_modal, petsc_sol, petsc_uex, global_dof, err_L2_mpi, local_dof)
       call COMPUTE_ERROR_DG(mat_dg, petsc_sol, petsc_uex, global_dof, err_DG_mpi, local_dof)
 
@@ -552,7 +562,7 @@
 !     POST-PROCESSING: EXPORTING THE SOLUTION
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   
 
-      call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
+      ! call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    END SETUP 

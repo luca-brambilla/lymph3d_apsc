@@ -217,7 +217,7 @@ module problem_data_and_properties
         
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        
+
         r(1) = 0.0 * p(1)
         r(2) = 0.0 * p(2)
         r(3) = 0.0 * p(3)
@@ -244,7 +244,7 @@ module problem_data_and_properties
 
         real(kind=8) :: alpha, theta, c
         
-        alpha = 15 ! penalty coefficient (which appears in the definition of the penalization function)
+        alpha = 10 ! penalty coefficient (which appears in the definition of the penalization function)
         theta = - 1 ! IP method (theta = -1 ---> SIP, theta = 0 ---> IIP, theta = 1 ---> NIP)
         c = 0 ! coefficient of the reaction term
         

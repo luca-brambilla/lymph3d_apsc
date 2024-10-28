@@ -29,7 +29,7 @@
                                  time_step, start_time, stop_time, time_restart, &
                                  num_dt_mon, Is_Restart, Is_Debug, &
                                  depth_search_mon_lst, IS_mon_lst, &
-                                 IsTime_dependent
+                                 IsTime_dependent, IsSave_output
                                  
 
       use Poly_exit_codes
@@ -46,7 +46,7 @@
       integer(kind=4)   :: i, status, ileft, iright, arglen, val_mon_lst
       integer(kind=4)   :: file_row = 0
 
-      integer(kind=4) :: IS_dynamic
+      integer(kind=4) :: IS_dynamic, IS_save
 
 
       !Setup default values 
@@ -61,6 +61,7 @@
       IS_failCFL        = IS_failCFL_default
       IS_instabilitycontrol = IS_instabilitycontrol_default
       IsTime_dependent  = IS_timedependent_default
+      IsSave_output = IS_saveoutput_default
 
       if(mpi_id == 0) write(*,'(A)')  !! PRINT VARIABLES
       
@@ -141,7 +142,11 @@
             IS_Restart = .true.
 
            case('TMONITOR')                                        
-            read(inline(ileft:iright),*) num_dt_mon                
+            read(inline(ileft:iright),*) num_dt_mon  
+            
+           case('SAVEOUT')
+            read(inline(ileft:iright),*) 
+            if(IS_save /= 0) IsSave_output = .true.
             
            case('DAMPING')
             read(inline(ileft:iright),*) damping_type   

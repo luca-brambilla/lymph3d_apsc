@@ -51,6 +51,9 @@
      
      !time dependence
      logical :: IsTime_dependent
+
+     ! save outputs
+     logical :: IsSave_output
      
      !parameters
      real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2=sqrt(2.0)  !< p-greek
@@ -135,6 +138,7 @@
       logical, parameter :: IS_instabilitycontrol_default = .FALSE.    
       
       logical, parameter :: IS_timedependent_default = .false.
+      logical, parameter :: IS_saveoutput_default = .false.
 
       end module Poly_default_codes
      

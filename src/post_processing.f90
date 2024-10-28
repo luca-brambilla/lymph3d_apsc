@@ -16,6 +16,67 @@ module post_processing
 
     contains
 
+    subroutine POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
+
+        type(Mesh_Structure), intent(in) :: PolyMesh
+        real(kind=8), dimension(:,:), allocatable, intent(out) :: u
+        integer(kind=4), intent(in) :: mpi_id   
+        integer(kind=4), intent(in) :: local_dof, global_dof
+        real(kind=8), pointer, intent(in) :: sol_ptr(:)
+        
+        integer(kind=4), dimension(:), allocatable :: nnod_num
+        real(kind=8), dimension(:), allocatable :: u_loc, u_glo
+        integer(kind=4), dimension(:), allocatable :: gathered_sizes, displacements
+        integer(kind=4) :: i, Np
+
+        Vec :: petsc_sol
+        Np = PolyMesh%Elem_loc(1)%NDof_loc
+
+        ! STORE LOCAL NUMERATION TO RECONSTRUCT THE SOLUTION
+        allocate(nnod_num(local_dof))
+        call CREATE_LOCAL_NODE_NUM(nnod_num, local_dof)
+
+        ! SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        allocate(u_loc(local_dof))
+        allocate(u_glo(global_dof))
+
+        if(mpi_np > 1) then
+
+            allocate(gathered_sizes(mpi_np))
+      
+            call MPI_AllGather(local_dof, 1, MPI_INTEGER, gathered_sizes, 1, & 
+                        MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            
+            allocate(displacements(mpi_np))
+            displacements(1) = 0
+            do i = 2, mpi_np
+                    displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
+            end do
+
+        endif
+
+        ! print *, 'SCATTER SOLUTION'
+        PetscCallA(VecGetArrayF90(petsc_sol, sol_ptr, mpi_ierr))
+        u_loc(1:local_dof) = sol_ptr
+        if(mpi_np == 1) then
+            u_glo = u_loc
+        else
+            call MPI_ALLGATHERV(u_loc, local_dof, MPI_DOUBLE_PRECISION, &
+                        u_glo, gathered_sizes, displacements, MPI_DOUBLE_PRECISION, &
+                        MPI_COMM_WORLD, mpi_ierr)
+        endif
+        deallocate(u_loc)
+
+        ! RECONSTRUCT SOLUTION MATRIX FOR POST-PROCESSING
+        allocate(u(Np, 3*PolyMesh%num_poly))    
+        u = RESHAPE(u_glo, (/Np, 3*PolyMesh%num_poly /))
+        deallocate(u_glo)
+
+        ! print *,'Done with the solution'
+    
+    end subroutine POST_PROCESS
+
     ! Evaluate nodal values of the solution and store them in output.vtk 
     subroutine EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
         
