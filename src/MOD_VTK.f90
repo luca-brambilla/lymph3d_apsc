@@ -379,34 +379,34 @@ module MOD_VTK
         ! write(vtk_filename, '(A,I0,A)') 'MONITORS/sol_tet_', PolyMesh%num_tet, '.vtk'
         vtk_filename_num = 'MONITORS/sol_tet_000000_000000.vtk'
 
-        ! mpi_id
-        if (mpi_id < 10) then            
-          write(vtk_filename_num(23:23),'(i1)') mpi_id                             
-        elseif (mpi_id < 100) then                                              
-          write(vtk_filename_num(22:23),'(i2)') mpi_id                             
-        elseif (mpi_id < 1000) then                                           
-          write(vtk_filename_num(21:23),'(i3)') mpi_id                              
-        elseif (mpi_id < 10000) then                                              
-          write(vtk_filename_num(20:23),'(i4)') mpi_id                             
-        elseif (mpi_id < 100000) then                                            
-          write(vtk_filename_num(19:23),'(i5)') mpi_id                         
-        elseif (mpi_id < 1000000) then
-          write(vtk_filename_num(18:23),'(i6)') mpi_id                            
+        ! num_dt
+        if (num_dt < 10) then            
+          write(vtk_filename_num(23:23),'(i1)') num_dt                             
+        elseif (num_dt < 100) then                                              
+          write(vtk_filename_num(22:23),'(i2)') num_dt                             
+        elseif (num_dt < 1000) then                                           
+          write(vtk_filename_num(21:23),'(i3)') num_dt                              
+        elseif (num_dt < 10000) then                                              
+          write(vtk_filename_num(20:23),'(i4)') num_dt                             
+        elseif (num_dt < 100000) then                                            
+          write(vtk_filename_num(19:23),'(i5)') num_dt                         
+        elseif (num_dt < 1000000) then
+          write(vtk_filename_num(18:23),'(i6)') num_dt                            
         endif
 
         ! timestep
-        if (num_dt < 10) then            
-          write(vtk_filename_num(30:30),'(i1)') num_dt                             
-        elseif (num_dt < 100) then                                              
-          write(vtk_filename_num(29:30),'(i2)') num_dt                             
-        elseif (num_dt < 1000) then                                           
-          write(vtk_filename_num(28:30),'(i3)') num_dt                              
-        elseif (num_dt < 10000) then                                              
-          write(vtk_filename_num(27:30),'(i4)') num_dt                             
-        elseif (num_dt < 100000) then                                            
-          write(vtk_filename_num(26:30),'(i5)') num_dt                         
-        elseif (num_dt < 1000000) then
-          write(vtk_filename_num(25:30),'(i6)') num_dt                            
+        if (mpi_id < 10) then            
+          write(vtk_filename_num(30:30),'(i1)') mpi_id                             
+        elseif (mpi_id < 100) then                                              
+          write(vtk_filename_num(29:30),'(i2)') mpi_id                             
+        elseif (mpi_id < 1000) then                                           
+          write(vtk_filename_num(28:30),'(i3)') mpi_id                              
+        elseif (mpi_id < 10000) then                                              
+          write(vtk_filename_num(27:30),'(i4)') mpi_id                             
+        elseif (mpi_id < 100000) then                                            
+          write(vtk_filename_num(26:30),'(i5)') mpi_id                         
+        elseif (mpi_id < 1000000) then
+          write(vtk_filename_num(25:30),'(i6)') mpi_id                            
         endif
 
 

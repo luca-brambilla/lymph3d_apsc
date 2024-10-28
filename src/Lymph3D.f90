@@ -28,7 +28,7 @@
 !     DEFINITION OF PETSC VARIABLES
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-      Mat :: petsc_stiff, petsc_mass, mat_dg ! stiffness, mass and DG matrices
+      Mat :: petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal ! stiffness, mass and DG matrices, reconstruction matrix
       Vec :: petsc_sol, petsc_rhs ! solution and rhs vectors for the algebraic system
       Vec :: petsc_uex, petsc_modal_coeff_uex ! modal (exact) solution and its coefficients
 
@@ -37,8 +37,8 @@
 
       PetscViewer viewer ! abstract PETSc object for displaying PETSc objects and their data
 
-      KSP :: ksp, ksp2 ! linear system solvers
-      PC :: pc, pc2 ! preconditioners
+      KSP :: ksp, ksp2, ksp3 ! linear system solvers
+      PC :: pc, pc2, pc3 ! preconditioners
 
       logical :: IsPoly
       integer(kind=4) :: local_dof, global_dof
@@ -163,7 +163,7 @@
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
 !     SET PETSC VECTORS AND MATRICES 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-      !!! NOT WORKING WITH PROCESSES
+      !!! NOT WORKING PRINT WITH PROCESSES
       call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
       if (mpi_id .eq. 0) then
             write(*,'(A)') 
@@ -176,6 +176,7 @@
       call SET_PETSC_MATRIX(petsc_stiff, local_dof, global_dof)
       call SET_PETSC_MATRIX(petsc_mass, local_dof, global_dof)
       call SET_PETSC_MATRIX(mat_dg, local_dof, global_dof)
+      call SET_PETSC_MATRIX(petsc_mass_modal, local_dof, global_dof)
 
       call SET_PETSC_VECTOR(petsc_rhs, local_dof, global_dof)
       call SET_PETSC_VECTOR(petsc_sol, local_dof, global_dof)
@@ -192,14 +193,14 @@
 
       print *, 'ASSEMBLE PETSC MATRICES'
 
-      call MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_stiff, petsc_mass, mat_dg)
+      call MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal)
 
-      ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'petsc_stiff.m',viewer,mpi_ierr))
+      ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_stiff.m',viewer,mpi_ierr))
       ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
       ! PetscCallA(MatView(petsc_stiff,viewer,mpi_ierr))
       ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
-      ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mass_matrix.m',viewer,mpi_ierr))
+      ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_mass.m',viewer,mpi_ierr))
       ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
       ! PetscCallA(MatView(petsc_mass,viewer,mpi_ierr))
       ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
@@ -207,6 +208,11 @@
       ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_dg.m',viewer,mpi_ierr))
       ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
       ! PetscCallA(MatView(mat_dg,viewer,mpi_ierr))
+      ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+
+      ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_mass_modal.m',viewer,mpi_ierr))
+      ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
+      ! PetscCallA(MatView(petsc_mass_modal,viewer,mpi_ierr))
       ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>       
@@ -217,7 +223,7 @@
       
       call MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
 
-      ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'rhs_vector',viewer,mpi_ierr))
+      ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_rhs',viewer,mpi_ierr))
       ! PetscCallA(VecView(petsc_rhs,viewer,mpi_ierr))
       ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
@@ -229,6 +235,7 @@
 
       call SOLVER_SETTINGS(petsc_stiff, ksp, pc)
       call SOLVER_SETTINGS(petsc_mass, ksp2, pc2)
+      call SOLVER_SETTINGS(petsc_mass_modal, ksp3, pc3)
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     CALLING SOLVER
@@ -245,13 +252,59 @@
       else
             if(mpi_id == 0) print *, "                   TIME LOOP START                   "
             ! initialization for time problem
-            t = start_time
+            t = 0.0
             num_dt = 1 !!! compute number of iteration if start not t=0?
+            stop_time = SQRT2/4.0 + 9*SQRT2 ! 10 peaks
 
+            if(mpi_id == 0) print *, "Iteration: ", 0, " Time: ", t
+            print *, "Assemble initial conditions"
+
+            !! MODAL OR SOLUTION???
             ! vectors initial conditions
+
+            ! integral
+            ! call MAKE_VECTOR(PolyMesh, petsc_num, global_dof, Np, petsc_u0, ic_displacement)
+            ! call MAKE_VECTOR(PolyMesh, petsc_num, global_dof, Np, petsc_v0, ic_velocity)
+            ! PRINT ?
+            ! compute modal coefficients
+            ! PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
+            ! PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
+            ! PetscCallA(KSPSolve(ksp3, petsc_v0, petsc_tmpv, mpi_ierr))
+            ! PetscCallA(VecCopy(petsc_tmpv, petsc_v0, mpi_ierr))
+
+            ! modal coefficients of initial conditions 
+            call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_u0, ic_displacement)
+            call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_v0, ic_velocity)
+            PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
+            PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
+            PetscCallA(KSPSolve(ksp3, petsc_v0, petsc_tmpv, mpi_ierr))
+            PetscCallA(VecCopy(petsc_tmpv, petsc_v0, mpi_ierr))
+            
+            ! print to file
+            PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_u0',viewer,mpi_ierr))
+            PetscCallA(VecView(petsc_u0,viewer,mpi_ierr))
+            PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+            PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_v0',viewer,mpi_ierr))
+            PetscCallA(VecView(petsc_v0,viewer,mpi_ierr))
+            PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+            
+            ! compute solution with modal coeff
+            ! PetscCallA(MatMult(petsc_mass_modal, petsc_u0, petsc_tmpv, mpi_ierr))
+            ! PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
+            ! PetscCallA(MatMult(petsc_mass_modal, petsc_v0, petsc_tmpv, mpi_ierr))
+            ! PetscCallA(VecCopy(petsc_tmpv, petsc_v0, mpi_ierr))
+
+            ! print to file
+            ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_u0_mod',viewer,mpi_ierr))
+            ! PetscCallA(VecView(petsc_u0,viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_v0_mod',viewer,mpi_ierr))
+            ! PetscCallA(VecView(petsc_v0,viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+
             ! petsc_u0 = 
             ! petsc_v0 = 
-
+            if(mpi_id == 0) print *, ""
             if(mpi_id == 0) print *, "Iteration: ", num_dt, " Time: ", t
 
             ! Mu_1 = (M-dt^2/2*A)u_0 + dt*M*v_0 + dt^2/2 * f_0
@@ -288,12 +341,14 @@
             ! copy old solution
             PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
 
+            num_dt = num_dt + 1
+            t = t + time_step
+
             ! loop
             ! Mu_{n+1) = F_n = (2M-dt^2*A)u_n - Mu_{n-1} + dt^2 * f_n
-            do while (t < stop_time)
-                  num_dt = num_dt + 1
-                  t = t + time_step
-                  
+            do while (t <= stop_time)
+
+                  if(mpi_id == 0) print *, ""
                   if(mpi_id == 0) print *, "Iteration: ", num_dt, " Time: ", t
 
                   ! petsc_tmpv = dt^2 A u_n
@@ -327,6 +382,9 @@
 
                   ! copy old solution
                   PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
+
+                  num_dt = num_dt + 1
+                  t = t + time_step
             end do
 
       end if
@@ -401,16 +459,18 @@
       call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
       print *, 'Computing modal coefficients...'
-      call COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex, t)
-
+      call COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex)
       ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'petsc_modal_coeff_uex',viewer,mpi_ierr))
       ! PetscCallA(VecView(petsc_modal_coeff_uex,viewer,mpi_ierr))
       ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
       
       print *, 'Calling solver for modal solution...'
-      PetscCallA(KSPSolve(ksp2, petsc_modal_coeff_uex, petsc_uex, mpi_ierr))
+      PetscCallA(KSPSolve(ksp3, petsc_modal_coeff_uex, petsc_uex, mpi_ierr))
 
-      PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'petsc_uex',viewer,mpi_ierr))
+      ! check time dependence
+      if (IsTime_dependent .eqv. .true.) PetscCallA(VecScale(petsc_uex, 1.0/time_function(t), mpi_ierr))
+
+      PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_uex',viewer,mpi_ierr))
       PetscCallA(VecView(petsc_uex,viewer,mpi_ierr))
       PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
       
@@ -422,6 +482,7 @@
 
       PetscCallA(KSPDestroy(ksp, mpi_ierr))
       PetscCallA(KSPDestroy(ksp2, mpi_ierr))
+      PetscCallA(KSPDestroy(ksp3, mpi_ierr))
       PetscCallA(VecDestroy(petsc_rhs, mpi_ierr))
       PetscCallA(VecDestroy(petsc_modal_coeff_uex, mpi_ierr))
 
@@ -436,7 +497,8 @@
       
       if(mpi_id == 0) print *,'Computing the errors...'
       
-      call COMPUTE_ERROR_L2(petsc_mass, petsc_sol, petsc_uex, global_dof, err_L2_mpi, local_dof)
+      !! WHICH MASS MATRIX?
+      call COMPUTE_ERROR_L2(petsc_mass_modal, petsc_sol, petsc_uex, global_dof, err_L2_mpi, local_dof)
       call COMPUTE_ERROR_DG(mat_dg, petsc_sol, petsc_uex, global_dof, err_DG_mpi, local_dof)
 
       call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -480,6 +542,7 @@
       PetscCallA(VecDestroy(petsc_sol,mpi_ierr))
       PetscCallA(VecDestroy(petsc_uex,mpi_ierr))
       !!! DEALLOCATE NEW OBJECTS
+      PetscCallA(MatDestroy(petsc_mass_modal, mpi_ierr))
       PetscCallA(VecDestroy(petsc_f, mpi_ierr))
       PetscCallA(VecDestroy(petsc_tmpv,mpi_ierr))
       PetscCallA(VecDestroy(petsc_u0,mpi_ierr))

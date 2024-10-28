@@ -6,13 +6,14 @@ module problem_data_and_properties
 
     !> @brief time function to be multiplied to space function to have h(x,t)=f(x)*g(t)
     function time_function(time)result(r)
+        
         implicit none
         real(kind=8) :: r
         real(kind=8) :: time
 
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0), sqrt2 = sqrt(2.)
+        real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2 = sqrt(2.)
 
-        r = sin(sqrt2*pi*time)
+        r = sin(SQRT2*PI*time)
 
     end function time_function
 
@@ -25,16 +26,16 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: p
         real(kind=8) :: alpha, theta, c
         real(kind=8) :: lambda, mu
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
+        real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
 
         call set_properties(alpha, theta, c)
 
         ! r(1) = 0
         ! r(2) = 0
         ! r(3) = - 9.8 * 2400
-        r(1) = 3*pi**2*cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(lambda + 2*mu)
-        r(2) = 3*pi**2*cos(pi*p(2))*sin(pi*p(1))*sin(pi*p(3))*(lambda + 2*mu)
-        r(3) = 3*pi**2*cos(pi*p(3))*sin(pi*p(1))*sin(pi*p(2))*(lambda + 2*mu)
+        r(1) = 3*PI**2*cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(lambda + 2*mu)
+        r(2) = 3*PI**2*cos(PI*p(2))*sin(PI*p(1))*sin(PI*p(3))*(lambda + 2*mu)
+        r(3) = 3*PI**2*cos(PI*p(3))*sin(PI*p(1))*sin(PI*p(2))*(lambda + 2*mu)
 
 
     end function f
@@ -50,7 +51,7 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: p !> physical coordinates vector
         real(kind=8) :: alpha, theta, c !> 
         real(kind=8) :: lambda, mu      !> elastic parameters 
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0), sqrt2 = sqrt(2.)
+        real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
 
         call set_properties(alpha, theta, c)
 
@@ -58,9 +59,9 @@ module problem_data_and_properties
         ! r(2) = 0
         ! r(3) = - 9.8 * 2400
         
-        r(1) = (-2.0*rho + 3.0*(lambda+2.0*mu))*pi**2 * cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))
-        r(2) = (-2.0*rho + 3.0*(lambda+2.0*mu))*pi**2 * sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-        r(3) = (-2.0*rho + 3.0*(lambda+2.0*mu))*pi**2 * sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+        r(1) = (-2.0*rho + 3.0*(lambda+2.0*mu))*PI**2 * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
+        r(2) = (-2.0*rho + 3.0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+        r(3) = (-2.0*rho + 3.0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
 
     end function f_time
@@ -71,24 +72,24 @@ module problem_data_and_properties
         integer(kind=4) :: tag
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
+        real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
 
         ! r = 0.0
 
         if(tag==1) then
-            r(1) = cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
-            r(2) = sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-            r(3) = sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
         if(tag==2) then
-            r(1) = cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
-            r(2) = sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-            r(3) = sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
         if(tag==3) then
-            r(1) = cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
-            r(2) = sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-            r(3) = sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
 
     end function gd
@@ -101,24 +102,24 @@ module problem_data_and_properties
         integer(kind=4) :: tag
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0), sqrt2 = sqrt(2.)
+        real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2 = sqrt(2.)
 
         ! r = 0.0
 
         if(tag==1) then
-            r(1) = sin(sqrt2*pi*time) * cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
-            r(2) = sin(sqrt2*pi*time) * sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-            r(3) = sin(sqrt2*pi*time) * sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
         if(tag==2) then
-            r(1) = sin(sqrt2*pi*time) * cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
-            r(2) = sin(sqrt2*pi*time) * sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-            r(3) = sin(sqrt2*pi*time) * sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
         if(tag==3) then
-            r(1) = sin(sqrt2*pi*time) * cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
-            r(2) = sin(sqrt2*pi*time) * sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-            r(3) = sin(sqrt2*pi*time) * sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
 
     end function gd_time
@@ -133,7 +134,7 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: p, normal
         real(kind=8), dimension(3,3) :: stress_tensor
         real(kind=8) :: lambda, mu
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0) 
+        real(kind=8), parameter :: PI = 4.d0*datan(1.d0) 
         integer(kind=4) :: i, j
 
         ! r(1) = 0
@@ -141,36 +142,36 @@ module problem_data_and_properties
         ! r(3) = - 23520
 
         if(tag==1) then
-            stress_tensor(1,1) = -pi*sin(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(3*lambda + 2*mu)
-            stress_tensor(2,2) = -pi*sin(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(3*lambda + 2*mu)
-            stress_tensor(3,3) = -pi*sin(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(3*lambda + 2*mu)
-            stress_tensor(1,2) = 2*mu*pi*cos(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
+            stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(1,2) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             stress_tensor(2,1) = stress_tensor(1,2)
-            stress_tensor(1,3) = 2*mu*pi*cos(pi*p(1))*cos(pi*p(3))*sin(pi*p(2))
+            stress_tensor(1,3) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(3))*sin(PI*p(2))
             stress_tensor(3,1) = stress_tensor(1,3)
-            stress_tensor(2,3) = 2*mu*pi*cos(pi*p(2))*cos(pi*p(3))*sin(pi*p(1))
+            stress_tensor(2,3) = 2*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
             stress_tensor(3,2) = stress_tensor(2,3)
         endif
         if(tag==2) then
-            stress_tensor(1,1) = -pi*sin(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(3*lambda + 2*mu)
-            stress_tensor(2,2) = -pi*sin(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(3*lambda + 2*mu)
-            stress_tensor(3,3) = -pi*sin(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(3*lambda + 2*mu)
-            stress_tensor(1,2) = 2*mu*pi*cos(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
+            stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(1,2) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             stress_tensor(2,1) = stress_tensor(1,2)
-            stress_tensor(1,3) = 2*mu*pi*cos(pi*p(1))*cos(pi*p(3))*sin(pi*p(2))
+            stress_tensor(1,3) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(3))*sin(PI*p(2))
             stress_tensor(3,1) = stress_tensor(1,3)
-            stress_tensor(2,3) = 2*mu*pi*cos(pi*p(2))*cos(pi*p(3))*sin(pi*p(1))
+            stress_tensor(2,3) = 2*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
             stress_tensor(3,2) = stress_tensor(2,3)
         endif
         if(tag==3) then
-            stress_tensor(1,1) = -pi*sin(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(3*lambda + 2*mu)
-            stress_tensor(2,2) = -pi*sin(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(3*lambda + 2*mu)
-            stress_tensor(3,3) = -pi*sin(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))*(3*lambda + 2*mu)
-            stress_tensor(1,2) = 2*mu*pi*cos(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
+            stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(1,2) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             stress_tensor(2,1) = stress_tensor(1,2)
-            stress_tensor(1,3) = 2*mu*pi*cos(pi*p(1))*cos(pi*p(3))*sin(pi*p(2))
+            stress_tensor(1,3) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(3))*sin(PI*p(2))
             stress_tensor(3,1) = stress_tensor(1,3)
-            stress_tensor(2,3) = 2*mu*pi*cos(pi*p(2))*cos(pi*p(3))*sin(pi*p(1))
+            stress_tensor(2,3) = 2*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
             stress_tensor(3,2) = stress_tensor(2,3)
         endif
 
@@ -188,11 +189,11 @@ module problem_data_and_properties
 
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0)
+        real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
         
-        r(1) = cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
-        r(2) = sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-        r(3) = sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+        r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+        r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+        r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
     end function uex
     
@@ -203,43 +204,38 @@ module problem_data_and_properties
 
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0), sqrt2 = sqrt(2.)
+        real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2 = sqrt(2.)
 
-        r(1) = sin(sqrt2*pi*time) * cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3)) 
-        r(2) = sin(sqrt2*pi*time) * sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-        r(3) = sin(sqrt2*pi*time) * sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+        r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+        r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+        r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
     end function uex_time
 
     !> @brief Initial condition for displacement
-    function u0_time(p, time)result(r)
+    function ic_displacement(p)result(r)
         
-        real(kind=8) :: time
-
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0), sqrt2 = sqrt(2.)
+        
+        r(1) = 0.0 * p(1)
+        r(2) = 0.0 * p(2)
+        r(3) = 0.0 * p(3)
 
-        r(1) = 0.0 
-        r(2) = 0.0
-        r(3) = 0.0
-
-    end function u0_time
+    end function ic_displacement
 
     !> @brief Initial condition for velocity
-    function v0_time(p, time)result(r)
+    function ic_velocity(p)result(r)
         
-        real(kind=8) :: time
-
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: pi = 4.d0*datan(1.d0), sqrt2 = sqrt(2.)
+        real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2 = sqrt(2.)
 
-        r(1) = sqrt2*pi * cos(pi*p(1))*sin(pi*p(2))*sin(pi*p(3))
-        r(2) = sqrt2*pi * sin(pi*p(1))*cos(pi*p(2))*sin(pi*p(3))
-        r(3) = sqrt2*pi * sin(pi*p(1))*sin(pi*p(2))*cos(pi*p(3))
+        r(1) = SQRT2*PI * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
+        r(2) = SQRT2*PI * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+        r(3) = SQRT2*PI * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
-    end function v0_time
+    end function ic_velocity
 
     !> @brief Set the properties of the numerical method
     subroutine set_properties(alpha, theta, c)
@@ -248,7 +244,7 @@ module problem_data_and_properties
 
         real(kind=8) :: alpha, theta, c
         
-        alpha = 10 ! penalty coefficient (which appears in the definition of the penalization function)
+        alpha = 15 ! penalty coefficient (which appears in the definition of the penalization function)
         theta = - 1 ! IP method (theta = -1 ---> SIP, theta = 0 ---> IIP, theta = 1 ---> NIP)
         c = 0 ! coefficient of the reaction term
         

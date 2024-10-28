@@ -1,4 +1,4 @@
-subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_stiff, petsc_mass, mat_dg)
+subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal)
 
 #include<petsc/finclude/petscksp.h>
 
@@ -17,7 +17,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
 
     ! petsc_stiff, petsc_mass and mat_dg are provided by SET_PETSC_MATRIX.f90
 
-    Mat :: petsc_stiff, petsc_mass, mat_dg
+    Mat :: petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal
     PetscScalar :: val(1), val1(1), val2(1), val3(1), val4(1)
     PetscInt :: irow(1), jcol(1), irow2(1), jcol2(1), irow3(1), jcol3(1)
 
@@ -48,7 +48,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     real(kind=8), dimension(3,3) :: Jinv
     real(kind=8), dimension(4) :: x, y, z
 
-    real(kind=8) :: lambda, mu
+    real(kind=8) :: lambda, mu, rho !! DENSITY USED FOR DYNAMICS
     integer(kind=4) :: mat_id
 
     integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, ipoly_loc, ipoly_glob, ipoly2_loc, ipoly2_glob
@@ -106,6 +106,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
         M_loc = 0.0
 
         mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
+        rho = PolyData%prop_mat(mat_id,1) !! DENSITY USED FOR DYNAMICS
         lambda = PolyData%prop_mat(mat_id,2)
         mu = PolyData%prop_mat(mat_id,3)
 
@@ -178,7 +179,9 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
                     jcol(1) = petsc_num((i-1)*Np*Npoly + beg+n-1) 
 
                     if (val(1) .ne. 0.0) then
-                        ! set value val to the matrix petsc_mass in the irow-th row and jcol-th column
+                        ! set value val to the matrix petsc_mass and petsc_mass_modal in the irow-th row and jcol-th column
+                        PetscCall(MatSetValues(petsc_mass_modal, 1, irow, 1, jcol, val, ADD_VALUES, mpi_ierr))
+                        val(1) = val(1)*rho
                         PetscCall(MatSetValues(petsc_mass, 1, irow, 1, jcol, val, ADD_VALUES, mpi_ierr))
                     endif
                     
@@ -397,6 +400,10 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     ! Assembly of mass matrix mat_dg
     PetscCall(MatAssemblyBegin(mat_dg, MAT_FINAL_ASSEMBLY, mpi_ierr))
     PetscCall(MatAssemblyEnd(mat_dg, MAT_FINAL_ASSEMBLY, mpi_ierr))
+
+    ! Assembly of mass matrix petsc_mass_modal
+    PetscCall(MatAssemblyBegin(petsc_mass_modal, MAT_FINAL_ASSEMBLY, mpi_ierr))
+    PetscCall(MatAssemblyEnd(petsc_mass_modal, MAT_FINAL_ASSEMBLY, mpi_ierr))
 
     ! print *, 'Reaction coefficient c: ', c
 

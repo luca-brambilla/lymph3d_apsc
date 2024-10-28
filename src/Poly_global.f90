@@ -53,7 +53,7 @@
      logical :: IsTime_dependent
      
      !parameters
-     real(kind=8), parameter :: pi = 4.d0*datan(1.d0)  !< p-greek
+     real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2=sqrt(2.0)  !< p-greek
      
      end module Poly_global
      

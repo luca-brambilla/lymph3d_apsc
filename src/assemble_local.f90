@@ -104,8 +104,8 @@ subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rh
     ! nq3 is provided by the subroutine quadrature in basis_function.f90
     ! Fk and Jdet are provided by the subroutine jacobians in Poly_ref_mappings.f90
 
-    ! density is 0 in static case
-    real(kind=8), intent(in), optional :: rho
+    ! density is 0.0 in static case
+    real(kind=8), intent(in) :: rho
 
     integer(kind=4), intent(in) :: nq3, Np
     real(kind=8), intent(in) :: Jdet
@@ -137,7 +137,8 @@ subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rh
             end do
 
             ! f_time is provided by problem_data_and_properties.f90
-            ! considers correct density if dynamic problem, otherwise rho=0
+            !! considers correct density if dynamic problem, otherwise rho=0.0
+            ! forc_term = f(lambda,mu,points)
             forc_term = f_time(lambda,mu,points,rho)
 
             do i=1,3
@@ -456,5 +457,59 @@ subroutine MAKE_STIFF_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2,
     endif
 
 end subroutine MAKE_STIFF_FACE
+
+!> @brief Assemble the local vector term vec_loc approximating the integral on the tetrahedron
+subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_analytic)
+
+    ! phi is provided by the subroutine basis in basis_function.f90
+    ! weitet3 is provided by the subroutine mapping_quadrature_3D in Poly_ref_mappings.f90
+    ! nq3 is provided by the subroutine quadrature in basis_function.f90
+    ! Fk and Jdet are provided by the subroutine jacobians in Poly_ref_mappings.f90
+
+    !! PASS FUNCTION AS ARGUMENT
+    interface
+        function f_analytic(point) result(res)
+            real(kind=8), dimension(3) :: point, res
+        end function f_analytic
+    end interface
+
+    integer(kind=4), intent(in) :: nq3, Np
+    real(kind=8), intent(in) :: Jdet
+    real(kind=8), dimension(4,nq3), intent(in) :: nodtet3
+    real(kind=8), dimension(nq3), intent(in) :: weitet3
+    real(kind=8), dimension(Np,nq3), intent(in) :: phi
+    real(kind=8), dimension(3,4), intent(in) :: Fk
+    real(kind=8), dimension(3,Np), intent(out) :: vec_loc
+
+    integer(kind=4) :: q, i, j, k, m
+    real(kind=8), dimension(3) :: points, eval
+
+    vec_loc = 0.0
+
+    ! loop on 3D quadrature nodes
+    do q = 1,nq3
+
+        do m=1,Np
+
+            ! map the quadrature nodes from the reference tetrahedron to the physical tetrahedron 
+            do j=1,3
+                points(j)=0.0
+                do k=1,4
+                    points(j) = points(j) + Fk(j,k)*nodtet3(k,q)
+                end do
+            end do
+
+            ! f_time is provided by problem_data_and_properties.f90
+            eval = f_analytic(points)
+
+            do i=1,3
+                vec_loc(i,m) = vec_loc(i,m) + abs(Jdet)*weitet3(q)*eval(i)*phi(m,q)
+            enddo
+        
+        end do
+
+    end do
+
+end subroutine MAKE_VECTOR_TET
 
 end module assemble_local

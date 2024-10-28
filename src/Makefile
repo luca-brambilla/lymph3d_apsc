@@ -24,9 +24,9 @@ all: $(OBJS) $(EXEC)
 
 $(EXEC): $(OBJS)
 	$(COMP) -o $@  $(OBJS) $(PETSC_LD_FLAGS) $(COMP_LD_FLAGS) $(METIS_LD_FLAGS) 
-	rm -f *.o *.mod
+#rm -f *.o *.mod
 
-$(OBJS):%.o: %.f90 assemble_local.o post_processing.o SET_PETSC_SYSTEM.o MOD_VTK.o Poly_ref_mappings.o basis_function.o Poly_setup_MPI.o Poly_mesh.o Poly_data.o Poly_global.o vet_mat_operations.o problem_data_and_properties.o
+$(OBJS):%.o: %.f90 assemble_local.o post_processing.o SET_PETSC_SYSTEM.o MOD_VTK.o Poly_ref_mappings.o basis_function.o Poly_setup_MPI.o Poly_mesh.o Poly_data.o Poly_global.o vet_mat_operations.o problem_data_and_properties.o MOD_MPI.o
 	$(COMP) $(PETSC_FC_FLAGS) $(COMP_FC_FLAGS) $(METIS_FC_FLAGS) $< -o $@
 
 .PHONY: clean

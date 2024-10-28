@@ -15,6 +15,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
 
     implicit none
     
+    real(kind=8) :: present = 0.0
     ! logical, intent(in) :: IsTime_dependent
     real(kind=8), intent(in), optional :: time
 
@@ -51,7 +52,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
     real(kind=8), dimension(3,3) :: Jinv
     real(kind=8), dimension(4) :: x, y, z
 
-    real(kind=8) :: lambda, mu, rho !!! density not used if not dynamic case
+    real(kind=8) :: lambda, mu, rho !! DENSITY USED FOR DYNAMICS
     integer(kind=4) :: mat_id
 
     integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, ipoly_glob, ipoly_loc, ipoly2_glob, ipoly2_loc
@@ -103,7 +104,12 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
     allocate(grad_b(3,Np,nq2,2))
 
     ! assign 0 to density for static case
-    rho = 0.0
+    if (IsTime_dependent .eqv. .true.) then
+        print *,'RHS with additional dynamic component'
+        present = 1.0
+    else
+        print *,'RHS with only static component'
+    endif
 
     ! loop on the tetrahedra
     do ie_loc = 1, PolyMesh%num_elem_loc
@@ -113,11 +119,9 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
 
         mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
 
-        !!! check if there is a better way than if in loop over elements
+        !!! check if there is a better way than this in loop over elements
         ! take correct density only for dynamic case 
-        if (IsTime_dependent .eqv. .true.) then
-            rho = PolyData%prop_mat(mat_id,1)
-        endif
+        rho = PolyData%prop_mat(mat_id,1) * present !! present = 1.0 if DYNAMIC PROBLEM, 0.0 otherwise
         lambda = PolyData%prop_mat(mat_id,2)
         mu = PolyData%prop_mat(mat_id,3)
 

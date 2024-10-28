@@ -1,4 +1,4 @@
-subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex)
+subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff, f_analytic)
      
 #include<petsc/finclude/petscksp.h>
 
@@ -12,8 +12,15 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
     use SET_PETSC_SYSTEM
         
     implicit none
-        
-    Vec :: petsc_modal_coeff_uex
+    
+    !! PASS FUNCTION AS ARGUMENT
+    interface
+        function f_analytic(point) result(res)
+            real(kind=8), dimension(3) :: point, res
+        end function f_analytic
+    end interface
+
+    Vec :: petsc_modal_coeff
     PetscScalar :: val(1)
     PetscInt :: irow(1)
 
@@ -32,9 +39,9 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
     real(kind=8), dimension(3) :: points
     real(kind=8), dimension(:,:), allocatable :: phi
     real(kind=8), dimension(:,:,:), allocatable :: dphi
-    real(kind=8), dimension(:,:), allocatable :: modal_coeff_uex
+    real(kind=8), dimension(:,:), allocatable :: modal_coeff
     integer(kind=4) :: petsc_num(global_dof)
-    real(kind=8), dimension(3) :: exact_sol
+    real(kind=8), dimension(3) :: eval
 
     integer(kind=4) :: q, ii, jj
 
@@ -44,7 +51,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
     p = PolyMesh%Elem_loc(1)%Degree
     Npoly = PolyMesh%num_poly
 
-    call SET_PETSC_VECTOR(petsc_modal_coeff_uex, local_dof, global_dof)
+    !call SET_PETSC_VECTOR(petsc_modal_coeff, local_dof, global_dof)
 
     ! Computation of Gauss-Legendre quadrature nodes and weights over the reference square and cube
     ! (see basis_functions.f90)
@@ -62,12 +69,12 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
 
     allocate(phi(Np,nq3))
     allocate(dphi(3,Np,nq3))
-    allocate(modal_coeff_uex(3,Np))
+    allocate(modal_coeff(3,Np))
 
     ! loop on the tetrahedra
     do ie_loc = 1, PolyMesh%num_elem_loc
 
-        modal_coeff_uex = 0.0
+        modal_coeff = 0.0
 
         ! computation of the coordinates of the tetrahedron
         do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
@@ -109,10 +116,10 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
                     enddo
                 enddo
                 
-                exact_sol = uex(points)
+                eval = f_analytic(points)
 
                 do i=1,3
-                    modal_coeff_uex(i,m) = modal_coeff_uex(i,m) + abs(Jdet)*weitet3(q)*exact_sol(i)*phi(m,q)
+                    modal_coeff(i,m) = modal_coeff(i,m) + abs(Jdet)*weitet3(q)*eval(i)*phi(m,q)
                 enddo
                 
             end do
@@ -124,11 +131,11 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
         do i=1,3
             do m=1,Np
 
-            val(1) = modal_coeff_uex(i,m)
+            val(1) = modal_coeff(i,m)
             irow(1) = petsc_num((i-1)*Np*Npoly + beg+m-1)
 
             if (val(1) .ne. 0.0) then
-                PetscCall(VecSetValues(petsc_modal_coeff_uex, 1, irow, val, ADD_VALUES, mpi_ierr))
+                PetscCall(VecSetValues(petsc_modal_coeff, 1, irow, val, ADD_VALUES, mpi_ierr))
             endif
 
             enddo
@@ -138,8 +145,8 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    PetscCall(VecAssemblyBegin(petsc_modal_coeff_uex,mpi_ierr))
-    PetscCall(VecAssemblyEnd(petsc_modal_coeff_uex,mpi_ierr))
+    PetscCall(VecAssemblyBegin(petsc_modal_coeff,mpi_ierr))
+    PetscCall(VecAssemblyEnd(petsc_modal_coeff,mpi_ierr))
 
     print *, 'Done with computing modal coefficients'
 
@@ -149,4 +156,4 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
     deallocate(nodtet3)
     deallocate(weitet3)
 
-end subroutine COMPUTE_MODAL_COEFFICIENTS
+end subroutine COMPUTE_MODAL_COEFFICIENTS_GEN
