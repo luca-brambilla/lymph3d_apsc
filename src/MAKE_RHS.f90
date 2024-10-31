@@ -1,4 +1,4 @@
-subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, time)
+subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
 
 #include<petsc/finclude/petscksp.h>
     
@@ -16,9 +16,6 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
     implicit none
     
     real(kind=8) :: present = 0.0
-    ! logical, intent(in) :: IsTime_dependent
-    real(kind=8), intent(in), optional :: time
-
     ! petsc_rhs is provided by SET_PETSC_VECTOR.f90
 
     Vec :: petsc_rhs
@@ -55,7 +52,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
     real(kind=8) :: lambda, mu, rho !! DENSITY USED FOR DYNAMICS
     integer(kind=4) :: mat_id
 
-    integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, ipoly_glob, ipoly_loc, ipoly2_glob, ipoly2_loc
+    integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, ipoly_loc, ipoly_glob, ipoly2_loc, ipoly2_glob
     integer(kind=4) :: n_tet_in_poly, iface_poly
     integer(kind=4) :: Npoly
     integer(kind=4) :: i, j, m, n
@@ -63,7 +60,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
 
     integer(kind=4) :: e, E1, E2
     integer(kind=4), dimension(4) :: face_flag
-    real(kind=8),dimension(3) :: nn
+    real(kind=8), dimension(3) :: nn
     integer(kind=4) :: tag
 
     real(kind=8), dimension(3,Np) :: rhs_tet_loc
@@ -93,7 +90,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
     call mapping_quadrature_2D(nod2, wei2, nq2, nodtria2, weitria2)
 
     ! list of the degrees of monomials of the Np basis functions up to order p (see basis_functions.f90)
-    allocate (blist(Np,3))
+    allocate(blist(Np,3))
     call basis_list(blist, p, Np)
 
     print *,'Assembling rhs...'
@@ -157,10 +154,10 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
         ! computation of the rhs term on the volume rhs_tet_loc (see assemble_local.f90)
         call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
 
-        ! this allows to assemble the local matrix correctly into the global vector
-        beg=(ipoly_glob-1)*Np+1
+        ! this allows to assemble the local vector correctly into the global vector
+        beg = (ipoly_glob-1)*Np + 1
         
-        ! insert the values of ths_tet_loc in the entries of the global rhs vector
+        ! insert the values of rhs_tet_loc in the entries of the global rhs vector
         do i=1,3
             do m=1,Np
 
@@ -175,12 +172,12 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
             enddo
         enddo
         
-        E1=ie_loc
+        E1 = ie_loc
 
         ! begin loop on the faces of the tetrahedron E1
         do e=1,PolyMesh%Elem_loc(E1)%num_faces
 
-            face_flag(e) = 0;
+            face_flag(e) = 0
 
             ! initialization of the face rhs term rhs_face_bd_loc
             rhs_face_bd_loc = 0.0
@@ -192,7 +189,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
             ! if e is not a boundary face, then find the polyhedron in which E2 is contained
             if (E2 /= -1 .and. E2 /= -2) then
 
-                ipoly2_glob = PolyMesh%elem_in_poly(E2);
+                ipoly2_glob = PolyMesh%elem_in_poly(E2)
 
                 ! see subroutine local_search in Poly_global.f90
                 call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
@@ -201,9 +198,10 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
 
             endif
 
+            ! if e is not a boundary face, then check if E1 and E2 belong to the same polyhedron
             if (E2 /= -1 .and. E2 /= -2) then
                 if (ipoly_glob == ipoly2_glob) then
-                    face_flag(e)=1;
+                    face_flag(e) = 1
                 endif
             end if
         
@@ -220,7 +218,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
                 ! so that b_box and hk can be easily retrieved
                 ! In both cases, compute the basis functions on the faces 
                 ! and the local matrices on the faces
-                if (ipoly2_loc == 0) then 
+                if (ipoly2_loc==0) then 
                     
                     n_tet_in_poly=PolyMesh%Poly(ipoly_loc)%num_tet_in_poly
 
@@ -235,7 +233,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
                     ! evaluation of the basis functions for every face of two neighbouring tetrahedra E1 and E2 at the 2D quadrature nodes
                     ! contained respectively in b_box1 and b_box2 (see basis_function.f90)
                     call basis_boundary(phi_b,grad_b,e, E2, PolyMesh%Poly(ipoly_loc)%b_box,&
-                                        PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist,Np, Fk, node_maps, nodtria2, nq2)
+                                        PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist, Np, Fk, node_maps, nodtria2, nq2)
 
                     call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly),&
                                         nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
@@ -244,19 +242,19 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
 
                     if (E2 /= -1 .and. E2 /= -2) then
 
-                        call basis_boundary(phi_b,grad_b,e, E2, PolyMesh%Poly(ipoly_loc)%b_box,&
-                                            PolyMesh%Poly(ipoly2_loc)%b_box, blist, Np, Fk, node_maps, nodtria2, nq2)
+                        call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
+                                            PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
-                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,&
-                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
+                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,nn, &
+                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
 
                     else
 
-                        call basis_boundary(phi_b,grad_b,e, E2, PolyMesh%Poly(ipoly_loc)%b_box,&
-                                            PolyMesh%Poly(1)%b_box, blist, Np, Fk, node_maps, nodtria2, nq2)
+                        call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
+                                            PolyMesh%Poly(1)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
-                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,&
-                                            nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
+                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,nn, &
+                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
 
                     endif
 
@@ -281,8 +279,9 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, ti
                     enddo
 
                 endif
-            endif
 
+            endif
+        
         enddo
     enddo
  

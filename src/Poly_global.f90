@@ -15,161 +15,225 @@
 !
 !    You should have received a copy of the GNU Affero General Public License
 !    along with PolyWAVE.  If not, see <http://www.gnu.org/licenses/>.
- 
-     module Poly_global
 
-     implicit none 
-     
-     !header file names
-     character(len = 14) :: head_file = 'Poly.input'
-     character(len = 75) :: grid_file, mate_file 
-     character(len = 70) :: folder_mpi, folder_monitors, folder_restart
+!> @brief Poly_global - Setup variables.
+module Poly_global
 
-     !time discretization paramters
-     real(kind=8)        ::  time_step, start_time, stop_time, time_restart
-     integer(kind=4)     ::  num_dt_mon, num_dt_restart
-     
-     !dampung type: 1) Q frequency proportional/ 2) Q frequency constant 
-     integer(kind=4) :: damping_type
-     
-     !option for output
-     integer(kind=4), dimension(6) :: opt_out_var
-                   
-     !Restart and Debug
-     logical :: Is_Restart, Is_Debug 
+    implicit none 
+    
+    ! header file names
+    !> Name of the header file for simulation options
+    character(len = 14) :: head_file = 'Poly.input'
+    !> Name of the mesh file
+    character(len = 75) :: grid_file
+    !> Name of the file with materials, polynomial degrees, boundary conditions
+    character(len = 75) :: mate_file
+    !> Name of the folder where to save MPI files
+    character(len = 70) :: folder_mpi
+    !> Name of the folder where to save solutions !!
+    character(len = 70) :: folder_monitors
+    !> Name of the folder where to read the restart !!
+    character(len = 70) :: folder_restart
 
-     !option for output file list 
-     real(kind=8)    :: depth_search_mon_lst 
-     logical         :: IS_mon_lst          
-                                  
-     !measuring computational time
-     integer(kind=4) :: time_hour, time_min, time_sec
-     real(kind=8)    :: start, finish
-     
-     !file found 
-     logical :: IS_filefound  
-     
-     !time dependence
-     logical :: IsTime_dependent
+    !time discretization paramters
+    !> timestep for time integration
+    real(kind=8)        :: time_step
+    !> initial time for time integration
+    real(kind=8)        :: start_time
+    !> stop time for time integration
+    real(kind=8)        :: stop_time
+    !> time for restart the simulation !!
+    real(kind=8)        :: time_restart
+    !> number of timestep to skip to save solution !!
+    integer(kind=4)     :: num_dt_mon
+    !> number of timestep for restart !!
+    integer(kind=4)     :: num_dt_restart
+    
+    !dampung type: 1) Q frequency proportional/ 2) Q frequency constant
+    !> damping type
+    integer(kind=4) :: damping_type
+    
+    !option for output
+    !> output variable !!
+    integer(kind=4), dimension(6) :: opt_out_var
 
-     ! save outputs
-     logical :: IsSave_output
-     
-     !parameters
-     real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2=sqrt(2.0)  !< p-greek
-     
-     end module Poly_global
+    !Restart and Debug
+    !> logical for restart !!
+    logical :: Is_Restart
+    !> logical for debug !!
+    logical :: Is_Debug
+
+    !option for output file list
+    !> ?!!
+    real(kind=8)    :: depth_search_mon_lst
+    !> ?!!
+    logical         :: IS_mon_lst
+                                
+    !measuring computational time
+    !> wall time hours
+    integer(kind=4) :: time_hour
+    !> wall time start
+    integer(kind=4) :: time_min
+    !> wall time seconds
+    integer(kind=4) :: time_sec
+    !> time of the beginning of simulation
+    real(kind=8)    :: start
+    !> time of end of simulation
+    real(kind=8)    :: finish
+    
+    !file found 
+    !> logical variable to identify if file was found
+    logical :: IS_filefound
+    
+    !time dependence
+    !> logical variable for time dependent problems
+    logical :: IsTime_dependent
+
+    ! save outputs
+    !>  logical variable to save outputs
+    logical :: IsSave_output
+    
+    !parameters
+    !> parameter for @f$ \pi @f$
+    real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
+    !> parameter for @f$ \sqrt{2} @f$
+    real(kind=8), parameter :: SQRT2=sqrt(2.0)
+    
+end module Poly_global
      
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    EXIT CODES 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-     module Poly_exit_codes
+!> @brief Exit codes !! CHECK
+module Poly_exit_codes
 
-     implicit none
+    implicit none
 
-     integer, parameter :: EXIT_NORMAL         = 0
-     integer, parameter :: EXIT_CFL            = 1
-     integer, parameter :: EXIT_INSTAB         = 2
-     integer, parameter :: EXIT_ANELASTIC      = 3
-     integer, parameter :: EXIT_SETUP          = 4
-     integer, parameter :: EXIT_SINGULARMTX    = 5
-     integer, parameter :: EXIT_SURF_NOTFOUND  = 6
-     integer, parameter :: EXIT_ENERGY_ERROR   = 7
-     integer, parameter :: EXIT_SYNTAX_ERROR   = 8
-     integer, parameter :: EXIT_MISSING_FILE   = 9
-     integer, parameter :: EXIT_ROOT           = 10
-     integer, parameter :: EXIT_ELEM_ORIENT    = 11
-     integer, parameter :: EXIT_NO_NODES       = 12
-     integer, parameter :: EXIT_NO_ELEMENTS    = 13
-     integer, parameter :: EXIT_DAMPING_PEAK   = 14
-     integer, parameter :: EXIT_NO_MATERIALS   = 15
-     integer, parameter :: EXIT_FUNCTION_ERROR = 16
-     integer, parameter :: EXIT_NOTHONORING_ERROR = 17
-     integer, parameter :: EXIT_NEIGHBOUR_EL_ERROR = 18
-     
-     end module Poly_exit_codes
+    !> Normal exit code
+    integer, parameter :: EXIT_NORMAL         = 0
+    !> Exit due to CFL (Courant–Friedrichs–Lewy) condition violation
+    integer, parameter :: EXIT_CFL            = 1
+    !> Exit due to numerical instability
+    integer, parameter :: EXIT_INSTAB         = 2
+    !> Exit due to anelastic condition
+    integer, parameter :: EXIT_ANELASTIC      = 3
+    !> Exit due to setup error
+    integer, parameter :: EXIT_SETUP          = 4
+    !> Exit due to singular matrix error
+    integer, parameter :: EXIT_SINGULARMTX    = 5
+    !> Exit because surface was not found
+    integer, parameter :: EXIT_SURF_NOTFOUND  = 6
+    !> Exit due to energy error
+    integer, parameter :: EXIT_ENERGY_ERROR   = 7
+    !> Exit due to syntax error
+    integer, parameter :: EXIT_SYNTAX_ERROR   = 8
+    !> Exit because a required file was missing
+    integer, parameter :: EXIT_MISSING_FILE   = 9
+    !> Exit due to root-finding error
+    integer, parameter :: EXIT_ROOT           = 10
+    !> Exit due to element orientation error
+    integer, parameter :: EXIT_ELEM_ORIENT    = 11
+    !> Exit because nodes were not found
+    integer, parameter :: EXIT_NO_NODES       = 12
+    !> Exit because elements were not found
+    integer, parameter :: EXIT_NO_ELEMENTS    = 13
+    !> Exit due to damping peak error
+    integer, parameter :: EXIT_DAMPING_PEAK   = 14
+    !> Exit because materials were not found
+    integer, parameter :: EXIT_NO_MATERIALS   = 15
+    !> Exit due to function error
+    integer, parameter :: EXIT_FUNCTION_ERROR = 16
+    !> Exit due to non-honoring error
+    integer, parameter :: EXIT_NOTHONORING_ERROR = 17
+    !> Exit due to neighboring element error
+    integer, parameter :: EXIT_NEIGHBOUR_EL_ERROR = 18
+    
+end module Poly_exit_codes
 
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    FAIL CODES 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     
-     module Poly_fail_codes
-      
-      implicit none 
-      
-      ! if .TRUE., fails on negative anelastic coefficients (see: damping 2)
-      logical :: IS_failoncoeffs
+module Poly_fail_codes
+    
+    implicit none 
+    
+    ! if .TRUE., fails on negative anelastic coefficients (see: damping 2)
+    logical :: IS_failoncoeffs
 
-      ! if .TRUE., do not start the TIME_LOOP
-      ! only setup mesh, parameters, CFL, etc. then quit
-      logical :: IS_setuponly
+    ! if .TRUE., do not start the TIME_LOOP
+    ! only setup mesh, parameters, CFL, etc. then quit
+    logical :: IS_setuponly
 
-      ! if .TRUE:, quit if CFL does not hold
-      logical :: IS_failCFL
+    ! if .TRUE:, quit if CFL does not hold
+    logical :: IS_failCFL
 
-      ! if .TRUE., quit if simulation becomes unstable
-      logical :: IS_instabilitycontrol
+    ! if .TRUE., quit if simulation becomes unstable
+    logical :: IS_instabilitycontrol
 
-     end module Poly_fail_codes
+end module Poly_fail_codes
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    DEFAULT VALUES 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-      module Poly_default_codes
-      
-      implicit none
+!> @brief Module containing default error values
+module Poly_default_codes
+    
+    implicit none
 
-      ! Default values
-      integer(kind=4), parameter :: damping_type_default = 1
-      
-      real(kind=8), parameter :: start_time_default = 0.d0;
-      
-      !!! INCONSISTENT CAPITALIZATION
-      logical, parameter :: IS_mon_lst_default = .FALSE.
-      logical, parameter :: IS_Restart_default = .FALSE.
-      logical, parameter :: IS_Debug_default = .FALSE.
-      logical, parameter :: IS_failoncoeffs_default = .FALSE.
-      logical, parameter :: IS_setuponly_default = .FALSE.
-      logical, parameter :: IS_failCFL_default = .FALSE.
-      logical, parameter :: IS_instabilitycontrol_default = .FALSE.    
-      
-      logical, parameter :: IS_timedependent_default = .false.
-      logical, parameter :: IS_saveoutput_default = .false.
+    ! Default values
+    integer(kind=4), parameter :: damping_type_default = 1
+    
+    real(kind=8), parameter :: start_time_default = 0.d0;
+    
+    !!! INCONSISTENT CAPITALIZATION
+    logical, parameter :: IS_mon_lst_default = .FALSE.
+    logical, parameter :: IS_Restart_default = .FALSE.
+    logical, parameter :: IS_Debug_default = .FALSE.
+    logical, parameter :: IS_failoncoeffs_default = .FALSE.
+    logical, parameter :: IS_setuponly_default = .FALSE.
+    logical, parameter :: IS_failCFL_default = .FALSE.
+    logical, parameter :: IS_instabilitycontrol_default = .FALSE.    
+    
+    logical, parameter :: IS_timedependent_default = .false.
+    logical, parameter :: IS_saveoutput_default = .false.
 
-      end module Poly_default_codes
+end module Poly_default_codes
      
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    QSORT MODULE 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-      module qsort     
+!> @brief Module containing quick sort algorithm for vectors
+module qsort     
 
-      implicit none
-      public :: QsortC
-      private :: Partition
+    implicit none
+    public :: QsortC
+    private :: Partition
 
-      contains
-
-        recursive subroutine QsortC(A)
-        
+    contains
+    ! @brief Quick sort algorithm subroutine for vectors
+    recursive subroutine QsortC(A)
+    
         integer(kind=4), intent(in out), dimension(:) :: A
         integer(kind=4) :: iq
 
         if(size(A) > 1) then
-          call Partition(A, iq)
-          call QsortC(A(:iq-1))
-          call QsortC(A(iq:))
+            call Partition(A, iq)
+            call QsortC(A(:iq-1))
+            call QsortC(A(iq:))
         endif
-        
-        end subroutine QsortC
+    
+    end subroutine QsortC
 
-        subroutine Partition(A, marker)
-  
+    !> @brief Subroutine in quick sort to partition a vector
+    subroutine Partition(A, marker)
+
         integer(kind=4), intent(in out), dimension(:) :: A
         integer(kind=4), intent(out) :: marker
         integer(kind=4) :: i, j, temp, x
@@ -179,129 +243,133 @@
         j = size(A) + 1
 
         do
-          j = j-1
-          do
-            if (A(j) <= x) exit
             j = j-1
-          end do
-          i = i+1
-          do
-            if (A(i) >= x) exit
+            do
+                if (A(j) <= x) exit
+                j = j-1
+            end do
             i = i+1
-          end do
-         
-          if (i < j) then
-            ! exchange A(i) and A(j)
-            temp = A(i)
-            A(i) = A(j)
-            A(j) = temp
-          elseif (i == j) then
-            marker = i+1
-            return
-          else
-            marker = i
-            return
-          endif
+            do
+                if (A(i) >= x) exit
+                i = i+1
+            end do
+            
+            if (i < j) then
+                ! exchange A(i) and A(j)
+                temp = A(i)
+                A(i) = A(j)
+                A(j) = temp
+            elseif (i == j) then
+                marker = i+1
+                return
+            else
+                marker = i
+                return
+            endif
         end do
 
-        end subroutine Partition
+    end subroutine Partition
 
-     end module qsort
+end module qsort
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-      module local_search
-      
-      implicit none
-      
-      public :: GET_EL_LOC_FROM_EL_GLO
-      
-      contains 
-          
-          subroutine GET_EL_LOC_FROM_EL_GLO(v, n_el , ie, ie_loc)
-         
-          integer(kind=4), intent(in out) :: n_el
-          integer(kind=4), intent(in out), dimension(n_el) :: v
-          integer(kind=4), intent(in) :: ie
-          integer(kind=4), intent(out) :: ie_loc
-          integer(kind=4) :: i
-          
-          ie_loc = 0
-          do i = 1, n_el
+!> @brief Module to get a local element from a global element
+module local_search
+    
+    implicit none
+    
+    public :: GET_EL_LOC_FROM_EL_GLO
+    
+    contains 
+    
+    !> @brief Subroutine to get a local element from a global element
+    subroutine GET_EL_LOC_FROM_EL_GLO(v, n_el , ie, ie_loc)
+        
+        integer(kind=4), intent(in out) :: n_el
+        integer(kind=4), intent(in out), dimension(n_el) :: v
+        integer(kind=4), intent(in) :: ie
+        integer(kind=4), intent(out) :: ie_loc
+        integer(kind=4) :: i
+        
+        ie_loc = 0
+        do i = 1, n_el
             if (v(i) == ie) then
-               ie_loc = i
-               return
+            ie_loc = i
+            return
             endif   
-          enddo
-          
-          end subroutine GET_EL_LOC_FROM_EL_GLO
-      
-      end module local_search
+        enddo
+        
+        end subroutine GET_EL_LOC_FROM_EL_GLO
+    
+end module local_search
 
+!> @brief Module to find a tetrahedron in polyhedron
 module find_poly
-  implicit none
-  
-  public :: FIND_TET_IN_POLY
-  
-  contains
+    implicit none
+    
+    public :: FIND_TET_IN_POLY
+    
+    contains
 
-  function FIND_TET_IN_POLY(array,val,N)result(index)
-    integer(kind=4) :: N
-    integer(kind=4) :: val
-    integer(kind=4),dimension(N) :: array
-    integer(kind=4),dimension(N) :: temp1,temp2
-    integer(kind=4),dimension(:), ALLOCATABLE :: index
-    integer(kind=4) i,ii
-    ii=1
+    !> @brief Function to find a tetrahedron in polyhedron
+    function FIND_TET_IN_POLY(array,val,N)result(index)
+        integer(kind=4) :: N
+        integer(kind=4) :: val
+        integer(kind=4),dimension(N) :: array
+        integer(kind=4),dimension(N) :: temp1,temp2
+        integer(kind=4),dimension(:), ALLOCATABLE :: index
+        integer(kind=4) i,ii
+        ii=1
 
-    do i=1,N
+        do i=1,N
 
-        if (array(i)  .eq. val) then
-            temp1(i)=1
-        else
-            temp1(i)=0
-        end if
-    end do
-    do i=1,N
-        if (temp1(i) .eq. 1) then
-            temp2(ii)=i
-            ii=ii+1
-        end if
-    end do
-
-    if (ii >1 ) then 
-        ALLOCATE(index(ii-1))
-        do i=1,ii-1
-            index(i)=temp2(i)
+            if (array(i)  .eq. val) then
+                temp1(i)=1
+            else
+                temp1(i)=0
+            end if
         end do
-    else
-        allocate(index(1))
-        index(1)=0
-    end if
+        do i=1,N
+            if (temp1(i) .eq. 1) then
+                temp2(ii)=i
+                ii=ii+1
+            end if
+        end do
 
-end function FIND_TET_IN_POLY
+        if (ii >1 ) then 
+            ALLOCATE(index(ii-1))
+            do i=1,ii-1
+                index(i)=temp2(i)
+            end do
+        else
+            allocate(index(1))
+            index(1)=0
+        end if
+
+    end function FIND_TET_IN_POLY
 
 end module find_poly
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    calc_time: description 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-     
-     subroutine calc_time(time_h, time_m, time_s, time_in_seconds)
-               
-        implicit none
+
+!> @brief Subroutine to pass from seconds to hh:mm:ss format
+subroutine calc_time(time_h, time_m, time_s, time_in_seconds)
+            
+    implicit none
+    
+    integer(kind=4), intent(out) :: time_h, time_m, time_s
+    integer(kind=4), intent(in)  :: time_in_seconds
+    real(kind=8)                 :: rem_min
+    
+    time_h  = int(floor(real(time_in_seconds)/3600));
+    rem_min = mod(time_in_seconds,3600)
+    time_m  = int(floor(rem_min/60))
+    time_s  = mod(mod(time_in_seconds,3600),60)
         
-        integer(kind=4), intent(out) :: time_h, time_m, time_s
-        integer(kind=4), intent(in)  :: time_in_seconds
-        real(kind=8)                 :: rem_min
-        
-        time_h  = int(floor(real(time_in_seconds)/3600));
-        rem_min = mod(time_in_seconds,3600)
-        time_m  = int(floor(rem_min/60))
-        time_s  = mod(mod(time_in_seconds,3600),60)
-         
-        
-     end subroutine calc_time
+end subroutine calc_time
  
  
  
