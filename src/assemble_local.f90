@@ -64,7 +64,7 @@ subroutine MAKE_STIFF_TET_LOC(Np, Jdet, weitet3, nq3, lambda, mu, dphi, stiff_lo
 end subroutine MAKE_STIFF_TET_LOC
 
 ! Assemble the local mass matrix mass_loc
-subroutine MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, mass_loc)
+subroutine MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, rho, mass_loc)
 
     ! phi is provided by the subroutine basis in basis_function.f90
     ! weitet3 is provided by the subroutine mapping_quadrature_3D in Poly_ref_mappings.f90
@@ -75,6 +75,7 @@ subroutine MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, mass_loc)
     real(kind=8), intent(in) :: Jdet
     real(kind=8), dimension(nq3), intent(in) :: weitet3 
     real(kind=8), dimension(Np,nq3), intent(in) :: phi
+    real(kind=8), intent(in) :: rho
     real(kind=8), dimension(3,3,Np,Np), intent(out) :: mass_loc
 
     integer(kind=4) :: q, i, m, n
@@ -87,7 +88,7 @@ subroutine MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, mass_loc)
             do n=1,Np
 
                 do i = 1,3
-                    mass_loc(i,i,m,n) = mass_loc(i,i,m,n) + weitet3(q)*abs(Jdet)*phi(m,q)*phi(n,q)
+                    mass_loc(i,i,m,n) = mass_loc(i,i,m,n) + rho * weitet3(q)*abs(Jdet)*phi(m,q)*phi(n,q)
                 enddo
             
             end do

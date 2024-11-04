@@ -100,13 +100,13 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
 
     ! loop on the tetrahedra
     do ie_loc = 1, PolyMesh%num_elem_loc
-    
+        ! if (mod(ie_loc,50) == 0) print *, ie_loc
         ! initialization of V_loc and M_loc
         V_loc = 0.0
         M_loc = 0.0
 
         mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
-        rho = PolyData%prop_mat(mat_id,1) !! DENSITY USED FOR DYNAMICS
+        rho = PolyData%prop_mat(mat_id,1) ! density used for dynamics
         lambda = PolyData%prop_mat(mat_id,2)
         mu = PolyData%prop_mat(mat_id,3)
 
@@ -143,7 +143,8 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
         call MAKE_STIFF_TET_LOC(Np, Jdet, weitet3, nq3, lambda, mu, dphi, V_loc)
 
         ! computation of the local mass matrix M_loc (see assemble_local.f90)
-        call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, M_loc)
+        ! used rho=1.0 for modal matrix, then multiplied for true mass matrix
+        call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, 1.0, M_loc)
 
         ! this allows to assemble the local matrix correctly into the global matrices
         beg = (ipoly_glob-1)*Np + 1
