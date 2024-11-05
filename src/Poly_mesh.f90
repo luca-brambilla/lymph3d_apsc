@@ -1,15 +1,15 @@
 !    Author: Nicoletta De Giosa
 !    This file is part of the library LYMPH3D
- 
-     module Poly_mesh
-     
-     use Poly_global
-     use Poly_exit_codes, only: EXIT_NO_ELEMENTS
-     
-     implicit none 
-     
-     
-     type Element
+
+!> @brief Module containing the definition of the structs Element, Polyhedron and Mesh_Structure.
+module Poly_mesh
+
+	use Poly_global
+	use Poly_exit_codes, only: EXIT_NO_ELEMENTS
+	
+	implicit none 
+    
+	type Element
      
         character(len=3) :: el_type
         integer(kind=4)  :: mat_prop
@@ -24,9 +24,9 @@
         real(kind=8), dimension(:), pointer :: area
         integer(kind=4), dimension(:), pointer :: flag
 
-     end type Element
+	end type Element
 
-     type Polyhedron
+	type Polyhedron
 
         integer(kind=4),dimension(:),allocatable :: tet_in_poly
         integer(kind=4) :: num_tet_in_poly
@@ -35,43 +35,43 @@
         real(kind=8), dimension(:,:,:), allocatable :: neigh_bbox
         real(kind=8), dimension(:),allocatable :: neigh_hk
 
-     end type Polyhedron
+	end type Polyhedron
 
-     type Mesh_Structure 
-     !*******************************************************************************
-     ! Mesh file parameters - 
-     !*******************************************************************************
+	type Mesh_Structure 
+	!*******************************************************************************
+	! Mesh file parameters - 
+	!*******************************************************************************
         
-         integer(kind=4) :: num_node, num_poly,num_hex, num_tet, num_prysm, &
-                            num_quad, num_tria, id_node, num_elem
-                      
-         integer(kind=4), dimension(:,:), allocatable :: con_hex, con_quad, &
-                                                         con_tet, con_tria, &
-                                                         con_prysm
-         
-         integer(kind=4), dimension(:), allocatable :: part_elem
-         integer(kind=4), dimension(:), allocatable :: elem_in_poly
-         integer(kind=4), dimension(:), allocatable :: elem_in_poly_loc
-         
-         real(kind=8), dimension(:), allocatable :: coord_x, coord_y, coord_z
-         
-         integer(kind=4) :: num_elem_loc, num_node_loc
-         integer (kind=4) :: num_poly_loc
-         integer(kind=4), dimension(:), allocatable :: elem_loc2glo
-         integer(kind=4), dimension(:), allocatable :: node_loc2glo
-         integer(kind=4), dimension(:), allocatable :: poly_loc2glo
+        integer(kind=4) :: num_node, num_poly,num_hex, num_tet, num_prysm, &
+                        num_quad, num_tria, id_node, num_elem
+                    
+        integer(kind=4), dimension(:,:), allocatable :: con_hex, con_quad, &
+                                                        con_tet, con_tria, &
+                                                        con_prysm
+        
+        integer(kind=4), dimension(:), allocatable :: part_elem
+        integer(kind=4), dimension(:), allocatable :: elem_in_poly
+        integer(kind=4), dimension(:), allocatable :: elem_in_poly_loc
+        
+        real(kind=8), dimension(:), allocatable :: coord_x, coord_y, coord_z
+        
+        integer(kind=4) :: num_elem_loc, num_node_loc
+        integer (kind=4) :: num_poly_loc
+        integer(kind=4), dimension(:), allocatable :: elem_loc2glo
+        integer(kind=4), dimension(:), allocatable :: node_loc2glo
+        integer(kind=4), dimension(:), allocatable :: poly_loc2glo
 
-         type(Element), dimension(:), pointer :: Elem_loc
+        type(Element), dimension(:), pointer :: Elem_loc
 
-         type(Polyhedron),dimension(:),pointer :: Poly
+        type(Polyhedron),dimension(:),pointer :: Poly
 
-       end type Mesh_Structure
+	end type Mesh_Structure
     
-     contains 
+    contains
      
-        !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
      
-        subroutine print_Dime_Mesh_Structure(Struct)
+    subroutine print_Dime_Mesh_Structure(Struct)
         
         implicit none
         
@@ -85,13 +85,13 @@
         write(*,'(A,I8)')'#Tria faces     : ', Struct%num_tria
 
         
-        end subroutine print_Dime_Mesh_Structure
+    end subroutine print_Dime_Mesh_Structure
      
 
-      !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
-        subroutine allocate_Mesh_Structure(Struct)  
+    subroutine allocate_Mesh_Structure(Struct)  
       
         implicit none
                
@@ -100,20 +100,20 @@
         Struct%num_elem = Struct%num_hex + Struct%num_tet + Struct%num_prysm
 
         if (Struct%num_elem  == 0) then
-          write(*,'(A)')'ERROR! NUM OF ELEMENTS = 0'
-          call EXIT(EXIT_NO_ELEMENTS)
+            write(*,'(A)')'ERROR! NUM OF ELEMENTS = 0'
+            call EXIT(EXIT_NO_ELEMENTS)
         endif
         if (Struct%num_hex > 0) then
-           allocate (Struct%con_hex(Struct%num_hex,9))
-           Struct%con_hex = 0;
+            allocate (Struct%con_hex(Struct%num_hex,9))
+            Struct%con_hex = 0;
         endif
         if (Struct%num_tet > 0) then
-           allocate (Struct%con_tet(Struct%num_tet,5))
-           Struct%con_tet = 0;
+            allocate (Struct%con_tet(Struct%num_tet,5))
+            Struct%con_tet = 0;
         endif
         if (Struct%num_prysm > 0) then
-           allocate (Struct%con_prysm(Struct%num_prysm,6))
-           Struct%con_prysm = 0;
+            allocate (Struct%con_prysm(Struct%num_prysm,6))
+            Struct%con_prysm = 0;
         endif
       
         !write(*,*) Struct%num_hex, Struct%num_tet, Struct%num_prysm, Struct%con_tet
@@ -129,7 +129,7 @@
         !allocate(Struct%part_elem(Struct%num_elem))
         allocate(Struct%elem_in_poly(Struct%num_elem))
   
-        end subroutine allocate_Mesh_Structure
+    end subroutine allocate_Mesh_Structure
 
         
         !subroutine allocate_Poly_in_Mesh_Structure(Struct)
@@ -153,7 +153,7 @@
         !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         ! IT WORKS ONLY IN SERIAL
 
-        subroutine print_Local_Mesh_Structure_VTK(Struct)
+    subroutine print_Local_Mesh_Structure_VTK(Struct)
         
         implicit none
         
@@ -169,38 +169,38 @@
         write(50,*)     'POINTS  ', Struct%num_node, '  float'
         
         do i = 1, Struct%num_node
-          write(50,*) Struct%coord_x(i), Struct%coord_y(i), Struct%coord_z(i)
+            write(50,*) Struct%coord_x(i), Struct%coord_y(i), Struct%coord_z(i)
         enddo
 
         write(50,*) 'CELLS ', Struct%num_elem, 9*Struct%num_hex &
-                              + 5*Struct%num_tet + 6*Struct%num_prysm
+                            + 5*Struct%num_tet + 6*Struct%num_prysm
 
         do i = 1, Struct%num_hex
-          write(50,*) 8, Struct%con_hex(i,2)-1, Struct%con_hex(i,3)-1, &
-                         Struct%con_hex(i,4)-1, Struct%con_hex(i,5)-1, &
-                         Struct%con_hex(i,6)-1, Struct%con_hex(i,7)-1, &
-                         Struct%con_hex(i,8)-1, Struct%con_hex(i,9)-1 
+            write(50,*) 8, Struct%con_hex(i,2)-1, Struct%con_hex(i,3)-1, &
+                        Struct%con_hex(i,4)-1, Struct%con_hex(i,5)-1, &
+                        Struct%con_hex(i,6)-1, Struct%con_hex(i,7)-1, &
+                        Struct%con_hex(i,8)-1, Struct%con_hex(i,9)-1 
         enddo
         do i = 1, Struct%num_tet
-          write(50,*) 4, Struct%con_tet(i,2)-1, Struct%con_tet(i,3)-1, &
-                         Struct%con_tet(i,4)-1, Struct%con_tet(i,5)-1 
+            write(50,*) 4, Struct%con_tet(i,2)-1, Struct%con_tet(i,3)-1, &
+                        Struct%con_tet(i,4)-1, Struct%con_tet(i,5)-1 
         enddo
         do i = 1, Struct%num_prysm
-          write(50,*) 5, Struct%con_prysm(i,2)-1, Struct%con_prysm(i,3)-1, &
-                         Struct%con_prysm(i,4)-1, Struct%con_prysm(i,5)-1, &
-                         Struct%con_prysm(i,6)-1
+            write(50,*) 5, Struct%con_prysm(i,2)-1, Struct%con_prysm(i,3)-1, &
+                        Struct%con_prysm(i,4)-1, Struct%con_prysm(i,5)-1, &
+                        Struct%con_prysm(i,6)-1
         enddo
 
 
         write(50,*) 'CELL_TYPES ', Struct%num_elem
         do i = 1, Struct%num_hex
-          write(50,*) 12
+            write(50,*) 12
         enddo
         do i = 1, Struct%num_tet
-          write(50,*) 10
+            write(50,*) 10
         enddo
         do i = 1, Struct%num_prysm
-          write(50,*) 14
+            write(50,*) 14
         enddo
         
         write(50,*) 'CELL_DATA ', Struct%num_elem
@@ -210,16 +210,15 @@
         write(50,*) 'LOOKUP_TABLE default'
 
         do i = 1, Struct%num_elem
-          write(50,*) Struct%part_elem(i)
-          !write(50,*) Struct%elem_in_poly(i)
+            write(50,*) Struct%part_elem(i)
+            !write(50,*) Struct%elem_in_poly(i)
         enddo
        
         close(50);
         
-        end subroutine print_Local_Mesh_Structure_VTK
+    end subroutine print_Local_Mesh_Structure_VTK
      
-        !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-
-     end module Poly_mesh  
+end module Poly_mesh  
 

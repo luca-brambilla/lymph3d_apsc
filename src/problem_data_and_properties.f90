@@ -1,3 +1,7 @@
+
+!> @brief Setup for the forcing term, boundary data and exact solution. Additionally, it contains a
+!> subroutine called set_properties, responsible for configuring the properties of the problem
+!> (penalization coefficient, IP method, reaction coefficient).
 module problem_data_and_properties
 
     implicit none

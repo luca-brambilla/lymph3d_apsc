@@ -19,8 +19,8 @@
 !> @brief Poly_global - Setup variables.
 module Poly_global
 
-    implicit none 
-    
+    implicit none
+
     ! header file names
     !> Name of the header file for simulation options
     character(len = 14) :: head_file = 'Poly.input'
@@ -48,11 +48,11 @@ module Poly_global
     integer(kind=4)     :: num_dt_mon
     !> number of timestep for restart !!
     integer(kind=4)     :: num_dt_restart
-    
+
     !dampung type: 1) Q frequency proportional/ 2) Q frequency constant
     !> damping type
     integer(kind=4) :: damping_type
-    
+
     !option for output
     !> output variable !!
     integer(kind=4), dimension(6) :: opt_out_var
@@ -68,7 +68,7 @@ module Poly_global
     real(kind=8)    :: depth_search_mon_lst
     !> ?!!
     logical         :: IS_mon_lst
-                                
+
     !measuring computational time
     !> wall time hours
     integer(kind=4) :: time_hour
@@ -80,11 +80,11 @@ module Poly_global
     real(kind=8)    :: start
     !> time of end of simulation
     real(kind=8)    :: finish
-    
-    !file found 
+
+    !file found
     !> logical variable to identify if file was found
     logical :: IS_filefound
-    
+
     !time dependence
     !> logical variable for time dependent problems
     logical :: IsTime_dependent
@@ -92,18 +92,18 @@ module Poly_global
     ! save outputs
     !>  logical variable to save outputs
     logical :: IsSave_output
-    
+
     !parameters
     !> parameter for @f$ \pi @f$
     real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
     !> parameter for @f$ \sqrt{2} @f$
     real(kind=8), parameter :: SQRT2=sqrt(2.0)
-    
+
 end module Poly_global
-     
+
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!    EXIT CODES 
+!    EXIT CODES
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> @brief Exit codes !! CHECK
@@ -149,18 +149,18 @@ module Poly_exit_codes
     integer, parameter :: EXIT_NOTHONORING_ERROR = 17
     !> Exit due to neighboring element error
     integer, parameter :: EXIT_NEIGHBOUR_EL_ERROR = 18
-    
+
 end module Poly_exit_codes
 
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!    FAIL CODES 
+!    FAIL CODES
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-    
+
 module Poly_fail_codes
-    
-    implicit none 
-    
+
+    implicit none
+
     ! if .TRUE., fails on negative anelastic coefficients (see: damping 2)
     logical :: IS_failoncoeffs
 
@@ -177,19 +177,19 @@ module Poly_fail_codes
 end module Poly_fail_codes
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!    DEFAULT VALUES 
+!    DEFAULT VALUES
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> @brief Module containing default error values
 module Poly_default_codes
-    
+
     implicit none
 
     ! Default values
     integer(kind=4), parameter :: damping_type_default = 1
-    
+
     real(kind=8), parameter :: start_time_default = 0.d0;
-    
+
     !!! INCONSISTENT CAPITALIZATION
     logical, parameter :: IS_mon_lst_default = .FALSE.
     logical, parameter :: IS_Restart_default = .FALSE.
@@ -197,20 +197,20 @@ module Poly_default_codes
     logical, parameter :: IS_failoncoeffs_default = .FALSE.
     logical, parameter :: IS_setuponly_default = .FALSE.
     logical, parameter :: IS_failCFL_default = .FALSE.
-    logical, parameter :: IS_instabilitycontrol_default = .FALSE.    
-    
+    logical, parameter :: IS_instabilitycontrol_default = .FALSE.
+
     logical, parameter :: IS_timedependent_default = .false.
     logical, parameter :: IS_saveoutput_default = .false.
 
 end module Poly_default_codes
-     
+
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!    QSORT MODULE 
+!    QSORT MODULE
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> @brief Module containing quick sort algorithm for vectors
-module qsort     
+module qsort
 
     implicit none
     public :: QsortC
@@ -219,7 +219,7 @@ module qsort
     contains
     ! @brief Quick sort algorithm subroutine for vectors
     recursive subroutine QsortC(A)
-    
+
         integer(kind=4), intent(in out), dimension(:) :: A
         integer(kind=4) :: iq
 
@@ -228,7 +228,7 @@ module qsort
             call QsortC(A(:iq-1))
             call QsortC(A(iq:))
         endif
-    
+
     end subroutine QsortC
 
     !> @brief Subroutine in quick sort to partition a vector
@@ -253,7 +253,7 @@ module qsort
                 if (A(i) >= x) exit
                 i = i+1
             end do
-            
+
             if (i < j) then
                 ! exchange A(i) and A(j)
                 temp = A(i)
@@ -276,40 +276,40 @@ end module qsort
 
 !> @brief Module to get a local element from a global element
 module local_search
-    
+
     implicit none
-    
+
     public :: GET_EL_LOC_FROM_EL_GLO
-    
-    contains 
-    
+
+    contains
+
     !> @brief Subroutine to get a local element from a global element
     subroutine GET_EL_LOC_FROM_EL_GLO(v, n_el , ie, ie_loc)
-        
+
         integer(kind=4), intent(in out) :: n_el
         integer(kind=4), intent(in out), dimension(n_el) :: v
         integer(kind=4), intent(in) :: ie
         integer(kind=4), intent(out) :: ie_loc
         integer(kind=4) :: i
-        
+
         ie_loc = 0
         do i = 1, n_el
             if (v(i) == ie) then
             ie_loc = i
             return
-            endif   
+            endif
         enddo
-        
+
         end subroutine GET_EL_LOC_FROM_EL_GLO
-    
+
 end module local_search
 
 !> @brief Module to find a tetrahedron in polyhedron
 module find_poly
     implicit none
-    
+
     public :: FIND_TET_IN_POLY
-    
+
     contains
 
     !> @brief Function to find a tetrahedron in polyhedron
@@ -337,7 +337,7 @@ module find_poly
             end if
         end do
 
-        if (ii >1 ) then 
+        if (ii >1 ) then
             ALLOCATE(index(ii-1))
             do i=1,ii-1
                 index(i)=temp2(i)
@@ -352,27 +352,27 @@ module find_poly
 end module find_poly
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!    calc_time: description 
+!    calc_time: description
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> @brief Subroutine to pass from seconds to hh:mm:ss format
 subroutine calc_time(time_h, time_m, time_s, time_in_seconds)
-            
+
     implicit none
-    
+
     integer(kind=4), intent(out) :: time_h, time_m, time_s
     integer(kind=4), intent(in)  :: time_in_seconds
     real(kind=8)                 :: rem_min
-    
+
     time_h  = int(floor(real(time_in_seconds)/3600));
     rem_min = mod(time_in_seconds,3600)
     time_m  = int(floor(rem_min/60))
     time_s  = mod(mod(time_in_seconds,3600),60)
-        
+
 end subroutine calc_time
- 
- 
- 
- 
-            
+
+
+
+
+
 

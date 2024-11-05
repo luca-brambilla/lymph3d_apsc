@@ -15,20 +15,21 @@
 !
 !    You should have received a copy of the GNU Affero General Public License
 !    along with PolyWAVE.  If not, see <http://www.gnu.org/licenses/>.
- 
-     module Poly_setup_MPI
+
+!> @brief Module for initialization of the MPI and PETSc envinronments with variables declaration.
+module Poly_setup_MPI
 #include<petsc/finclude/petscksp.h>
 
      use mpi
      use petscksp
-     
+
 
      implicit none
 
      integer(kind=4), dimension (:), allocatable :: mpi_stat
      integer(kind=4) :: mpi_id, mpi_np, mpi_ierr
      logical(kind=4) :: flag
-     
+
      PetscErrorCode :: ierr
      PetscMPIInt :: size,rank
 
@@ -44,35 +45,41 @@
      !parameter (POLYSPEED_DOUBLE = MPI_DOUBLE_PRECISION)
 
 
-      contains      
-      
-          subroutine INITIALIZATION()
+     contains
 
-          !> MPI INITIALIZATION
-          
-          call MPI_INIT(mpi_ierr)
-          call MPI_Initialized(flag,mpi_ierr)
-          call MPI_COMM_RANK(MPI_COMM_WORLD, mpi_id, mpi_ierr)
-          call MPI_COMM_SIZE(MPI_COMM_WORLD, mpi_np, mpi_ierr)
+     !> @brief Subroutine for initialization of the MPI and PETSc envinronments.
+     subroutine INITIALIZATION()
 
-          PetscCall(PetscInitialize(ierr))
-          PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,size,ierr))
-          PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,rank,ierr))
+     !> MPI INITIALIZATION
 
-          !> Console output in case of error
-          
-          if (mpi_ierr.ne.0 .or. ierr .ne. 0) then
-          !> Error occured on rank number: ....
-               write(*,*)'MPI Initialization error - proc : ',mpi_id
-          endif
+     call MPI_INIT(mpi_ierr)
+     call MPI_Initialized(flag,mpi_ierr)
+     call MPI_COMM_RANK(MPI_COMM_WORLD, mpi_id, mpi_ierr)
+     call MPI_COMM_SIZE(MPI_COMM_WORLD, mpi_np, mpi_ierr)
 
-          !What does it mean?
-          !speed_tag = speed_tag_min
-          !return
-          
-          end subroutine INITIALIZATION
-   
-     end module Poly_setup_MPI
-     
-     
-     
+     PetscCall(PetscInitialize(ierr))
+     PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,size,ierr))
+     PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,rank,ierr))
+
+     ! Initialize PETSc
+     ! call PetscInitialize(PETSC_NULL_CHARACTER, ierr)
+     !call MPI_Comm_size(PETSC_COMM_WORLD, size, ierr)
+     !call MPI_Comm_rank(PETSC_COMM_WORLD, rank, ierr)
+
+     !> Console output in case of error
+
+     if (mpi_ierr.ne.0 .or. ierr .ne. 0) then
+     !> Error occured on rank number: ....
+          write(*,*)'MPI Initialization error - proc : ',mpi_id
+     endif
+
+     !What does it mean?
+     !speed_tag = speed_tag_min
+     !return
+
+     end subroutine INITIALIZATION
+
+end module Poly_setup_MPI
+
+
+

@@ -8,10 +8,10 @@ The library numerically computes volume and surface integrals using Gaussian qua
 The library includes the following files (notice that they are listed in in the order they are invoked from the main file rather than in alphabetical order):
 
 * Lymph3D.f90: is the main file, which is structured as follows:
-    - it initializes the PETSc and MPI environments with the subroutine INITIALIZATION; 
+    - it initializes the PETSc and MPI environments with the subroutine INITIALIZATION;
     - it calls the subroutine READ_INPUT_FILES to read the input file and the mesh file;
     - it calls the subroutine MAKE_PARTITION_AND_MPI_FILES to make the partition into processes and to store the mesh information among processes;
-    - it defines the PETSc matrices and vectors by calling SET_PETSC_MATRIX and SET_PETSC_VECTOR and assembles them by calling MAKE_MATRICES and MAKE_RHS. 
+    - it defines the PETSc matrices and vectors by calling SET_PETSC_MATRIX and SET_PETSC_VECTOR and assembles them by calling MAKE_MATRICES and MAKE_RHS.
     - it sets the algebraic solvers with the subroutine SOLVER_SETTINGS;
     - it solves the linear system by calling the PETSc function KSPSolve;
     - it scatters the solution so that it can be exported;
@@ -27,15 +27,15 @@ The library includes the following files (notice that they are listed in in the 
 It also contains the following subroutines:
   - allocate_Mesh_Structure to allocate the Mesh Structure, namely it sets the number of elements and allocates the connettivity matrices and the vector elem_in_poly;
   - print_Dime_Mesh_Structure to print the Mesh Structure, namely it prints the number of nodes, hexahedra, tetrahedra, prysmas, quadrilateral faces and triangular faces;
-  
+
 * Poly_data.f90: contains the definition of the struct Data_Structure, which stores the material file parameters such as the density and Lamé parameters, and subroutines related to print, allocation and setting of default values to the parameters.
 
 * Poly_global.f90: contains the subroutine calc_time which takes as input the wall-time in seconds time_in_seconds and compute the corresponding time in hours, minutes and seconds. It also contains the following modules:
     - Poly_global, which stores some useful variables as head_file (the name of the input file stored in the variable), mate_file (the name of the file containing information on the materials), grid_file (the name of the file containing the mesh), and some variables related to the output and the measuring of the computational time;
     - Poly_exit_codes, Poly_fail_codes and Poly_default_codes, which are related to error and fail codes if something goes wrong reading the .input file and the .mate file;
     - qsort, which stores the qsort algorithm for sorting elements of an array;
-    - local_search, which contains the subroutine GET_EL_LOC_FROM_EL_GLO that we need in order to find the local index of an element of the mesh; 
-    - find_poly, which contains the function FIND_TET_IN_POLY, needed to find all the tetrahedra contained in a single polyhedra. 
+    - local_search, which contains the subroutine GET_EL_LOC_FROM_EL_GLO that we need in order to find the local index of an element of the mesh;
+    - find_poly, which contains the function FIND_TET_IN_POLY, needed to find all the tetrahedra contained in a single polyhedra.
 
 * Poly_readfile.f90: contains the subroutines that actually reads all the input files line by line.
 
