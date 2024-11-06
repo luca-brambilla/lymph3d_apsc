@@ -66,7 +66,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
 
     ! set the properties of the method (see problem_data_and_properties.f90)
     call set_properties(alpha, theta, c)
-    
+
     ! total degree of the basis functions
     p = PolyMesh%Elem_loc(1)%Degree;
     Npoly = PolyMesh%num_poly
@@ -86,13 +86,13 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     ! Maps to the reference tetrahedron and reference triangle (see Poly_ref_mappings.f90)
     call mapping_quadrature_3D(nod3, wei3, nq3, nodtet3, weitet3)
     call mapping_quadrature_2D(nod2, wei2, nq2, nodtria2, weitria2)
-    
+
     ! list of the degrees of monomials of the Np basis functions up to order p (see basis_functions.f90)
     allocate(blist(Np,3))
     call basis_list(blist, p, Np)
-        
+
     print *, 'Assembling linear system...'
-    
+
     allocate(phi(Np,nq3))
     allocate(dphi(3,Np,nq3))
     allocate(phi_b(Np,nq2,2))
@@ -112,11 +112,11 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
 
         ! computation of the coordinates of the tetrahedron
         do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
-        
+
             ! see MAKE_PARTITION_AND_MPI_FILES.f90
             call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)      
-            
+                                PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)
+
             x(ivert)=PolyMesh%coord_x(id_node)
             y(ivert)=PolyMesh%coord_y(id_node)
             z(ivert)=PolyMesh%coord_z(id_node)
@@ -125,7 +125,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
 
         ! computation of the reference map Fk, the inverse Jinv and the determinant Jdet of its jacobian (see Poly_ref_mappings.f90)
         call jacobians(x, y, z, Fk, Jinv, Jdet)
-       
+
         ! find the polyhedron ipoly_glob that contains the tetrahedron ie_loc
         ie_glob = PolyMesh%elem_loc2glo(ie_loc)
         ipoly_glob = PolyMesh%elem_in_poly(ie_glob)
@@ -138,13 +138,13 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
         ! evaluation of the basis functions and their partial derivatives at the 3D quadrature nodes for a given polyhedral element contained in b_box
         ! (see basis_functions.f90)
         call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
-        
+
         ! computation of the local stiffness matrix V_loc (see assemble_local.f90)
         call MAKE_STIFF_TET_LOC(Np, Jdet, weitet3, nq3, lambda, mu, dphi, V_loc)
 
         ! computation of the local mass matrix M_loc (see assemble_local.f90)
         ! used rho=1.0 for modal matrix, then multiplied for true mass matrix
-        call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, 1.0, M_loc)
+        call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, 1.0d0, M_loc)
 
         ! this allows to assemble the local matrix correctly into the global matrices
         beg = (ipoly_glob-1)*Np + 1
@@ -158,7 +158,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
                         val(1)  = V_loc(i,j,m,n)
                         irow(1) = petsc_num((i-1)*Np*Npoly + beg+m-1)
                         jcol(1) = petsc_num((j-1)*Np*Npoly + beg+n-1)
-                        
+
                         if (val(1) .ne. 0.0) then
                             ! set value val to the matrix petsc_stiff in the irow-th row and jcol-th column
                             PetscCall(MatSetValues(petsc_stiff, 1, irow, 1, jcol, val, ADD_VALUES, mpi_ierr))
@@ -177,7 +177,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
 
                     val(1)  = M_loc(i,i,m,n)
                     irow(1) = petsc_num((i-1)*Np*Npoly + beg+m-1)
-                    jcol(1) = petsc_num((i-1)*Np*Npoly + beg+n-1) 
+                    jcol(1) = petsc_num((i-1)*Np*Npoly + beg+n-1)
 
                     if (val(1) .ne. 0.0) then
                         ! set value val to the matrix petsc_mass and petsc_mass_modal in the irow-th row and jcol-th column
@@ -185,11 +185,11 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
                         val(1) = val(1)*rho
                         PetscCall(MatSetValues(petsc_mass, 1, irow, 1, jcol, val, ADD_VALUES, mpi_ierr))
                     endif
-                    
+
                 enddo
             enddo
         enddo
-        
+
         E1 = ie_loc
 
         ! begin loop on the faces of the tetrahedron E1
@@ -215,9 +215,9 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
                 call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
                             PolyMesh%num_poly_loc, &
                             ipoly2_glob,ipoly2_loc)
-            
+
             endif
-            
+
             ! if e is not a boundary face, then check if E1 and E2 belong to the same polyhedron
             if (E2 /= -1 .and. E2 /= -2) then
                 if (ipoly_glob == ipoly2_glob) then
@@ -231,12 +231,12 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
 
                 nn = PolyMesh%Elem_loc(E1)%normal(e,:)
 
-                ! If it is true, then the two polyhedra do not belong to the same processor 
+                ! If it is true, then the two polyhedra do not belong to the same processor
                 ! so we have to retrieve b_box of neighbouring element from neigh_bbox
                 ! and hk of neighbouring element from neigh_hk
-                ! Otherwise, the two polyhedra belong to the same processor 
+                ! Otherwise, the two polyhedra belong to the same processor
                 ! so that b_box and hk can be easily retrieved
-                ! In both cases, compute the basis functions on the faces 
+                ! In both cases, compute the basis functions on the faces
                 ! and the local matrices on the faces
                 if (ipoly2_loc==0) then
 
@@ -385,7 +385,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
 
             endif
 
-        enddo 
+        enddo
     enddo
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -397,7 +397,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     ! Assembly of mass matrix petsc_mass
     PetscCall(MatAssemblyBegin(petsc_mass, MAT_FINAL_ASSEMBLY, mpi_ierr))
     PetscCall(MatAssemblyEnd(petsc_mass, MAT_FINAL_ASSEMBLY, mpi_ierr))
-        
+
     ! Assembly of mass matrix mat_dg
     PetscCall(MatAssemblyBegin(mat_dg, MAT_FINAL_ASSEMBLY, mpi_ierr))
     PetscCall(MatAssemblyEnd(mat_dg, MAT_FINAL_ASSEMBLY, mpi_ierr))
