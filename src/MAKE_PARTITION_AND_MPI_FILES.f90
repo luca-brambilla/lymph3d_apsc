@@ -1683,7 +1683,7 @@ end subroutine CREATE_GLOBAL_POLY_MAP
 
            !if (mpi_id == 2) write(*,*) 'after', IsFound_int, IsFound_bnd, con_quad_loc(i,:) 
           
-           if((IsFound_int .eqv. .FALSE.) .and. (IsFound_bnd .eqv. .FALSE.) &
+           if((IsFound_int .eqv. .false.) .and. (IsFound_bnd .eqv. .false.) &
                 .and. con_quad_loc(i,4) /= 0) &
                num_quad_send =  num_quad_send + 1 !num_quad left to search
       enddo
@@ -1882,7 +1882,7 @@ end subroutine CREATE_GLOBAL_POLY_MAP
    
       integer(kind=4), dimension(:),allocatable :: index_loc,index_send,index_send_mpi
       integer(kind=4) :: num_poly_send,num_poly_send_loc,num_poly_send_mpi,num_index_send_mpi,num_hk_send_mpi    
-      integer(kind=4) :: tag                                    
+      integer(kind=4) :: space_fun_tag                                    
       
       logical :: IsFound_int, IsFound_bnd, IsQuad
        
@@ -2010,7 +2010,7 @@ end subroutine CREATE_GLOBAL_POLY_MAP
                    !endif                          
                    if(IsFound_bnd) then
                       mat   = con_tria_loc(i,1); mat_ne   =   PolyMesh%con_tria(Row2,1)
-                      tag = PolyMesh%con_tria(Row2,5)
+                      space_fun_tag = PolyMesh%con_tria(Row2,5)
                       ie    = con_tria_loc(i,2); 
 
                       ! Dirichlet bc identifier
@@ -2031,7 +2031,7 @@ end subroutine CREATE_GLOBAL_POLY_MAP
 
                       PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = mpi_id
                       PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1:5) = &
-                                                             [mat_ne, ie_ne, iface_ne, ipoly_glob, tag]
+                                                             [mat_ne, ie_ne, iface_ne, ipoly_glob, space_fun_tag]
 
                      ! print *, "neigh_el: ", PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,:)
                      ! print *, ""
@@ -2049,7 +2049,7 @@ end subroutine CREATE_GLOBAL_POLY_MAP
            !if(mpi_id == 1) write(*,*) IsFound_int, IsFound_bnd, 'el', i, con_quad_loc(i,4:7)
            !read(*,*)
 
-           if((IsFound_int .eqv. .FALSE.) .and. (IsFound_bnd .eqv. .FALSE.) &
+           if((IsFound_int .eqv. .false.) .and. (IsFound_bnd .eqv. .false.) &
                 .and. con_tria_loc(i,4) /= 0) &
                num_tria_send =  num_tria_send + 1
          
@@ -2383,7 +2383,7 @@ end subroutine CREATE_GLOBAL_POLY_MAP
       type(Mesh_Structure), intent(inout) :: PolyMesh       
       type(Data_Structure), intent(inout) :: PolyData      
       
-      !> first comute how many elements per materials 
+      !> first compute how many elements per materials 
       allocate(el_per_mat_loc(PolyData%nmat),el_per_mat(PolyData%nmat))
       el_per_mat_loc = 0; el_per_mat = 0
       
@@ -2687,7 +2687,7 @@ end subroutine CREATE_GLOBAL_POLY_MAP
 
          enddo
          
-         write(unit_mpi,*) 'Neighbouring Elements: shared by (mpi-proc/mat_id/el_id/face_id/poly id/tag)'
+         write(unit_mpi,*) 'Neighbouring Elements: shared by (mpi-proc/mat_id/el_id/face_id/poly id/space_fun_tag)'
          write(unit_mpi,*) 'Neigh Face #1 :', PolyMesh%Elem_loc(ie)%neigh_el(1,:)
          write(unit_mpi,*) 'Neigh Face #2: ', PolyMesh%Elem_loc(ie)%neigh_el(2,:)
          write(unit_mpi,*) 'Neigh Face #3: ', PolyMesh%Elem_loc(ie)%neigh_el(3,:)

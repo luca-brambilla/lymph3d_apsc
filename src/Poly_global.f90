@@ -89,6 +89,9 @@ module Poly_global
     !> logical variable for time dependent problems
     logical :: IsTime_dependent
 
+    !> logical variable for type of solver
+    logical :: IS_MatrixFree
+
     ! save outputs
     !>  logical variable to save outputs
     logical :: IsSave_output
@@ -191,16 +194,17 @@ module Poly_default_codes
     real(kind=8), parameter :: start_time_default = 0.d0;
 
     !!! INCONSISTENT CAPITALIZATION
-    logical, parameter :: IS_mon_lst_default = .FALSE.
-    logical, parameter :: IS_Restart_default = .FALSE.
-    logical, parameter :: IS_Debug_default = .FALSE.
-    logical, parameter :: IS_failoncoeffs_default = .FALSE.
-    logical, parameter :: IS_setuponly_default = .FALSE.
-    logical, parameter :: IS_failCFL_default = .FALSE.
-    logical, parameter :: IS_instabilitycontrol_default = .FALSE.
+    logical, parameter :: IS_mon_lst_default = .false.
+    logical, parameter :: IS_Restart_default = .false.
+    logical, parameter :: IS_Debug_default = .false.
+    logical, parameter :: IS_failoncoeffs_default = .false.
+    logical, parameter :: IS_setuponly_default = .false.
+    logical, parameter :: IS_failCFL_default = .false.
+    logical, parameter :: IS_instabilitycontrol_default = .false.
 
     logical, parameter :: IS_timedependent_default = .false.
     logical, parameter :: IS_saveoutput_default = .false.
+    logical, parameter :: IS_MatrixFree_default = .false.
 
 end module Poly_default_codes
 

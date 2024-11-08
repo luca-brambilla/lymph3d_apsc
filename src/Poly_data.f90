@@ -36,17 +36,25 @@ module Poly_data
         integer(kind=4) :: nmat_nle         !< number of nonlinear el. material
         integer(kind=4) :: nmat_rnd         !< number of random el. material
 
-        integer(kind=4) :: nload_diri_el
-                                             !< number of el. Dirichlet bound. (XYZ load)
-        integer(kind=4) :: nload_neum_el
-                                             !< number of el. Neumann bound. (XYZ load)
+        integer(kind=4) :: nload_diri_el    !< number of el. Dirichlet bound. (XYZ load)
+        integer(kind=4) :: nload_neum_el    !< number of el. Neumann bound. (XYZ load)
         integer(kind=4) :: nload_neuN_el    !< number of el. Neumann bound. (normal load)
-        integer(kind=4) :: nload_poiX_el,nload_poiY_el,nload_poiZ_el
-                                             !< number of el. point load (XYZ load)
-        integer(kind=4) :: nload_plaX_el,nload_plaY_el,nload_plaZ_el
-                                             !< number of el. plane wave load (XYZ load)
-        integer(kind=4) :: nload_forX_el,nload_forY_el,nload_forZ_el
-                                             !< number of el. volume load (XYZ load)
+
+        ! Number of element point load (XYZ load)
+        integer(kind=4) :: nload_poiX_el    !< Number of element point load X
+        integer(kind=4) :: nload_poiY_el    !< Number of element point load Y
+        integer(kind=4) :: nload_poiZ_el    !< Number of element point load Z
+
+        ! Number of element plane wave load (XYZ load)
+        integer(kind=4) :: nload_plaX_el    !< Number of element plane wave load X
+        integer(kind=4) :: nload_plaY_el    !< Number of element plane wave load Y
+        integer(kind=4) :: nload_plaZ_el    !< Number of element plane wave load Z
+
+        ! Number of element volume load (XYZ load)
+        integer(kind=4) :: nload_forX_el    !< Number of element volumme load X
+        integer(kind=4) :: nload_forY_el    !< Number of element volumme load Y
+        integer(kind=4) :: nload_forZ_el    !< Number of element volumme load Z
+
         integer(kind=4) :: nload_abc_el     !< number of el. absorbing conditions
         integer(kind=4) :: nfunc            !< number of keyword FUNC
         integer(kind=4) :: nfunc_data       !< number of data for all FUNC keywords
@@ -57,43 +65,67 @@ module Poly_data
         real(kind=8)    :: fmax             !<reference f-value for damping
         real(kind=8)    :: fpeak            !<peak frequency non linear case
 
-        integer(kind=4), dimension(:), allocatable :: sdeg_mat, tag_mat, &
-                                                      sdeg_mat_nle, tag_mat_nle, &
-                                                      rand_mat, &
-                                                      fun_space_diri_el, tag_diri_el, &
-                                                      fun_space_neum_el, tag_neum_el, &
-                                                      fun_neuN_el, tag_neuN_el, &
-                                                      fun_poiX_el, fun_poiY_el, &
-                                                      fun_poiZ_el , &
-                                                      fun_plaX_el, tag_plaX_el, &
-                                                      fun_plaY_el, tag_plaY_el, &
-                                                      fun_plaZ_el, tag_plaZ_el, &
-                                                      fun_forX_el, fun_forY_el, &
-                                                      fun_forZ_el, &
-                                                      tag_abc_el, &
-                                                      fun_sism_el, tag_sism_el, &
-                                                      tag_case, val_case, &
-                                                      val_nhe, tol_nhe, &
-                                                      tag_func, func_type, func_indx
 
+        ! Integer arrays with allocatable dimensions
+        integer(kind=4), dimension(:), allocatable :: sdeg_mat
+        integer(kind=4), dimension(:), allocatable :: tag_mat
+        integer(kind=4), dimension(:), allocatable :: sdeg_mat_nle
+        integer(kind=4), dimension(:), allocatable :: tag_mat_nle
+        integer(kind=4), dimension(:), allocatable :: rand_mat
+        integer(kind=4), dimension(:), allocatable :: space_fun_tag_diri_el ! function in space tag for dirichlet BC in problem_data_and_properties.f90 - tag = Element%neigh_el(:,5)
+        integer(kind=4), dimension(:), allocatable :: face_tag_diri_el       ! mesh face tag
+        integer(kind=4), dimension(:), allocatable :: space_fun_tag_neum_el ! function in space tag for neumann BC in problem_data_and_properties.f90 - tag = Element%neigh_el(:,5)
+        integer(kind=4), dimension(:), allocatable :: face_tag_neum_el       ! mesh face tag
+        integer(kind=4), dimension(:), allocatable :: fun_neuN_el
+        integer(kind=4), dimension(:), allocatable :: tag_neuN_el
+        integer(kind=4), dimension(:), allocatable :: fun_poiX_el
+        integer(kind=4), dimension(:), allocatable :: fun_poiY_el
+        integer(kind=4), dimension(:), allocatable :: fun_poiZ_el
+        integer(kind=4), dimension(:), allocatable :: fun_plaX_el
+        integer(kind=4), dimension(:), allocatable :: tag_plaX_el
+        integer(kind=4), dimension(:), allocatable :: fun_plaY_el
+        integer(kind=4), dimension(:), allocatable :: tag_plaY_el
+        integer(kind=4), dimension(:), allocatable :: fun_plaZ_el
+        integer(kind=4), dimension(:), allocatable :: tag_plaZ_el
+        integer(kind=4), dimension(:), allocatable :: fun_forX_el
+        integer(kind=4), dimension(:), allocatable :: fun_forY_el
+        integer(kind=4), dimension(:), allocatable :: fun_forZ_el
+        integer(kind=4), dimension(:), allocatable :: tag_abc_el
+        integer(kind=4), dimension(:), allocatable :: fun_sism_el
+        integer(kind=4), dimension(:), allocatable :: tag_sism_el
+        integer(kind=4), dimension(:), allocatable :: tag_case
+        integer(kind=4), dimension(:), allocatable :: val_case
+        integer(kind=4), dimension(:), allocatable :: val_nhe
+        integer(kind=4), dimension(:), allocatable :: tol_nhe
+        integer(kind=4), dimension(:), allocatable :: tag_func
+        integer(kind=4), dimension(:), allocatable :: func_type
+        integer(kind=4), dimension(:), allocatable :: func_indx
 
-
-
+        ! Integer arrays with two-dimensional allocatable array
         integer(kind=4), dimension(:,:), allocatable :: tag_func_mat_nle
 
-        real(kind=8), dimension(:), allocatable :: tol_case, func_data, &
-                                                   QS, QP
+        ! Real arrays with allocatable dimensions
+        real(kind=8), dimension(:), allocatable :: tol_case
+        real(kind=8), dimension(:), allocatable :: func_data
+        real(kind=8), dimension(:), allocatable :: QS
+        real(kind=8), dimension(:), allocatable :: QP
 
-        real(kind=8), dimension(:,:), allocatable :: prop_mat, val_mat_nle, &
-                                                     val_diri_el,  &
-                                                     val_neum_el, &
-                                                     val_neuN_el, &
-                                                     val_poiX_el, val_poiY_el, &
-                                                     val_poiZ_el, val_plaX_el, &
-                                                     val_plaY_el, val_plaZ_el, &
-                                                     val_forX_el, val_forY_el, &
-                                                     val_forZ_el, &
-                                                     val_sism_el
+        ! Real arrays with two-dimensional allocatable arrays
+        real(kind=8), dimension(:,:), allocatable :: prop_mat
+        real(kind=8), dimension(:,:), allocatable :: val_mat_nle
+        real(kind=8), dimension(:,:), allocatable :: val_diri_el
+        real(kind=8), dimension(:,:), allocatable :: val_neum_el
+        real(kind=8), dimension(:,:), allocatable :: val_neuN_el
+        real(kind=8), dimension(:,:), allocatable :: val_poiX_el
+        real(kind=8), dimension(:,:), allocatable :: val_poiY_el
+        real(kind=8), dimension(:,:), allocatable :: val_poiZ_el
+        real(kind=8), dimension(:,:), allocatable :: val_plaX_el
+        real(kind=8), dimension(:,:), allocatable :: val_plaY_el
+        real(kind=8), dimension(:,:), allocatable :: val_plaZ_el
+        real(kind=8), dimension(:,:), allocatable :: val_forX_el
+        real(kind=8), dimension(:,:), allocatable :: val_forY_el
+        real(kind=8), dimension(:,:), allocatable :: val_forZ_el
+        real(kind=8), dimension(:,:), allocatable :: val_sism_el
 
 
     end type Data_Structure
@@ -143,7 +175,7 @@ module Poly_data
 
         Struct%nmat_nhe      = 0     !< material number for not-honoring enhanced
 
-        Struct%srcmodflag    = 0     !<flag for srcmod - sism lines
+        Struct%srcmodflag    = 0     !<f lag for srcmod - sism lines
 
     end subroutine set_Data_Structure_default_value
 
@@ -167,9 +199,9 @@ module Poly_data
         if(Struct%nmat_rnd > 0) &
             write(*,'(A,I8)')     'Materials Random : ',Struct%nmat_rnd
         if(Struct%nload_diri_el > 0) &
-            write(*,'(A,I8)')'Dirichlet B.C. : ',Struct%nload_diri_el
+            write(*,'(A,I8)')'Dirichlet B.C.   : ',Struct%nload_diri_el
         if(Struct%nload_neum_el > 0) &
-            write(*,'(A,I8)')'Neumann B.C.   : ',Struct%nload_neum_el
+            write(*,'(A,I8)')'Neumann B.C.     : ',Struct%nload_neum_el
         if(Struct%nload_neuN_el > 0) &
             write(*,'(A,I8)')'Neumann N B.C.   : ',Struct%nload_neuN_el
         if(Struct%nload_poiX_el > 0) &
@@ -243,14 +275,14 @@ module Poly_data
         ! Dirichlet boundary conditions
         if (Struct%nload_diri_el > 0) &
             allocate (Struct%val_diri_el(Struct%nload_diri_el,4), &
-                        Struct%fun_space_diri_el(Struct%nload_diri_el), &
-                        Struct%tag_diri_el(Struct%nload_diri_el))
+                        Struct%space_fun_tag_diri_el(Struct%nload_diri_el), &
+                        Struct%face_tag_diri_el(Struct%nload_diri_el))
 
         ! Neumann boundary conditions
         if (Struct%nload_neum_el > 0) &
             allocate (Struct%val_neum_el(Struct%nload_neum_el,4), &
-                        Struct%fun_space_neum_el(Struct%nload_neum_el), &
-                        Struct%tag_neum_el(Struct%nload_neum_el))
+                        Struct%space_fun_tag_neum_el(Struct%nload_neum_el), &
+                        Struct%face_tag_neum_el(Struct%nload_neum_el))
 
         if (Struct%nload_neuN_el > 0) &
             allocate (Struct%val_neuN_el(Struct%nload_neuN_el,4), &

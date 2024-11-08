@@ -4,32 +4,41 @@
 !> @brief Module containing the definition of the structs Element, Polyhedron and Mesh_Structure. It also contains utilites
 module Poly_mesh
 
-	use Poly_global
-	use Poly_exit_codes, only: EXIT_NO_ELEMENTS
+    use Poly_global
+    use Poly_exit_codes, only: EXIT_NO_ELEMENTS
 
-	implicit none
+    implicit none
 
     !> Properties of each element
-	type Element
+    type Element
 
         character(len=3) :: el_type     !< Type of the element
-        integer(kind=4)  :: mat_prop    !< Id for heterogeneous materials
+        integer(kind=4)  :: mat_prop    !< ID for heterogeneous materials
         integer(kind=4)  :: num_vert    !< Number of vertices of the element
         integer(kind=4)  :: num_faces   !< Number of faces of the element
-        integer(kind=4)  :: Degree      !< Local degree of the basis function for this element
-        integer(kind=4)  :: NDof_loc    !< Local number of degrees of fredom
+        integer(kind=4)  :: Degree      !< Local degree of the basis function for the element
+        integer(kind=4)  :: NDof_loc    !< Local number of degrees of freedom
         integer(kind=4), dimension(:),   pointer :: vert    !< Indexes of the vertices of the element
         integer(kind=4), dimension(:,:), pointer :: faces   !< Indexes of the vertices for every face of the element
-        integer(kind=4), dimension(:,:), pointer :: neigh_el    !< Properties of the neighbor elements
-        integer(kind=4), dimension(:), pointer :: Dof_glo       !!<
+
+        !> Properties of the neighbor elements (6 columns):
+        !> 0 - mpi_proc: processor containing the neighbor element data
+        !> 1 - mat_id: ID of the neighbor material
+        !> 2 - el_id: global element across face ID with -1 for Dirichlet boundary, -2 for Neumann boundary
+        !> 3 - face_id: global face ID? !! DO NOT KNOW
+        !> 4 - poly_id: numbering for processors dof ID? !! DO NOT KNOW
+        !> 5 - tag: tag from .mate file, numbering of BC with 0 if internal face
+        integer(kind=4), dimension(:,:), pointer :: neigh_el
+
+        integer(kind=4), dimension(:), pointer :: Dof_glo       !< Mapping to global degrees of freedom
         real(kind=8), dimension(:,:), pointer :: normal     !< Coordinates of the normal to each face
         real(kind=8), dimension(:), pointer :: area         !< Area of each face
         integer(kind=4), dimension(:), pointer :: flag      !!<
 
-	end type Element
+    end type Element
 
     !> Properties of each polyhedron
-	type Polyhedron
+    type Polyhedron
 
         integer(kind=4),dimension(:),allocatable :: tet_in_poly     !< Number of tetrahedra contained in the polyhedron
         integer(kind=4) :: num_tet_in_poly      !< Global indexes of the tetrahedra contained in the polyhedron
@@ -38,13 +47,13 @@ module Poly_mesh
         real(kind=8), dimension(:,:,:), allocatable :: neigh_bbox !< Coordinates of two diametrically opposite points of the bounding box of the neighbouring polyhedra
         real(kind=8), dimension(:),allocatable :: neigh_hk !< Diameters of the neighbouring polyhedra
 
-	end type Polyhedron
+    end type Polyhedron
 
     !> Properties of the mesh
-	type Mesh_Structure
-	!*******************************************************************************
-	! Mesh file parameters -
-	!*******************************************************************************
+    type Mesh_Structure
+    !*******************************************************************************
+    ! Mesh file parameters -
+    !*******************************************************************************
         integer(kind=4) :: num_node         !< Total number of vertices
         integer(kind=4) :: num_poly         !< Total number of polyhedra
         integer(kind=4) :: num_hex          !< Total number of hexahedra
@@ -80,7 +89,7 @@ module Poly_mesh
 
         type(Polyhedron),dimension(:),pointer :: Poly  !< For each polyhedron it stores all the properties
 
-	end type Mesh_Structure
+    end type Mesh_Structure
 
     contains
 
@@ -208,16 +217,16 @@ module Poly_mesh
                         Struct%con_prysm(i,6)-1
         enddo
 
-
+        ! Vtk Cell type file formats
         write(50,*) 'CELL_TYPES ', Struct%num_elem
         do i = 1, Struct%num_hex
-            write(50,*) 12
+            write(50,*) 12  ! hexahedra
         enddo
         do i = 1, Struct%num_tet
-            write(50,*) 10
+            write(50,*) 10  ! tetrahedra
         enddo
         do i = 1, Struct%num_prysm
-            write(50,*) 14
+            write(50,*) 14 ! pyramids? !!
         enddo
 
         write(50,*) 'CELL_DATA ', Struct%num_elem
@@ -238,4 +247,3 @@ module Poly_mesh
     !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 end module Poly_mesh
-

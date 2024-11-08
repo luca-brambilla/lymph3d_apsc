@@ -51,7 +51,7 @@
       endif
       
       inquire(file=head_file,exist=IS_filefound);
-      if(IS_filefound .eqv. .FALSE.) then
+      if(IS_filefound .eqv. .false.) then
         write(*,*) 'File ', head_file, ' is missing!'
         call EXIT(EXIT_MISSING_FILE)
       endif
@@ -97,7 +97,7 @@
       endif
       
       inquire(file=mate_file,exist=IS_filefound);
-      if(IS_filefound .eqv. .FALSE.) call EXIT(EXIT_MISSING_FILE)
+      if(IS_filefound .eqv. .false.) call EXIT(EXIT_MISSING_FILE)
       
       
       call set_Data_Structure_default_value(PolyData)
@@ -123,7 +123,7 @@
       if (mpi_id.eq.0)  write(*,'(A,A35)') 'Grid File : ',grid_file
       
       inquire(file=grid_file,exist=IS_filefound);
-      if(IS_filefound .eqv. .FALSE.) call EXIT(EXIT_MISSING_FILE)
+      if(IS_filefound .eqv. .false.) call EXIT(EXIT_MISSING_FILE)
       
 
       !counting hexahedras and squares

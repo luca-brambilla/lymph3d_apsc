@@ -4,29 +4,30 @@ module MOD_VTK
     use Poly_mesh
 
     implicit none
-    
+
     contains
-    
+
+    !>
     subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nnode_per_el, n_elem, s_name, s, PolyMesh)
-    
+
       implicit none
-      
-      !> Input arguments
+
+      ! Input arguments
       character(len=*), intent(in) :: filename
       integer*4, intent(in) :: n_elem,nnode_per_el
       real*8, dimension(4,n_elem), intent(in) :: xx,yy,zz
       integer*4,dimension(n_elem,4) :: tnew
       type(Mesh_Structure), intent(in) :: PolyMesh
-      
-      !> Optional input arguments
+
+      ! Optional input arguments
       character(len=*), intent(in), optional :: s_name
       real*8, dimension(3,4,n_elem), intent(inout), optional :: s
-    
-      !> Internal variables
+
+      ! Internal variables
       integer*4 :: VTK_file_unit
       integer*4 :: i,j
-      
-      !> Caping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
+
+      ! Capping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
       real*8, parameter :: cap = 1E-40
 
       do i=1,n_elem
@@ -34,16 +35,16 @@ module MOD_VTK
           tnew(i,j)=(i-1)*4+j-1
         end do
       end do
-      
+
       open(newunit=VTK_file_unit, action='WRITE', file=filename, &
             form='FORMATTED', status='replace')
-      
+
             write(VTK_file_unit,'(A)')'# vtk DataFile Version 3.0'
             write(VTK_file_unit,'(A)')'VTKFile'
             write(VTK_file_unit,'(A)')'ASCII'
             write(VTK_file_unit,'(A)')
             write(VTK_file_unit,'(A)')'DATASET UNSTRUCTURED_GRID'
-      
+
       write(VTK_file_unit,'(A7,I12,A7)')'POINTS ',n_elem*4,' double';
             POINT_LOOP: do i=1,n_elem
             !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
@@ -52,7 +53,7 @@ module MOD_VTK
               end do
             end do POINT_LOOP
       write(VTK_file_unit,'(A)')
-      
+
       write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem, n_elem*(nnode_per_el+1);
             ELEM_LOOP: do i=1,n_elem
               write(VTK_file_unit,'(I12,8I12)')nnode_per_el, tnew(i,:);
@@ -60,13 +61,13 @@ module MOD_VTK
               !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1;
             end do ELEM_LOOP
       write(VTK_file_unit,'(A)')
-      
+
       write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem;
             ELEM_TYPE_LOOP: do i=1,n_elem
               write(VTK_file_unit,'(I2)')10;
             end do ELEM_TYPE_LOOP
       write(VTK_file_unit,'(A)')
-      
+
       if (present(s_name) .and. present(s)) then
         write(VTK_file_unit,'(A11,I12)')'POINT_DATA ', n_elem*4;
         write(VTK_file_unit,'(A8,A12,A7)')'VECTORS ', s_name, ' double'
@@ -88,27 +89,27 @@ module MOD_VTK
             end do POLY_LOOP1
 
       write(VTK_file_unit,'(A)')
-      
+
       close(unit=VTK_file_unit)
-      
+
     end subroutine VTK_WRITE_SOLUTION
 
     subroutine VTK_WRITE_MESH_PARTITION(filename, xx, yy, zz, nnode_per_el, n_elem, PolyMesh)
-    
+
       implicit none
-      
-      !> Input arguments
+
+      ! Input arguments
       character(len=*), intent(in) :: filename
       integer*4, intent(in) :: n_elem,nnode_per_el
       real*8, dimension(4,n_elem), intent(in) :: xx,yy,zz
       integer*4,dimension(n_elem,4) :: tnew
       type(Mesh_Structure), intent(in) :: PolyMesh
-    
-      !> Internal variables
+
+      ! Internal variables
       integer*4 :: VTK_file_unit
       integer*4 :: i,j
-      
-      !> Caping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
+
+      ! Capping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
       real*8, parameter :: cap = 1E-40
 
       do i=1,n_elem
@@ -116,16 +117,16 @@ module MOD_VTK
           tnew(i,j)=(i-1)*4+j-1
         end do
       end do
-      
+
       open(newunit=VTK_file_unit, action='WRITE', file=filename, &
             form='FORMATTED', status='replace')
-      
+
             write(VTK_file_unit,'(A)')'# vtk DataFile Version 3.0'
             write(VTK_file_unit,'(A)')'VTKFile'
             write(VTK_file_unit,'(A)')'ASCII'
             write(VTK_file_unit,'(A)')
             write(VTK_file_unit,'(A)')'DATASET UNSTRUCTURED_GRID'
-      
+
       write(VTK_file_unit,'(A7,I12,A7)')'POINTS ',n_elem*4,' double';
             POINT_LOOP: do i=1,n_elem
             !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
@@ -134,7 +135,7 @@ module MOD_VTK
               end do
             end do POINT_LOOP
       write(VTK_file_unit,'(A)')
-      
+
       write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem, n_elem*(nnode_per_el+1);
             ELEM_LOOP: do i=1,n_elem
               write(VTK_file_unit,'(I12,8I12)')nnode_per_el, tnew(i,:);
@@ -142,7 +143,7 @@ module MOD_VTK
               !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1;
             end do ELEM_LOOP
       write(VTK_file_unit,'(A)')
-      
+
       write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem;
             ELEM_TYPE_LOOP: do i=1,n_elem
               write(VTK_file_unit,'(I2)')10;
@@ -157,28 +158,28 @@ module MOD_VTK
             end do POLY_LOOP2
 
       write(VTK_file_unit,'(A)')
-      
+
       close(unit=VTK_file_unit)
-      
+
     end subroutine VTK_WRITE_MESH_PARTITION
 
     subroutine VTK_WRITE_MESH_AGGLOMERATION(filename, xx, yy, zz, nnode_per_el, n_elem, PolyMesh)
-    
+
       implicit none
-      
-      !> Input arguments
+
+      ! Input arguments
       character(len=*), intent(in) :: filename
       integer*4, intent(in) :: n_elem,nnode_per_el
       real*8, dimension(4,n_elem), intent(in) :: xx,yy,zz
       integer*4,dimension(n_elem,4) :: tnew
       type(Mesh_Structure), intent(in) :: PolyMesh
       ! integer*4,dimension(n_elem) :: E2P
-    
-      !> Internal variables
+
+      ! Internal variables
       integer*4 :: VTK_file_unit
       integer*4 :: i,j
-      
-      !> Caping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
+
+      ! Capping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
       real*8, parameter :: cap = 1E-40
 
       do i=1,n_elem
@@ -186,16 +187,16 @@ module MOD_VTK
           tnew(i,j)=(i-1)*4+j-1
         end do
       end do
-      
+
       open(newunit=VTK_file_unit, action='WRITE', file=filename, &
             form='FORMATTED', status='replace')
-      
+
             write(VTK_file_unit,'(A)')'# vtk DataFile Version 3.0'
             write(VTK_file_unit,'(A)')'VTKFile'
             write(VTK_file_unit,'(A)')'ASCII'
             write(VTK_file_unit,'(A)')
             write(VTK_file_unit,'(A)')'DATASET UNSTRUCTURED_GRID'
-      
+
       write(VTK_file_unit,'(A7,I12,A7)')'POINTS ',n_elem*4,' double';
             POINT_LOOP: do i=1,n_elem
             !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
@@ -204,7 +205,7 @@ module MOD_VTK
               end do
             end do POINT_LOOP
       write(VTK_file_unit,'(A)')
-      
+
       write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem, n_elem*(nnode_per_el+1);
             ELEM_LOOP: do i=1,n_elem
               write(VTK_file_unit,'(I12,8I12)')nnode_per_el, tnew(i,:);
@@ -212,7 +213,7 @@ module MOD_VTK
               !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1;
             end do ELEM_LOOP
       write(VTK_file_unit,'(A)')
-      
+
       write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem;
             ELEM_TYPE_LOOP: do i=1,n_elem
               write(VTK_file_unit,'(I2)')10;
@@ -227,30 +228,30 @@ module MOD_VTK
             end do POLY_LOOP3
 
       write(VTK_file_unit,'(A)')
-      
+
       close(unit=VTK_file_unit)
-      
+
     end subroutine VTK_WRITE_MESH_AGGLOMERATION
-  
-    ! Store the errors, the degree and hmax in an appropriate file
+
+    !> Store the errors, the degree and hmax in an appropriate file
     subroutine VTK_WRITE_ERR(filename, p, err_L2, err_DG, hh)
-    
+
         implicit none
-        
-        !> Input arguments
+
+        ! Input arguments
         character(len=*), intent(in) :: filename
         integer (kind=4) :: p
         real (kind=8) :: err_L2
         real (kind=8) :: err_DG
         real (kind=8) :: hh
-            
-        !> Internal variables
+
+        ! Internal variables
         integer*4 :: VTK_file_unit
         !integer*4 :: i,j
-      
+
         open(newunit=VTK_file_unit, action='WRITE', file=filename, &
               form='FORMATTED', status='replace')
-        
+
         write(VTK_file_unit,'(A)')'degree';
         write(VTK_file_unit,'(I1)') p;
 
@@ -271,31 +272,31 @@ module MOD_VTK
                 !write(VTK_file_unit,'(I12,8I12)')nnode_per_el, t(i,:)-1;
               write(VTK_file_unit,'(1F16.8)') hh
               !end do ELEM_LOOP
-        
+
         close(unit=VTK_file_unit)
-        
+
     end subroutine
 
-    ! Store the errors, the degree and hmax in an appropriate file for the convergence test
-    ! It is similar to VTK_WRITE_ERR, but here we append the data instead of replacing
+    !> Store the errors, the degree and hmax in an appropriate file for the convergence test
+    !> It is similar to VTK_WRITE_ERR, but here we append the data instead of replacing
     subroutine VTK_WRITE_CONV(filename, p, err_L2, err_DG, hh)
-    
+
       implicit none
-      
-      !> Input arguments
+
+      ! Input arguments
       character(len=*), intent(in) :: filename
       integer (kind=4) :: p
       real (kind=8) :: err_L2
       real (kind=8) :: err_DG
       real (kind=8) :: hh
-          
-      !> Internal variables
+
+      ! Internal variables
       integer*4 :: VTK_file_unit
       !integer*4 :: i,j
-    
+
       open(newunit=VTK_file_unit, action='WRITE', file=filename, &
             form='FORMATTED', position='append', status='unknown')
-      
+
       write(VTK_file_unit,'(A)')'degree';
       write(VTK_file_unit,'(I1)') p;
 
@@ -317,16 +318,16 @@ module MOD_VTK
             write(VTK_file_unit,'(1F16.8)') hh
             !end do ELEM_LOOP
       write(VTK_file_unit,'(A)') ' ';
-      
+
       close(unit=VTK_file_unit)
-      
+
     end subroutine
-    
-    ! Store the numerical solution in an appropriate file
+
+    !> Store the numerical solution in an appropriate file
     subroutine WRITE_SOLUTION_VTK(nelem, PolyMesh, u, IsPoly, mpi_id, num_dt)
 
       use problem_data_and_properties
-    
+
       implicit none
 
       integer(kind=4), intent(in), optional :: num_dt
@@ -343,35 +344,35 @@ module MOD_VTK
       do ie_loc = 1,nelem
 
         do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
-        
+
             call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                  PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)      
-            
+                                  PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)
+
             xx(ivert,ie_loc)=PolyMesh%coord_x(id_node)
             yy(ivert,ie_loc)=PolyMesh%coord_y(id_node)
             zz(ivert,ie_loc)=PolyMesh%coord_z(id_node)
 
         enddo
-        
+
       enddo
-      
-      !> WRITE VTK-FILE ---------------------------------------------------- 
+
+      ! WRITE VTK-FILE ----------------------------------------------------
       if(IsPoly) then
 
         ! write(vtk_filename, '(A,I0,A)') 'MONITORS/sol_poly_', PolyMesh%num_poly, '.vtk'
         vtk_filename_num = 'MONITORS/sol_poly_000000.vtk'
-        if (mpi_id < 10) then            
-          write(vtk_filename_num(24:24),'(i1)') mpi_id                             
-        elseif (mpi_id < 100) then                                              
-          write(vtk_filename_num(23:24),'(i2)') mpi_id                             
-        elseif (mpi_id < 1000) then                                           
-          write(vtk_filename_num(22:24),'(i3)') mpi_id                              
-        elseif (mpi_id < 10000) then                                              
-          write(vtk_filename_num(21:24),'(i4)') mpi_id                             
-        elseif (mpi_id < 100000) then                                            
-          write(vtk_filename_num(20:24),'(i5)') mpi_id                         
+        if (mpi_id < 10) then
+          write(vtk_filename_num(24:24),'(i1)') mpi_id
+        elseif (mpi_id < 100) then
+          write(vtk_filename_num(23:24),'(i2)') mpi_id
+        elseif (mpi_id < 1000) then
+          write(vtk_filename_num(22:24),'(i3)') mpi_id
+        elseif (mpi_id < 10000) then
+          write(vtk_filename_num(21:24),'(i4)') mpi_id
+        elseif (mpi_id < 100000) then
+          write(vtk_filename_num(20:24),'(i5)') mpi_id
         elseif (mpi_id < 1000000) then
-          write(vtk_filename_num(19:24),'(i6)') mpi_id                            
+          write(vtk_filename_num(19:24),'(i6)') mpi_id
         endif
 
       else
@@ -380,47 +381,47 @@ module MOD_VTK
         vtk_filename_num = 'MONITORS/sol_tet_000000_000000.vtk'
 
         ! num_dt
-        if (num_dt < 10) then            
-          write(vtk_filename_num(23:23),'(i1)') num_dt                             
-        elseif (num_dt < 100) then                                              
-          write(vtk_filename_num(22:23),'(i2)') num_dt                             
-        elseif (num_dt < 1000) then                                           
-          write(vtk_filename_num(21:23),'(i3)') num_dt                              
-        elseif (num_dt < 10000) then                                              
-          write(vtk_filename_num(20:23),'(i4)') num_dt                             
-        elseif (num_dt < 100000) then                                            
-          write(vtk_filename_num(19:23),'(i5)') num_dt                         
+        if (num_dt < 10) then
+          write(vtk_filename_num(23:23),'(i1)') num_dt
+        elseif (num_dt < 100) then
+          write(vtk_filename_num(22:23),'(i2)') num_dt
+        elseif (num_dt < 1000) then
+          write(vtk_filename_num(21:23),'(i3)') num_dt
+        elseif (num_dt < 10000) then
+          write(vtk_filename_num(20:23),'(i4)') num_dt
+        elseif (num_dt < 100000) then
+          write(vtk_filename_num(19:23),'(i5)') num_dt
         elseif (num_dt < 1000000) then
-          write(vtk_filename_num(18:23),'(i6)') num_dt                            
+          write(vtk_filename_num(18:23),'(i6)') num_dt
         endif
 
         ! timestep
-        if (mpi_id < 10) then            
-          write(vtk_filename_num(30:30),'(i1)') mpi_id                             
-        elseif (mpi_id < 100) then                                              
-          write(vtk_filename_num(29:30),'(i2)') mpi_id                             
-        elseif (mpi_id < 1000) then                                           
-          write(vtk_filename_num(28:30),'(i3)') mpi_id                              
-        elseif (mpi_id < 10000) then                                              
-          write(vtk_filename_num(27:30),'(i4)') mpi_id                             
-        elseif (mpi_id < 100000) then                                            
-          write(vtk_filename_num(26:30),'(i5)') mpi_id                         
+        if (mpi_id < 10) then
+          write(vtk_filename_num(30:30),'(i1)') mpi_id
+        elseif (mpi_id < 100) then
+          write(vtk_filename_num(29:30),'(i2)') mpi_id
+        elseif (mpi_id < 1000) then
+          write(vtk_filename_num(28:30),'(i3)') mpi_id
+        elseif (mpi_id < 10000) then
+          write(vtk_filename_num(27:30),'(i4)') mpi_id
+        elseif (mpi_id < 100000) then
+          write(vtk_filename_num(26:30),'(i5)') mpi_id
         elseif (mpi_id < 1000000) then
-          write(vtk_filename_num(25:30),'(i6)') mpi_id                            
+          write(vtk_filename_num(25:30),'(i6)') mpi_id
         endif
 
 
       endif
 
       call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, 4, nelem, 'solution', u, PolyMesh)
-      
+
       return
-    
+
     end subroutine WRITE_SOLUTION_VTK
 
-    ! Write .vtk files for the visualization of the partition and agglomeration of the mesh
+    !> Write .vtk files for the visualization of the partition and agglomeration of the mesh
     subroutine WRITE_MESH_VISUALIZATION_VTK(nelem, PolyMesh, mpi_id)
-    
+
       implicit none
 
       type(Mesh_Structure), intent(inout) :: PolyMesh
@@ -433,61 +434,61 @@ module MOD_VTK
       do ie_loc = 1,nelem
 
         do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
-        
+
             call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                  PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)      
-            
+                                  PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)
+
             xx(ivert,ie_loc)=PolyMesh%coord_x(id_node)
             yy(ivert,ie_loc)=PolyMesh%coord_y(id_node)
             zz(ivert,ie_loc)=PolyMesh%coord_z(id_node)
 
         enddo
-        
+
       enddo
-      
-      !> WRITE VTK-FILE ---------------------------------------------------- 
+
+      ! WRITE VTK-FILE ----------------------------------------------------
 
         vtk_filename_partition = 'mesh_visualization/mesh_partition_000000.vtk'
-        if (mpi_id < 10) then            
-          write(vtk_filename_partition(40:40),'(i1)') mpi_id                             
-        elseif (mpi_id < 100) then                                              
-          write(vtk_filename_partition(39:40),'(i2)') mpi_id                             
-        elseif (mpi_id < 1000) then                                           
-          write(vtk_filename_partition(38:40),'(i3)') mpi_id                              
-        elseif (mpi_id < 10000) then                                              
-          write(vtk_filename_partition(37:40),'(i4)') mpi_id                             
-        elseif (mpi_id < 100000) then                                            
-          write(vtk_filename_partition(36:40),'(i5)') mpi_id                         
+        if (mpi_id < 10) then
+          write(vtk_filename_partition(40:40),'(i1)') mpi_id
+        elseif (mpi_id < 100) then
+          write(vtk_filename_partition(39:40),'(i2)') mpi_id
+        elseif (mpi_id < 1000) then
+          write(vtk_filename_partition(38:40),'(i3)') mpi_id
+        elseif (mpi_id < 10000) then
+          write(vtk_filename_partition(37:40),'(i4)') mpi_id
+        elseif (mpi_id < 100000) then
+          write(vtk_filename_partition(36:40),'(i5)') mpi_id
         elseif (mpi_id < 1000000) then
-          write(vtk_filename_partition(35:40),'(i6)') mpi_id                            
+          write(vtk_filename_partition(35:40),'(i6)') mpi_id
         endif
 
         vtk_filename_agglomeration = 'mesh_visualization/mesh_agglomeration_000000.vtk'
-        if (mpi_id < 10) then            
-          write(vtk_filename_agglomeration(44:44),'(i1)') mpi_id                             
-        elseif (mpi_id < 100) then                                              
-          write(vtk_filename_agglomeration(43:44),'(i2)') mpi_id                             
-        elseif (mpi_id < 1000) then                                           
-          write(vtk_filename_agglomeration(42:44),'(i3)') mpi_id                              
-        elseif (mpi_id < 10000) then                                              
-          write(vtk_filename_agglomeration(41:44),'(i4)') mpi_id                             
-        elseif (mpi_id < 100000) then                                            
-          write(vtk_filename_agglomeration(40:44),'(i5)') mpi_id                         
+        if (mpi_id < 10) then
+          write(vtk_filename_agglomeration(44:44),'(i1)') mpi_id
+        elseif (mpi_id < 100) then
+          write(vtk_filename_agglomeration(43:44),'(i2)') mpi_id
+        elseif (mpi_id < 1000) then
+          write(vtk_filename_agglomeration(42:44),'(i3)') mpi_id
+        elseif (mpi_id < 10000) then
+          write(vtk_filename_agglomeration(41:44),'(i4)') mpi_id
+        elseif (mpi_id < 100000) then
+          write(vtk_filename_agglomeration(40:44),'(i5)') mpi_id
         elseif (mpi_id < 1000000) then
-          write(vtk_filename_agglomeration(39:44),'(i6)') mpi_id                            
+          write(vtk_filename_agglomeration(39:44),'(i6)') mpi_id
         endif
 
       call VTK_WRITE_MESH_PARTITION(vtk_filename_partition, xx,yy,zz, 4, nelem, PolyMesh)
       call VTK_WRITE_MESH_AGGLOMERATION(vtk_filename_agglomeration, xx,yy,zz, 4, nelem, PolyMesh)
-      
+
       return
-    
+
     end subroutine WRITE_MESH_VISUALIZATION_VTK
 
-    ! Associate files storing the errors in an appropriate name
-    ! and call the functions which stores the data
+    !> Associate files storing the errors in an appropriate name
+    !> and call the functions which stores the data
     subroutine WRITE_ERRORS(p, err_DG, err_L2, hh, PolyMesh, IsPoly)
-    
+
       use problem_data_and_properties
 
       implicit none
@@ -502,10 +503,10 @@ module MOD_VTK
       character(len=80) :: filename_err, filename_conv
       character(len=80) :: file_poly, file_tet
       real(kind=8) :: alpha, theta, c
-    
+
       call set_properties(alpha, theta, c)
-    
-      !> WRITE VTK-FILE ----------------------------------------------------
+
+      ! WRITE VTK-FILE ----------------------------------------------------
       if(IsPoly) then
 
         write(file_poly, '(A,I0,A)') 'ERRORS_POLY/Errors_poly_', PolyMesh%num_poly, '.vtk'
@@ -536,7 +537,7 @@ module MOD_VTK
       call VTK_WRITE_CONV(filename_conv, p, err_L2, err_DG, hh)
 
       return
-      
+
     end subroutine WRITE_ERRORS
-    
+
 end module MOD_VTK

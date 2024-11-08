@@ -21,178 +21,183 @@
 !    READ_HEADER(header_file)
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-      subroutine READ_HEADER(header_file)
+subroutine READ_HEADER(header_file)
 
-      use Poly_global, only: grid_file, mate_file, &
-                                 folder_mpi, folder_monitors, folder_restart, &
-                                 opt_out_var, damping_type, &                                 
-                                 time_step, start_time, stop_time, time_restart, &
-                                 num_dt_mon, Is_Restart, Is_Debug, &
-                                 depth_search_mon_lst, IS_mon_lst, &
-                                 IsTime_dependent, IsSave_output
-                                 
+   use Poly_global, only: grid_file, mate_file, &
+                              folder_mpi, folder_monitors, folder_restart, &
+                              opt_out_var, damping_type, &
+                              time_step, start_time, stop_time, time_restart, &
+                              num_dt_mon, Is_Restart, Is_Debug, &
+                              depth_search_mon_lst, IS_mon_lst, &
+                              IsTime_dependent, IsSave_output, IS_MatrixFree
 
-      use Poly_exit_codes
-      use Poly_fail_codes
-      use Poly_default_codes
-      use Poly_setup_mpi
 
-      implicit none
+   use Poly_exit_codes
+   use Poly_fail_codes
+   use Poly_default_codes
+   use Poly_setup_mpi
+
+   implicit none
+   
+   character(len=14) :: header_file
+   character(len=8)  :: keyword
+   character(len=70) :: inline
+
+   integer(kind=4)   :: i, status, ileft, iright, arglen, val_mon_lst
+   integer(kind=4)   :: file_row = 0
+
+   integer(kind=4) :: IS_dynamic, IS_save, IS_free
+
+
+   !Setup default values 
+   start_time              = start_time_default
+   damping_type            = damping_type_default
+
+   IS_mon_lst              = IS_mon_lst_default
+   IS_debug                = IS_debug_default
+   IS_restart              = IS_restart_default
+   IS_setuponly            = IS_setuponly_default
+   IS_failoncoeffs         = IS_failoncoeffs_default
+   IS_failCFL              = IS_failCFL_default
+   IS_instabilitycontrol   = IS_instabilitycontrol_default
+   IsTime_dependent        = IS_timedependent_default
+   IsSave_output           = IS_saveoutput_default
+   IS_MatrixFree           = IS_MatrixFree_default
+
+   if(mpi_id == 0) write(*,'(A)')  !! PRINT VARIABLES
+   
+   open(40,file=header_file)
+   
+   do    
+      read(40,'(A)',IOSTAT = status) inline
+      file_row = file_row + 1
       
-      character(len=14) :: header_file
-      character(len=8)  :: keyword
-      character(len=70) :: inline
-
-      integer(kind=4)   :: i, status, ileft, iright, arglen, val_mon_lst
-      integer(kind=4)   :: file_row = 0
-
-      integer(kind=4) :: IS_dynamic, IS_save
-
-
-      !Setup default values 
-      start_time        = start_time_default
-      damping_type      = damping_type_default
-
-      IS_mon_lst        = IS_mon_lst_default
-      IS_debug          = IS_debug_default
-      IS_restart        = IS_restart_default
-      IS_setuponly      = IS_setuponly_default
-      IS_failoncoeffs   = IS_failoncoeffs_default
-      IS_failCFL        = IS_failCFL_default
-      IS_instabilitycontrol = IS_instabilitycontrol_default
-      IsTime_dependent  = IS_timedependent_default
-      IsSave_output = IS_saveoutput_default
-
-      if(mpi_id == 0) write(*,'(A)')  !! PRINT VARIABLES
+      if (status.ne.0) exit
       
-      open(40,file=header_file)
+      ! Skip comments
+      if (inline(1:1) == ' ') then
+         cycle
+      endif
+
+      !!!! Parse keyword arguments
+      ileft = 1
+      iright = len_trim(inline)
       
-      do    
-         read(40,'(A)',IOSTAT = status) inline
-         file_row = file_row + 1
-         
-         if (status.ne.0) exit
-         
-         ! Skip comments
-         if (inline(1:1) == ' ') then
-            cycle
-         endif
+      ! Compute index to first non-keyword argument
+      do i = 1,iright
+         if (inline(i:i) == ' ') exit
+      enddo
+      ileft = i + 1
+      keyword = inline(1:(ileft-2))
 
-         !!!! Parse keyword arguments
-         ileft = 1
-         iright = len_trim(inline)
-         
-         ! Compute index to first non-keyword argument
-         do i = 1,iright
-            if (inline(i:i) == ' ') exit
-         enddo
-         ileft = i + 1
-         keyword = inline(1:(ileft-2))
+      ! Now ileft points after the first blank
+      arglen = len_trim(inline(ileft:iright))
 
-         ! Now ileft points after the first blank
-         arglen = len_trim(inline(ileft:iright))
-
-         ! Remove this for keywords without arguments!
-         if (arglen == 0) then
-            write(*,'(A,I3,A,A,A)') 'FATAL in PolyWAVE.input, row', &
-                   file_row, ': no argument given for command "', trim(keyword), '"'
-            call EXIT(EXIT_SYNTAX_ERROR)
-         endif
+      ! Remove this for keywords without arguments!
+      if (arglen == 0) then
+         write(*,'(A,I3,A,A,A)') 'FATAL in PolyWAVE.input, row', &
+                  file_row, ': no argument given for command "', trim(keyword), '"'
+         call EXIT(EXIT_SYNTAX_ERROR)
+      endif
 
 !         write(*,*) 'Comparing ', inline(1:(ileft-2)), ', ileft=', ileft
 
-         if(mpi_id == 0) write(*,'(A)')keyword  !! PRINT READ VARIABLES
-         
-         select case (keyword)
+      if(mpi_id == 0) write(*,'(A)')keyword  !! PRINT READ VARIABLES
+      
+      select case (keyword)
 
-           case('GRIDFILE')
+         case('GRIDFILE')
             read(inline(ileft:iright),*) grid_file
 
-           case('MATFILE')
+         case('MATFILE')
             read(inline(ileft:iright),*) mate_file
-           
-           case('MPIFILE')
+         
+         case('MPIFILE')
             read(inline(ileft:iright),*) folder_mpi   
-           
-           case('MONFILE')
+         
+         case('MONFILE')
             read(inline(ileft:iright),*) folder_monitors   
-           
-           case('BKPFILE')
+         
+         case('BKPFILE')
             read(inline(ileft:iright),*) folder_restart   
 
-           case('OPTIOUT')
+         case('OPTIOUT')
             read(inline(ileft:iright),*) opt_out_var(1),opt_out_var(2),opt_out_var(3), &
-                                         opt_out_var(4),opt_out_var(5),opt_out_var(6) 
+                                       opt_out_var(4),opt_out_var(5),opt_out_var(6) 
          
-           case('TIMESTEP')
+         case('TIMESTEP')
             read(inline(ileft:iright),*) time_step
          
-           case('STARTIME')
+         case('STARTIME')
             read(inline(ileft:iright),*) start_time
          
-           case('STOPTIME')
+         case('STOPTIME')
             read(inline(ileft:iright),*) stop_time
 
-           case('DYNAMIC')
+         case('DYNAMIC')
             read(inline(ileft:iright),*) IS_dynamic
             if (IS_dynamic /= 0) IsTime_dependent = .true.
 
-           case('RESTART')
+         case('RESTART')
             read(inline(ileft:iright),*) time_restart
             IS_Restart = .true.
 
-           case('TMONITOR')                                        
+         case('TMONITOR')                                        
             read(inline(ileft:iright),*) num_dt_mon  
             
-           case('SAVEOUT')
-            read(inline(ileft:iright),*) 
+         case('SAVEOUT')
+            read(inline(ileft:iright),*) IS_save
             if(IS_save /= 0) IsSave_output = .true.
+
+         case('MATFREE')
+            read(inline(ileft:iright),*) IS_save
+            if(IS_free /= 0) IS_MatrixFree = .true.
             
-           case('DAMPING')
+         case('DAMPING')
             read(inline(ileft:iright),*) damping_type   
-    
-           case('MLST')                        
+   
+         case('MLST')                        
             read(inline(ileft:iright),*) depth_search_mon_lst, val_mon_lst
             if (val_mon_lst == 1) IS_mon_lst = .true. 
             
             
-           case('FAILCFL')
+         case('FAILCFL')
             ! If specified as "FAILCFL", quit if CFL condition does not hold
             IS_failCFL = .true.
 
-           case('FAILINST')
+         case('FAILINST')
             ! If specified as "FAILINST", enable instability control
             IS_instabilitycontrol = .true.
 
-           case('SETUPONL')
+         case('SETUPONL')
             ! If specified as "SETUPONL", quit before starting the time loop
             IS_setuponly = .true.
 
-           case('FAILCOEF')
+         case('FAILCOEF')
             ! If specified as "FAILCOEF", quit if any of the computed
             ! anelastic coefficients is negative [damping 2]
             IS_failoncoeffs = .true.
 
-           case('DEBUG')
-              IS_Debug = .true.
+         case('DEBUG')
+            IS_Debug = .true.
       
 
-           ! Fail if keyword is not recognised
-           case default
-            write(*,'(A,I3,A,A)') 'FATAL in PolyWAVE.input, row', &
-                         file_row, ': unknown keyword ', keyword
+         ! Fail if keyword is not recognised
+         case default
+            write(*,'(A,I3,A,A)') 'FATAL in test1.input, row', &
+                        file_row, ': unknown keyword ', keyword
             call EXIT(EXIT_SYNTAX_ERROR)
 
-         end select  
+      end select  
 
-      enddo
-          
-      
-      close(40)
-      
-      if(mpi_id == 0) write(*,'(A)') !! PRINT VARIABLES
+   enddo
+         
+   
+   close(40)
+   
+   if(mpi_id == 0) write(*,'(A)') !! PRINT VARIABLES
 
-      end subroutine READ_HEADER
+end subroutine READ_HEADER
 
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -227,26 +232,27 @@
 
        select case (keyword)
 
-           case('MATE'); PolyData%nmat          = PolyData%nmat + 1
-           case('MATN'); PolyData%nmat_nle      = PolyData%nmat_nle + 1     
-           case('MATR'); PolyData%nmat_rnd      = PolyData%nmat_rnd + 1
-           case('DIRI'); PolyData%nload_diri_el = PolyData%nload_diri_el + 1
-           case('NEUM'); PolyData%nload_neum_el = PolyData%nload_neum_el + 1
-           case('NEUN'); PolyData%nload_neuN_el = PolyData%nload_neuN_el + 1                 
-           case('PLOX'); PolyData%nload_poiX_el = PolyData%nload_poiX_el + 1
-           case('PLOY'); PolyData%nload_poiY_el = PolyData%nload_poiY_el + 1
-           case('PLOZ'); PolyData%nload_poiZ_el = PolyData%nload_poiZ_el + 1
-           case('PLAX'); PolyData%nload_plaX_el = PolyData%nload_plaX_el + 1                
-           case('PLAY'); PolyData%nload_plaY_el = PolyData%nload_plaY_el + 1                
-           case('PLAZ'); PolyData%nload_plaZ_el = PolyData%nload_plaZ_el + 1                
-           case('FORX'); PolyData%nload_forX_el = PolyData%nload_forX_el + 1
-           case('FORY'); PolyData%nload_forY_el = PolyData%nload_forY_el + 1
-           case('FORZ'); PolyData%nload_forZ_el = PolyData%nload_forZ_el + 1
-           case('ABSO'); PolyData%nload_abc_el  = PolyData%nload_abc_el + 1
-           case('SISM'); PolyData%nload_sism_el = PolyData%nload_sism_el + 1                
-           case('CASE'); PolyData%n_case        = PolyData%n_case + 1        
-           case('NHEE'); PolyData%nmat_nhe      = PolyData%nmat_nhe + 1        
-           case('SLIP')        
+         case('MATE'); PolyData%nmat          = PolyData%nmat + 1
+         case('MATN'); PolyData%nmat_nle      = PolyData%nmat_nle + 1     
+         case('MATR'); PolyData%nmat_rnd      = PolyData%nmat_rnd + 1
+         case('DIRI'); PolyData%nload_diri_el = PolyData%nload_diri_el + 1
+         case('NEUM'); PolyData%nload_neum_el = PolyData%nload_neum_el + 1
+         case('NEUN'); PolyData%nload_neuN_el = PolyData%nload_neuN_el + 1                 
+         case('PLOX'); PolyData%nload_poiX_el = PolyData%nload_poiX_el + 1
+         case('PLOY'); PolyData%nload_poiY_el = PolyData%nload_poiY_el + 1
+         case('PLOZ'); PolyData%nload_poiZ_el = PolyData%nload_poiZ_el + 1
+         case('PLAX'); PolyData%nload_plaX_el = PolyData%nload_plaX_el + 1                
+         case('PLAY'); PolyData%nload_plaY_el = PolyData%nload_plaY_el + 1                
+         case('PLAZ'); PolyData%nload_plaZ_el = PolyData%nload_plaZ_el + 1                
+         case('FORX'); PolyData%nload_forX_el = PolyData%nload_forX_el + 1
+         case('FORY'); PolyData%nload_forY_el = PolyData%nload_forY_el + 1
+         case('FORZ'); PolyData%nload_forZ_el = PolyData%nload_forZ_el + 1
+         case('ABSO'); PolyData%nload_abc_el  = PolyData%nload_abc_el + 1
+         case('SISM'); PolyData%nload_sism_el = PolyData%nload_sism_el + 1                
+         case('CASE'); PolyData%n_case        = PolyData%n_case + 1        
+         case('NHEE'); PolyData%nmat_nhe      = PolyData%nmat_nhe + 1        
+         case('SLIP')        
+
             ! Not-honoring Fault Plane
             read(inline(5:),*) src_name
             if (src_name.eq.'LOAD-SRCMOD2') PolyData%srcmodflag = 1; 
@@ -257,64 +263,64 @@
             
             select case (func_typec)
                case(0,32)
-                ! Case 32 - Ramp Source Time Function
-                 PolyData%nfunc_data = PolyData%nfunc_data + 0
+                  ! Case 32 - Ramp Source Time Function
+                  PolyData%nfunc_data = PolyData%nfunc_data + 0
                case(1) 
-                 ! RICKER WAVELET
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2
+                  ! RICKER WAVELET
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2
                case(2) 
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2
                case(3,30,31,33) 
-                   ! TIME SERIES
-                   ! Case 31 - Text File with Source Time Function
-                 read(inline(5:),*) tagel_func, func_typec, nfunc_datac
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2*nfunc_datac
+                  ! TIME SERIES
+                  ! Case 31 - Text File with Source Time Function
+                  read(inline(5:),*) tagel_func, func_typec, nfunc_datac
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2*nfunc_datac
                 
                case(4) 
-                 ! DERIVATIVE OF THE RICKER WAVELET
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2
+                  ! DERIVATIVE OF THE RICKER WAVELET
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2
                case(5) 
-                 ! DERIVATIVE OF THE GAUSSIAN WAVELET
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2
+                  ! DERIVATIVE OF THE GAUSSIAN WAVELET
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2
 
                case(6) 
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2
                case(7) 
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2
                case(8,9) 
-                 PolyData%nfunc_data = PolyData%nfunc_data + 1
+                  PolyData%nfunc_data = PolyData%nfunc_data + 1
 
                case(12) 
-                 ! SIGMOIDAL FUNC
-                 PolyData%nfunc_data = PolyData%nfunc_data + 3
+                  ! SIGMOIDAL FUNC
+                  PolyData%nfunc_data = PolyData%nfunc_data + 3
                case(13) 
-                 ! GRENOBLE BENCHMARK
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2
+                  ! GRENOBLE BENCHMARK
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2
                case(14) 
-                 ! SCEC BENCHMARK
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2
+                  ! SCEC BENCHMARK
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2
                case(15) 
-                 ! EXPLOSION    
-                 PolyData%nfunc_data = PolyData%nfunc_data + 4
+                  ! EXPLOSION    
+                  PolyData%nfunc_data = PolyData%nfunc_data + 4
                case(50,55) 
-                 ! VARIABLE TAU 
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2  
+                  ! VARIABLE TAU 
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2  
                case(60,62) 
-                 ! LINEAR EQUIVALENT
-                 read(inline(5:),*) tagel_func, func_typec, nfunc_datac               
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2*nfunc_datac
+                  ! LINEAR EQUIVALENT
+                  read(inline(5:),*) tagel_func, func_typec, nfunc_datac               
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2*nfunc_datac
                case(61,63)                                      
-                 read(inline(5:),*) tagel_func, func_typec, nfunc_datac               
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2*nfunc_datac
+                  read(inline(5:),*) tagel_func, func_typec, nfunc_datac               
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2*nfunc_datac
                case(99) 
-                 ! CASHIMA   
-                 PolyData%nfunc_data = PolyData%nfunc_data + 2    
+                  ! CASHIMA   
+                  PolyData%nfunc_data = PolyData%nfunc_data + 2    
                case(100)
                  PolyData%nfunc_data = PolyData%nfunc_data + 1   
                case(773) 
-                   ! TIME SERIES
-                 read(inline(5:),*) tagel_func, func_typec, nfunc_datac
-                 PolyData%nfunc_data = PolyData%nfunc_data + nfunc_datac
+                  ! TIME SERIES
+                  read(inline(5:),*) tagel_func, func_typec, nfunc_datac
+                  PolyData%nfunc_data = PolyData%nfunc_data + nfunc_datac
 
             end select 
          
@@ -430,8 +436,8 @@
 
            case('DIRI')
             idX = idX + 1
-            read(inline(ileft:iright),*) PolyData%tag_diri_el(idX), &
-                                         PolyData%fun_space_diri_el(idX), &
+            read(inline(ileft:iright),*) PolyData%face_tag_diri_el(idX), &
+                                         PolyData%space_fun_tag_diri_el(idX), &
                                          PolyData%val_diri_el(idX,1), &
                                          PolyData%val_diri_el(idX,2), &
                                          PolyData%val_diri_el(idX,3), &
@@ -439,8 +445,8 @@
 
            case('NEUM')
             inX = inX + 1
-            read(inline(ileft:iright),*) PolyData%tag_neum_el(inX), &
-                                         PolyData%fun_space_neum_el(inX), &
+            read(inline(ileft:iright),*) PolyData%face_tag_neum_el(inX), &
+                                         PolyData%space_fun_tag_neum_el(inX), &
                                          PolyData%val_neum_el(inX,1), &
                                          PolyData%val_neum_el(inX,2), &
                                          PolyData%val_neum_el(inX,3), &
@@ -804,10 +810,10 @@
        elseif ((keyword == 'quad') .or. (keyword == 'QUAD')) then
           control = 0
           do i = 1, PolyData%nload_diri_el
-             if (PolyData%tag_diri_el(i) == mat_code) control = 1
+             if (PolyData%face_tag_diri_el(i) == mat_code) control = 1
           enddo
           do i = 1, PolyData%nload_neum_el
-             if (PolyData%tag_neum_el(i) == mat_code) control = 1
+             if (PolyData%face_tag_neum_el(i) == mat_code) control = 1
           enddo
           do i = 1, PolyData%nload_neuN_el                     
              if (PolyData%tag_neuN_el(i) == mat_code) control = 1
@@ -821,10 +827,10 @@
        elseif ((keyword == 'tria') .or. (keyword == 'TRIA')) then
           control = 0
           do i = 1, PolyData%nload_diri_el
-             if (PolyData%tag_diri_el(i) == mat_code) control = 1
+             if (PolyData%face_tag_diri_el(i) == mat_code) control = 1
           enddo
           do i = 1, PolyData%nload_neum_el
-             if (PolyData%tag_neum_el(i) == mat_code) control = 1
+             if (PolyData%face_tag_neum_el(i) == mat_code) control = 1
           enddo
           do i = 1, PolyData%nload_neuN_el                     
              if (PolyData%tag_neuN_el(i) == mat_code) control = 1
@@ -863,7 +869,7 @@
      integer(kind=4)       :: id_status, id_node, i, j, ie, str_len, ileft, iright, & 
                               trash, mat_code, ihexa, iquad, inode, control, &
                               elem_total, itetra, iprysm, itria,ipoly,check_poly, &
-                              fun_space
+                              space_fun_tag
                               
      real(kind=8)          :: xx, yy, zz
       
@@ -884,8 +890,9 @@
         if (inline(1:1) /= '#') exit
       enddo
       
-      read(inline,*) PolyMesh%num_node, elem_total
+      read(inline,*) PolyMesh%num_node, elem_total ! elem_total for both 3D, 2D
       
+      ! read nodes
       do i = 1, PolyMesh%num_node
       
         !read(40,*) id_node, PolyMesh%vert_x(i), PolyMesh%vert_y(i), PolyMesh%vert_z(i)
@@ -894,8 +901,10 @@
         
       enddo
       
+      ! read 3D elements and 2D faces
       do ie = 1, elem_total
          
+         ! look for a word (alphabetic characters)
          read(40,'(A)')inline
          str_len = len(inline)
          ileft = 0
@@ -913,6 +922,7 @@
          
          read(inline(1:ileft),*) trash, mat_code
          
+         ! 3D, 2nd column for material tag (MATE)
          if ((keyword == 'hex') .or. (keyword =='HEX')) then
             control = 0
             do i = 1, PolyData%nmat
@@ -953,13 +963,15 @@
                read(inline(iright:str_len),*)(PolyMesh%con_prysm(iprysm,j),j=2,6)
             endif
 
+         ! 2D, 2nd column is the face tag
+         ! TODO - assign space function tag for quads and poly?
          elseif ((keyword == 'quad') .or. (keyword == 'QUAD')) then
            control = 0
            do i = 1, PolyData%nload_diri_el
-              if (PolyData%tag_diri_el(i) == mat_code) control = 1
+              if (PolyData%face_tag_diri_el(i) == mat_code) control = 1
            enddo
            do i = 1, PolyData%nload_neum_el
-              if (PolyData%tag_neum_el(i) == mat_code) control = 1
+              if (PolyData%face_tag_neum_el(i) == mat_code) control = 1
            enddo
            do i = 1, PolyData%nload_neuN_el                               
               if (PolyData%tag_neuN_el(i) == mat_code) control = 1          
@@ -981,15 +993,15 @@
          elseif ((keyword == 'tria') .or. (keyword == 'TRIA')) then
            control = 0
            do i = 1, PolyData%nload_diri_el
-              if (PolyData%tag_diri_el(i) == mat_code) then
+              if (PolyData%face_tag_diri_el(i) == mat_code) then
                control = 1
-               fun_space = PolyData%fun_space_diri_el(i)
+               space_fun_tag = PolyData%space_fun_tag_diri_el(i) ! find space function tag dirichlet
               endif
            enddo
            do i = 1, PolyData%nload_neum_el
-              if (PolyData%tag_neum_el(i) == mat_code) then
+              if (PolyData%face_tag_neum_el(i) == mat_code) then
                control = 1
-               fun_space = PolyData%fun_space_neum_el(i)
+               space_fun_tag = PolyData%space_fun_tag_neum_el(i) ! find space function tag neumann
               endif
            enddo
            do i = 1, PolyData%nload_neuN_el                               
@@ -1005,7 +1017,7 @@
              !read(*,*)
              PolyMesh%con_tria(itria,1) = mat_code
              read(inline(iright:str_len),*)(PolyMesh%con_tria(itria,j),j=2,4)
-             PolyMesh%con_tria(itria,5) = fun_space
+             PolyMesh%con_tria(itria,5) = space_fun_tag ! assign space function tag
              !write(*,*) iquad, PolyMesh%con_quad(iquad,:)
              !read(*,*)
            endif
