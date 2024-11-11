@@ -155,7 +155,7 @@ end subroutine MAKE_RHS_TET
 
 ! Assemble the local rhs term rhs_face_bd_loc approximating the integral on the boundary faces of the tetrahedron 
 subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, Fk, nodtria2, weitria2, nq2, lambda, mu, node_maps, &
-                            phi_b, grad_b, tag, rhs_face_bd_loc)
+                            phi_b, grad_b, space_fun_tag, rhs_face_bd_loc)
 
     ! theta and alpha are provided by the subroutine set_properties in problem_data_and_properties.f90
     ! phi_b and grad_b are provided by the subroutine basis_boundary in basis_functions.f90
@@ -177,7 +177,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
     real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b
     real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b
     real(kind=8), dimension(3,4), intent(in) :: Fk
-    integer(kind=4), intent(in) :: tag
+    integer(kind=4), intent(in) :: space_fun_tag
     real(kind=8), dimension(3,Np), intent(out) :: rhs_face_bd_loc
 
     integer(kind=4) :: q, i, j, k, t, m
@@ -221,7 +221,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
                     end do
                 end do
                 
-                diri_data = gd(points,tag)
+                diri_data = gd(points,space_fun_tag)
 
                 temp(1,m) = (lambda + 2*mu)*grad_b(1,m,q,1)*diri_data(1)*normal(1) + &
                             mu*grad_b(2,m,q,1)*diri_data(1)*normal(2) + mu*grad_b(3,m,q,1)*diri_data(1)*normal(3) + &
@@ -268,7 +268,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
                     end do
                 end do
 
-                neum_data = gn(lambda,mu,normal,points,tag)
+                neum_data = gn(lambda,mu,normal,points,space_fun_tag)
 
                 do i=1,3
                     rhs_face_bd_loc(i,m) = rhs_face_bd_loc(i,m) &

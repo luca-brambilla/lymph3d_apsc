@@ -71,26 +71,26 @@ module problem_data_and_properties
     end function f_time
        
     !> @brief Dirichlet boundary data
-    function gd(p,tag)result(r)
+    function gd(p,space_fun_tag)result(r)
     
-        integer(kind=4) :: tag
+        integer(kind=4) :: space_fun_tag
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
         real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
 
         ! r = 0.0
 
-        if(tag==1) then
+        if(space_fun_tag==1) then
             r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
             r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
-        if(tag==2) then
+        if(space_fun_tag==2) then
             r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
             r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
-        if(tag==3) then
+        if(space_fun_tag==3) then
             r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
             r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
@@ -99,28 +99,28 @@ module problem_data_and_properties
     end function gd
 
     !> @brief Dirichlet boundary data depending on time
-    function gd_time(p,tag,time)result(r)
+    function gd_time(p,space_fun_tag,time)result(r)
     
         real(kind=8) :: time
 
-        integer(kind=4) :: tag
+        integer(kind=4) :: space_fun_tag
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
         real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2 = sqrt(2.)
 
         ! r = 0.0
 
-        if(tag==1) then
+        if(space_fun_tag==1) then
             r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
             r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
-        if(tag==2) then
+        if(space_fun_tag==2) then
             r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
             r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
-        if(tag==3) then
+        if(space_fun_tag==3) then
             r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
             r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
@@ -129,11 +129,11 @@ module problem_data_and_properties
     end function gd_time
 
     !> @brief Surface traction data
-    function gn(lambda,mu,normal,p,tag)result(r)
+    function gn(lambda,mu,normal,p,space_fun_tag)result(r)
     
         implicit none
 
-        integer(kind=4) :: tag
+        integer(kind=4) :: space_fun_tag
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p, normal
         real(kind=8), dimension(3,3) :: stress_tensor
@@ -145,7 +145,7 @@ module problem_data_and_properties
         ! r(2) = 0
         ! r(3) = - 23520
 
-        if(tag==1) then
+        if(space_fun_tag==1) then
             stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
             stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
             stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
@@ -156,7 +156,7 @@ module problem_data_and_properties
             stress_tensor(2,3) = 2*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
             stress_tensor(3,2) = stress_tensor(2,3)
         endif
-        if(tag==2) then
+        if(space_fun_tag==2) then
             stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
             stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
             stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
@@ -167,7 +167,7 @@ module problem_data_and_properties
             stress_tensor(2,3) = 2*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
             stress_tensor(3,2) = stress_tensor(2,3)
         endif
-        if(tag==3) then
+        if(space_fun_tag==3) then
             stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
             stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
             stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)

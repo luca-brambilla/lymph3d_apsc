@@ -61,7 +61,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
     integer(kind=4) :: e, E1, E2
     integer(kind=4), dimension(4) :: face_flag
     real(kind=8), dimension(3) :: nn
-    integer(kind=4) :: tag
+    integer(kind=4) :: space_fun_tag
 
     real(kind=8), dimension(3,Np) :: rhs_tet_loc
     real(kind=8), dimension(3,Np) :: rhs_face_bd_loc
@@ -184,7 +184,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
 
             ! find the neighbouring tetrahedron E2 sharing the face e with E1
             E2 = PolyMesh%Elem_loc(E1)%neigh_el(e,2)
-            tag = PolyMesh%Elem_loc(E1)%neigh_el(e,5)
+            space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(e,5)
 
             ! if e is not a boundary face, then find the polyhedron in which E2 is contained
             if (E2 /= -1 .and. E2 /= -2) then
@@ -236,7 +236,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
                                         PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist, Np, Fk, node_maps, nodtria2, nq2)
 
                     call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly),&
-                                        nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
+                                        nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
 
                 else
 
@@ -246,7 +246,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
                                             PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,nn, &
-                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
+                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
 
                     else
 
@@ -254,7 +254,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
                                             PolyMesh%Poly(1)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,nn, &
-                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,tag,rhs_face_bd_loc)
+                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
 
                     endif
 
