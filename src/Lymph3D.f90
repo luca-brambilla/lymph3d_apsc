@@ -1,7 +1,8 @@
-!    Author: Lorenzo Gorlezza
-!    This file is part of the library LYMPH3D
+!   Author: Lorenzo Gorlezza
+!           Luca Brambilla
+!   This file is part of the library LYMPH3D
 
-!> @brief Lymph3D (Discontinuous Galerkin methods on polyhedral meshes for PDE problems) 
+!> @brief Lymph3D (Discontinuous Galerkin methods on polyhedral meshes for PDE problems)
 
 ! Here starts the code Lymph3D
 
@@ -19,14 +20,19 @@ program Lymph3D
     use Poly_mesh
     use post_processing
     use SET_PETSC_SYSTEM
+    use matrix_free
 
     use MOD_MPI_CUSTOM
 
     implicit none
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    ! read additional flags
+    ! integer :: iarg
+    ! character(len=256) :: arg
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     DEFINITION OF PETSC VARIABLES
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     Mat :: petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal ! stiffness, mass and DG matrices, reconstruction matrix
     Vec :: petsc_sol, petsc_rhs ! solution and rhs vectors for the algebraic system
@@ -54,30 +60,56 @@ program Lymph3D
     integer(kind=4), dimension(:), allocatable :: gathered_sizes, displacements
 
     real(kind=8) :: E, nu
-    integer(kind=4) :: i, mat_id
+    integer(kind=4) :: i, mat_id, ie_loc
 
     type(Data_Structure) :: PolyData
-    type(Mesh_Structure) :: PolyMesh 
+    type(Mesh_Structure) :: PolyMesh
 
     integer(kind=4) :: num_dt = 1     ! number of iteration
     real(kind=8) :: t             ! time variable
-    
+
     real(kind=8) dt2 ! dt^2
     real(kind=8) half_dt2 ! dt^2 / 2
     real(kind=8), parameter :: one = 1.0
+
+
+    ! each local has a matrix
+    real(kind=8), dimension(:,:,:,:,:), allocatable :: M_loc
+    real(kind=8), dimension(:,:,:,:,:), allocatable :: M_modal_loc
+    ! real(kind=8), dimension(:,PolyMesh%num_elem_loc,3,3,Np,Np), allocatable, intent(out) :: K_loc
+    real(kind=8), dimension(:,:,:), allocatable :: u0_loc
+    real(kind=8), dimension(:,:,:), allocatable :: un_loc
+    real(kind=8), dimension(:,:,:), allocatable :: usol_loc
+    real(kind=8), dimension(:,:,:), allocatable :: rhs_loc
+
+
+    real(kind=8), dimension(:,:,:,:,:,:), allocatable :: K_loc
+    real(kind=8), dimension(:,:,:,:,:,:), allocatable :: A_dg_loc
+
+    ! type(KRowArray), dimension(:), allocatable :: K_loc
+    ! type(KRowArray), dimension(:), allocatable :: A_dg_loc
+
+    ! integer(kind=4), pointer :: internal_neigh(:)
+    ! integer(kind=4), allocatable :: tmp_pointer(:)
+    ! integer(kind=4) :: n_neigh 
+
     ! IsTime_dependent = .false.
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-      
+
+    ! read parameter
+    ! iarg = getarg(1,arg)
+    ! open(unit=10, file=arg, status="new")
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
     allocate(mpi_stat(MPI_STATUS_SIZE))
 
     call INITIALIZATION()
 
     ! call MPI_OP_CREATE(MPI_ZERO_OVERWRITE, .TRUE., MPI_ZERO_OVERWRITE_OP, mpi_user_reduction_error)
-    ! call MPI_OP_CREATE(MPI_OVERWRITE_BY_NEW, .FALSE., MPI_OVERWRITE_BY_NEW_OP, mpi_user_reduction_error)
+    ! call MPI_OP_CREATE(MPI_OVERWRITE_BY_NEW, .false., MPI_OVERWRITE_BY_NEW_OP, mpi_user_reduction_error)
 
     start = MPI_WTIME()
-    
+
     if(mpi_id == 0) then
         write(*,'(A)')''
         write(*,'(A)')'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>'
@@ -88,56 +120,66 @@ program Lymph3D
         write(*,'(A)')''
     endif
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     READ INPUT FILES AND ALLOCATE VARIABLES
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     call READ_INPUT_FILES(PolyData,PolyMesh)
     if(mpi_id == 0) then
-        write(*,'(A)') 
+        write(*,'(A)')
         write(*,'(A)')'--------------------Type of problem--------------------'
-        write(*,'(A)')   
+        write(*,'(A)')
+        write(*,'(A,L)')'Matrix free: ',IS_MatrixFree
+        write(*,'(A,L)')'Time dependent problem: ', IsTime_dependent
         if (IsTime_dependent .eqv. .false.) then
             write(*,'(A)')'Stationary problem'
-            write(*,'(A,L)')'variable: ',IsTime_dependent
         else
-            write(*,'(A)')'Time dependent problem'
-            write(*,'(A,L)')'variable      : ',IsTime_dependent
-            write(*,'(A,E8.3)')'start time [s] : ', start_time
-            write(*,'(A,E8.3)')'end time   [s] : ', stop_time
-            write(*,'(A,E8.3)')'timestep   [s] : ', time_step
+            write(*,'(A,F8.5)')'start time [s] : ', start_time
+            write(*,'(A,F8.5)')'end time   [s] : ', stop_time
+            write(*,'(A,F8.5)')'timestep   [s] : ', time_step
         endif
         write(*,'(A)')
     endif
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     CHOOSE TO SOLVE WITH TETRAHEDRA
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     IsPoly = .false.
     Npoly = PolyMesh%num_poly
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     CHOOSE TO SOLVE WITH POLYHEDRA
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     ! set a number of polyhedra which may be different from the one read from the mesh file
     ! Npoly=900
 
     if (Npoly /= PolyMesh%num_elem) IsPoly = .true.
-     
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!     PARTITION OF THE GRID AND GENERATION OF LOCAL CONNECTIVITY 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!     PARTITION OF THE GRID AND GENERATION OF LOCAL CONNECTIVITY
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     call MAKE_PARTITION_AND_MPI_FILES(PolyData, PolyMesh, Npoly)
-    write(*,'(A28,I5,A28,I5)') 'Global number of polyhedra:', PolyMesh%num_poly, &
+
+    !! MAY VARY FROM ELEMENT TO ELEMENT !!!
+    Np = PolyMesh%Elem_loc(1)%NDof_loc ! number of degrees of freedom of each element
+    p = PolyMesh%Elem_loc(1)%Degree ! order of basis functions
+    global_dof = 3*PolyMesh%num_poly*Np;
+    if (mpi_id == 0 ) then
+        print *, 'Global number of degrees of freedom: ', global_dof
+    endif
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    write(*,'(A28,I10,A28,I10)') 'Global number of polyhedra:', PolyMesh%num_poly, &
         'Local number of polyhedra:', PolyMesh%num_poly_loc
     print *, 'Done reading mesh'
 
     Np = PolyMesh%Elem_loc(1)%NDof_loc ! number of degrees of freedom of each element
     p = PolyMesh%Elem_loc(1)%Degree ! order of basis functions
-    
+
     global_dof = 3*PolyMesh%num_poly*Np;
     local_dof = 3*PolyMesh%num_poly_loc*Np;
     PRINT *, 'Local number of degrees of freedom: ', local_dof
@@ -153,243 +195,218 @@ program Lymph3D
     ! set the value of rho, lambda and mu
     do mat_id=1,PolyData%nmat
         ! PolyData%prop_mat(mat_id,1) = 2400
-        ! PolyData%prop_mat(mat_id,2) = E*nu / ((1+nu)*(1-2*nu)) 
+        ! PolyData%prop_mat(mat_id,2) = E*nu / ((1+nu)*(1-2*nu))
         ! PolyData%prop_mat(mat_id,3) = E / (2 * (1+nu))
         PolyData%prop_mat(mat_id,1) = 1
         PolyData%prop_mat(mat_id,2) = 1
         PolyData%prop_mat(mat_id,3) = 1
     enddo
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
-!     SET PETSC VECTORS AND MATRICES 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!     SET PETSC VECTORS AND MATRICES
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     !!! NOT WORKING PRINT WITH PROCESSES
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
     if (mpi_id .eq. 0) then
-        write(*,'(A)') 
+        write(*,'(A)')
         write(*,'(A)')'--------------------Compute solution-------------------'
     endif
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    print *, 'SET PETSC MATRICES AND VECTORS'
-
-    call SET_PETSC_MATRIX(petsc_stiff, local_dof, global_dof)
-    call SET_PETSC_MATRIX(petsc_mass, local_dof, global_dof)
-    call SET_PETSC_MATRIX(mat_dg, local_dof, global_dof)
-    call SET_PETSC_MATRIX(petsc_mass_modal, local_dof, global_dof)
-
-    call SET_PETSC_VECTOR(petsc_rhs, local_dof, global_dof)
-    call SET_PETSC_VECTOR(petsc_sol, local_dof, global_dof)
-    call SET_PETSC_VECTOR(petsc_uex, local_dof, global_dof)
-    
-    call SET_PETSC_VECTOR(petsc_tmpv, local_dof, global_dof)
-    call SET_PETSC_VECTOR(petsc_f, local_dof, global_dof)
-    call SET_PETSC_VECTOR(petsc_u0, local_dof, global_dof)
-    call SET_PETSC_VECTOR(petsc_v0, local_dof, global_dof)
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
-!     ASSEMBLE MATRICES 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  
-
-    print *, 'ASSEMBLE PETSC MATRICES'
-
-    call MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal)
-
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_stiff.m',viewer,mpi_ierr))
-    ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
-    ! PetscCallA(MatView(petsc_stiff,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_mass.m',viewer,mpi_ierr))
-    ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
-    ! PetscCallA(MatView(petsc_mass,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_dg.m',viewer,mpi_ierr))
-    ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
-    ! PetscCallA(MatView(mat_dg,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_mass_modal.m',viewer,mpi_ierr))
-    ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
-    ! PetscCallA(MatView(petsc_mass_modal,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>       
-!     ASSEMBLE RIGHT HAND SIDE
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-    print *, 'ASSEMBLE RHS'
-    
-    call MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
-
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_rhs',viewer,mpi_ierr))
-    ! PetscCallA(VecView(petsc_rhs,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  
-!     SETTING SOLVERS
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-    print *, 'SETTING SOLVERS'
-
-    call SOLVER_SETTINGS(petsc_stiff, ksp, pc)
-    call SOLVER_SETTINGS(petsc_mass, ksp2, pc2)
-    call SOLVER_SETTINGS(petsc_mass_modal, ksp3, pc3)
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!     CALLING SOLVER
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  
-
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-    print *, 'CALLING SOLVER'
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-    
-    if (IsTime_dependent .eqv. .false.) then
-        ! Au=f
-        PetscCallA(KSPSolve(ksp, petsc_rhs, petsc_sol, mpi_ierr))
+    if (IS_MatrixFree .eqv. .true.) then
+        print *, 'matrix-free set matrices and vectors'
 
     else
-        if(mpi_id == 0) print *, "                   TIME LOOP START                   "
-        ! initialization for time problem
+        print *, 'SET PETSC MATRICES AND VECTORS'
+
+        call SET_PETSC_MATRIX(petsc_stiff, local_dof, global_dof)
+        call SET_PETSC_MATRIX(petsc_mass, local_dof, global_dof)
+        call SET_PETSC_MATRIX(mat_dg, local_dof, global_dof)
+        call SET_PETSC_MATRIX(petsc_mass_modal, local_dof, global_dof)
+
+        call SET_PETSC_VECTOR(petsc_rhs, local_dof, global_dof)
+        call SET_PETSC_VECTOR(petsc_sol, local_dof, global_dof)
+        call SET_PETSC_VECTOR(petsc_uex, local_dof, global_dof)
+
+        call SET_PETSC_VECTOR(petsc_tmpv, local_dof, global_dof)
+        call SET_PETSC_VECTOR(petsc_f, local_dof, global_dof)
+        call SET_PETSC_VECTOR(petsc_u0, local_dof, global_dof)
+        call SET_PETSC_VECTOR(petsc_v0, local_dof, global_dof)
+    end if
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!     ASSEMBLE MATRICES
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    if (IS_MatrixFree .eqv. .true.) then
+        print *, 'assemble matrix-free matrices'
+    else
+        print *, 'ASSEMBLE PETSC MATRICES'
+
+        call MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal)
+
+        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_stiff.m',viewer,mpi_ierr))
+        ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
+        ! PetscCallA(MatView(petsc_stiff,viewer,mpi_ierr))
+        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+
+        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_mass.m',viewer,mpi_ierr))
+        ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
+        ! PetscCallA(MatView(petsc_mass,viewer,mpi_ierr))
+        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+
+        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_dg.m',viewer,mpi_ierr))
+        ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
+        ! PetscCallA(MatView(mat_dg,viewer,mpi_ierr))
+        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+
+        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'mat_mass_modal.m',viewer,mpi_ierr))
+        ! call PetscViewerPushFormat(viewer, PETSC_VIEWER_ASCII_MATLAB, mpi_ierr)
+        ! PetscCallA(MatView(petsc_mass_modal,viewer,mpi_ierr))
+        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+    end if
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!     ASSEMBLE RIGHT HAND SIDE
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    if (IS_MatrixFree .eqv. .true.) then
+        print *, 'assemble matrix-free rsh'
+    else
+        print *, 'ASSEMBLE RHS'
+
+        call MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
+
+        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_rhs',viewer,mpi_ierr))
+        ! PetscCallA(VecView(petsc_rhs,viewer,mpi_ierr))
+        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+    end if
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!     SETTING SOLVERS
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    if (IS_MatrixFree .eqv. .true.) then
+        print *, 'set matrix-free solvers'
+    else
+        print *, 'SETTING SOLVERS'
+
+        call SOLVER_SETTINGS(petsc_stiff, ksp, pc)
+        call SOLVER_SETTINGS(petsc_mass, ksp2, pc2)
+        call SOLVER_SETTINGS(petsc_mass_modal, ksp3, pc3)
+    end if
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!     CALLING SOLVER
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    print *, 'CALLING SOLVER - matrix-free: ',IS_MatrixFree
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    ! allocate(internal_neigh(10))
+    ! do i=1,10
+    !     allocate(tmp_pointer(2))
+    !     internal_neigh(i) => tmp_pointer
+    !     deallocate(tmp_pointer)
+
+    !     if (.not. allocated(internal_neigh(i))) then
+    !         print *, "Error: internal_neigh(", i, ")%values is not allocated"
+    !         stop
+    !     else
+    !         print *, size(internal_neigh(i))
+    !     endif
+    ! end do
+    ! n_neigh = size(internal_neigh)
+
+    if (IS_MatrixFree .eqv. .true.) then
+
+        print *, 'matrix free solver'
         t = 0.0
-        num_dt = 1 !!! compute number of iteration if start not t=0?
-        stop_time = SQRT2/4.0 + 9*SQRT2 ! 10 peaks
+        ! allocate(internal_neigh(PolyMesh%num_elem_loc))
+        ! allocate(A_dg_loc(PolyMesh%num_elem_loc))
+        ! allocate(K_loc(PolyMesh%num_elem_loc))
+        call MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, A_dg_loc, M_modal_loc, rhs_loc)
 
-        if(mpi_id == 0) print *, "Iteration: ", 0, " Time: ", t
-        print *, "Assemble initial conditions"
+        !! initial conditions
+        !u0_loc = 
+        !un_loc = 
 
-        !! MODAL OR SOLUTION???
-        ! vectors initial conditions
+        do i = 1,PolyMesh%num_elem_loc
+            !n_neigh = size(internal_neigh(i)%values)
+            call TIME_LOOP_MATRIX_FREE(PolyMesh%Elem_loc(i)%neigh_el(:,2), Np, time_step, t, K_loc(i,:,:,:,:,:), M_loc(i,:,:,:,:), rhs_loc(i,:,:), u0_loc(i,:,:), un_loc, usol_loc(i,:,:))
+            ! update solutions
+            u0_loc(i,:,:) = un_loc(i,:,:)
+            un_loc(i,:,:) = usol_loc(i,:,:)
+        end do
 
-        ! integral
-        ! call MAKE_VECTOR(PolyMesh, petsc_num, global_dof, Np, petsc_u0, ic_displacement)
-        ! call MAKE_VECTOR(PolyMesh, petsc_num, global_dof, Np, petsc_v0, ic_velocity)
-        ! PRINT ?
-        ! compute modal coefficients
-        ! PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
-        ! PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
-        ! PetscCallA(KSPSolve(ksp3, petsc_v0, petsc_tmpv, mpi_ierr))
-        ! PetscCallA(VecCopy(petsc_tmpv, petsc_v0, mpi_ierr))
+    else
+        if (IsTime_dependent .eqv. .false.) then
+            ! Au=f
+            PetscCallA(KSPSolve(ksp, petsc_rhs, petsc_sol, mpi_ierr))
 
-        ! modal coefficients of initial conditions 
-        call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_u0, ic_displacement)
-        call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_v0, ic_velocity)
-        PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
-        PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
-        PetscCallA(KSPSolve(ksp3, petsc_v0, petsc_tmpv, mpi_ierr))
-        PetscCallA(VecCopy(petsc_tmpv, petsc_v0, mpi_ierr))
-        
-        ! print to file
-        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_u0',viewer,mpi_ierr))
-        ! PetscCallA(VecView(petsc_u0,viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_v0',viewer,mpi_ierr))
-        ! PetscCallA(VecView(petsc_v0,viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-        
-        ! compute solution with modal coeff
-        ! PetscCallA(MatMult(petsc_mass_modal, petsc_u0, petsc_tmpv, mpi_ierr))
-        ! PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
-        ! PetscCallA(MatMult(petsc_mass_modal, petsc_v0, petsc_tmpv, mpi_ierr))
-        ! PetscCallA(VecCopy(petsc_tmpv, petsc_v0, mpi_ierr))
+        else
+            if(mpi_id == 0) print *, "                   TIME LOOP START                   "
+            ! initialization for time problem
+            t = 0.0
+            num_dt = 1 !!! compute number of iteration if start not t=0?
+            time_step = 0.001
+            !stop_time = SQRT2/4.0 + 9.0*SQRT2 ! 10 peaks
+            !stop_time = SQRT2/4.0 + 2.0*SQRT2
+            stop_time = 0.01
 
-        ! print to file
-        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_u0_mod',viewer,mpi_ierr))
-        ! PetscCallA(VecView(petsc_u0,viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_v0_mod',viewer,mpi_ierr))
-        ! PetscCallA(VecView(petsc_v0,viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+            if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", 0, " Time: ", t
 
-        ! petsc_u0 = 
-        ! petsc_v0 = 
-        if(mpi_id == 0) print *, ""
-        if(mpi_id == 0) print *, "Iteration: ", num_dt, " Time: ", t
+            print *, "Assemble initial conditions"
 
-        ! Mu_1 = (M-dt^2/2*A)u_0 + dt*M*v_0 + dt^2/2 * f_0
+            ! vectors initial conditions
+            ! compute modal coefficients of initial conditions
+            call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_u0, ic_displacement)
+            call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_v0, ic_velocity)
+            PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
+            PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
+            PetscCallA(KSPSolve(ksp3, petsc_v0, petsc_tmpv, mpi_ierr))
+            PetscCallA(VecCopy(petsc_tmpv, petsc_v0, mpi_ierr))
 
-        dt2 = time_step * time_step
-        half_dt2 = 0.5 * dt2
-        
-        ! petsc_tmpv = -0.5 dt^2 A u0
-        PetscCallA(MatMult(petsc_stiff, petsc_u0, petsc_tmpv, mpi_ierr))
-        PetscCallA(VecScale(petsc_tmpv, -half_dt2, mpi_ierr))
-        ! petsc_f = M u0
-        PetscCallA(MatMult(petsc_mass, petsc_u0, petsc_f, mpi_ierr))
-        ! petsc_f = (M-dt^2/2*A)u_0
-        PetscCallA(VecAXPY(petsc_f, one, petsc_tmpv, mpi_ierr))
-        ! petsc_tmpv = M v0
-        PetscCallA(MatMult(petsc_mass, petsc_v0, petsc_tmpv, mpi_ierr))
-        ! petsc_f = (M-dt^2/2*A)u_0 + dt*M*v_0
-        PetscCallA(VecAXPY(petsc_f, time_step, petsc_tmpv, mpi_ierr))
-
-        ! petsc_tmpv = dt^2/2 * f_0(x)*f'_0(t)
-        ! PetscCallA(VecCopy(petsc_rhs, petsc_tmpv, mpi_ierr))
-        ! PetscCallA(VecScale(petsc_tmpv, half_dt2*time_function(time), mpi_ierr))
-
-        !!! check if the same f'(t) applies for both forcing and BC
-        ! petsc_f = [(M-dt^2/2*A)u_0 + dt*M*v_0] + dt^2/2 * f_0(x)*f'_0(t)
-        PetscCallA(VecAXPY(petsc_f, half_dt2*time_function(t), petsc_rhs, mpi_ierr))
-        ! M u1 = F
-        PetscCallA(KSPSolve(ksp2, petsc_f, petsc_sol, mpi_ierr))
-
-        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-        !!! SAVE SOLUTION
-        if (IsSave_output .eqv. .true.) then
-            call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
-            call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
-        endif
-
-        ! copy old solution
-        ! PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
-
-        num_dt = num_dt + 1
-        t = t + time_step
-
-        ! loop
-        ! Mu_{n+1) = F_n = (2M-dt^2*A)u_n - Mu_{n-1} + dt^2 * f_n
-        do while (t <= stop_time)
+            ! print to file
+            ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_u0',viewer,mpi_ierr))
+            ! PetscCallA(VecView(petsc_u0,viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_v0',viewer,mpi_ierr))
+            ! PetscCallA(VecView(petsc_v0,viewer,mpi_ierr))
+            ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
             if(mpi_id == 0) print *, ""
-            if(mpi_id == 0) print *, "Iteration: ", num_dt, " Time: ", t
+            if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
+            ! Mu_1 = (M-dt^2/2*A)u_0 + dt*M*v_0 + dt^2/2 * f_0
 
-            !!! petsc_u0 -> u_{n-1}
-            !!! petsc_sol -> u_n
-            !!! at the end write on petsc_sol for u_{n+1}
+            dt2 = time_step * time_step
+            half_dt2 = 0.5 * dt2
 
-            ! petsc_tmpv = dt^2 A u_n
-            PetscCallA(MatMult(petsc_stiff, petsc_sol, petsc_tmpv, mpi_ierr))
-            PetscCallA(VecScale(petsc_tmpv, -dt2, mpi_ierr))
-            ! petsc_f = 2M u_n
-            PetscCallA(MatMult(petsc_mass, petsc_sol, petsc_f, mpi_ierr))
-            PetscCallA(VecScale(petsc_f, 2.0*one, mpi_ierr))
-            ! petsc_f = (2M-dt^2*A)u_n
+            ! petsc_tmpv = -0.5 dt^2 A u0
+            PetscCallA(MatMult(petsc_stiff, petsc_u0, petsc_tmpv, mpi_ierr))
+            PetscCallA(VecScale(petsc_tmpv, -half_dt2, mpi_ierr))
+            ! petsc_f = M u0
+            PetscCallA(MatMult(petsc_mass, petsc_u0, petsc_f, mpi_ierr))
+            ! petsc_f = (M-dt^2/2*A)u_0
             PetscCallA(VecAXPY(petsc_f, one, petsc_tmpv, mpi_ierr))
-            ! petsc_tmpv = M u_{n-1}
-            PetscCallA(MatMult(petsc_mass, petsc_u0, petsc_tmpv, mpi_ierr))
-            ! petsc_f = (M-dt^2/2*A)u_n - M*u_{n-1}
-            PetscCallA(VecAXPY(petsc_f, -one, petsc_tmpv, mpi_ierr))
+            ! petsc_tmpv = M v0
+            PetscCallA(MatMult(petsc_mass, petsc_v0, petsc_tmpv, mpi_ierr))
+            ! petsc_f = (M-dt^2/2*A)u_0 + dt*M*v_0
+            PetscCallA(VecAXPY(petsc_f, time_step, petsc_tmpv, mpi_ierr))
 
-            ! Compute new RHS - keep initial RHS, muliply by time function
-            !!! check if the same f'(t) applies for both forcing and BC
-
-            ! petsc_tmpv = dt^2 * f_n(x)*f'_n(t)
+            ! petsc_tmpv = dt^2/2 * f_0(x)*f'_0(t)
             ! PetscCallA(VecCopy(petsc_rhs, petsc_tmpv, mpi_ierr))
-            ! PetscCallA(VecScale(petsc_tmpv, time_function(t)*dt2, mpi_ierr))
+            ! PetscCallA(VecScale(petsc_tmpv, half_dt2*time_function(time), mpi_ierr))
 
-            ! F = petsc_f = [(M-dt^2/2*A)u_n + dt*M*u_{n-1}] + dt^2 * f_n(x)*f'_n(t)
-            PetscCallA(VecAXPY(petsc_f, dt2*time_function(t), petsc_rhs, mpi_ierr))
-
-            ! copy old solution before overwriting solution
-            PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
-
-            ! solve linear system M u_{n+1} = F
+            !!! check if the same f'(t) applies for both forcing and BC
+            ! petsc_f = [(M-dt^2/2*A)u_0 + dt*M*v_0] + dt^2/2 * f_0(x)*f'_0(t)
+            PetscCallA(VecAXPY(petsc_f, half_dt2*time_function(t), petsc_rhs, mpi_ierr))
+            ! M u1 = F
             PetscCallA(KSPSolve(ksp2, petsc_f, petsc_sol, mpi_ierr))
 
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
             !!! SAVE SOLUTION
-            if ( (IsSave_output .eqv. .true.) .and. (mod(num_dt, num_dt_mon) == 0) ) then
+            if (IsSave_output .eqv. .true.) then
                 call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
                 call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
             endif
@@ -397,26 +414,79 @@ program Lymph3D
             num_dt = num_dt + 1
             t = t + time_step
 
-        end do
+            ! loop
+            ! Mu_{n+1) = F_n = (2M-dt^2*A)u_n - Mu_{n-1} + dt^2 * f_n
+            do while (t <= stop_time)
 
-    end if
+                if(mpi_id == 0) print *, ""
+                if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
+
+                !!! petsc_u0 -> u_{n-1}
+                !!! petsc_sol -> u_n
+                !!! at the end write on petsc_sol for u_{n+1}
+
+                ! petsc_tmpv = dt^2 A u_n
+                PetscCallA(MatMult(petsc_stiff, petsc_sol, petsc_tmpv, mpi_ierr))
+                PetscCallA(VecScale(petsc_tmpv, -dt2, mpi_ierr))
+                ! petsc_f = 2M u_n
+                PetscCallA(MatMult(petsc_mass, petsc_sol, petsc_f, mpi_ierr))
+                PetscCallA(VecScale(petsc_f, 2.0*one, mpi_ierr))
+                ! petsc_f = (2M-dt^2*A)u_n
+                PetscCallA(VecAXPY(petsc_f, one, petsc_tmpv, mpi_ierr))
+                ! petsc_tmpv = M u_{n-1}
+                PetscCallA(MatMult(petsc_mass, petsc_u0, petsc_tmpv, mpi_ierr))
+                ! petsc_f = (M-dt^2/2*A)u_n - M*u_{n-1}
+                PetscCallA(VecAXPY(petsc_f, -one, petsc_tmpv, mpi_ierr))
+
+                ! Compute new RHS - keep initial RHS, muliply by time function
+                !!! check if the same f'(t) applies for both forcing and BC
+
+                ! petsc_rhs = dt^2 * f_n(x)*f'_n(t)
+                ! F = petsc_f = [(M-dt^2/2*A)u_n + dt*M*u_{n-1}] + dt^2 * f_n(x)*f'_n(t)
+                PetscCallA(VecAXPY(petsc_f, dt2*time_function(t), petsc_rhs, mpi_ierr))
+
+                ! copy old solution before overwriting solution
+                PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
+
+                ! solve linear system M u_{n+1} = F
+                PetscCallA(KSPSolve(ksp2, petsc_f, petsc_sol, mpi_ierr))
+
+                call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+                !!! SAVE SOLUTION
+                if ( (IsSave_output .eqv. .true.) .and. (mod(num_dt, num_dt_mon) == 0) ) then
+                    call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
+                    call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
+                endif
+
+                num_dt = num_dt + 1
+                t = t + time_step
+
+            end do
+
+            if(mpi_id == 0) print *, "Solution end time: ", t
+
+        end if
+
+        call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
+        call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
+    endif
 
     ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'petsc_sol',viewer,mpi_ierr))
     ! PetscCallA(VecView(petsc_sol,viewer,mpi_ierr))
     ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     STORE LOCAL NUMERATION TO RECONSTRUCT THE SOLUTION
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>       
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     ! allocate(nnod_num(local_dof))
 
     ! call CREATE_LOCAL_NODE_NUM(nnod_num, local_dof)
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-      
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
     ! call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
     ! allocate(u_loc(local_dof))
@@ -425,10 +495,10 @@ program Lymph3D
     ! if(mpi_np > 1) then
 
     !       allocate(gathered_sizes(mpi_np))
-    
-    !       call MPI_AllGather(local_dof, 1, MPI_INTEGER, gathered_sizes, 1, & 
+
+    !       call MPI_AllGather(local_dof, 1, MPI_INTEGER, gathered_sizes, 1, &
     !                   MPI_INTEGER, MPI_COMM_WORLD, ierr)
-        
+
     !       allocate(displacements(mpi_np))
     !       displacements(1) = 0
     !       do i = 2, mpi_np
@@ -449,19 +519,19 @@ program Lymph3D
     ! endif
     ! deallocate(u_loc)
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     RECONSTRUCT SOLUTION MATRIX FOR POST-PROCESSING
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
- 
-    ! allocate(u(Np, 3*PolyMesh%num_poly))    
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+    ! allocate(u(Np, 3*PolyMesh%num_poly))
     ! u = RESHAPE(u_glo, (/Np, 3*PolyMesh%num_poly /))
     ! deallocate(u_glo)
 
     ! print *,'Done with the solution'
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     COMPUTE MODAL SOLUTION
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     !!! NOT WORKING WITH PROCESSES
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
     if (mpi_id == 0) then
@@ -470,50 +540,66 @@ program Lymph3D
     endif
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    print *, 'Computing modal coefficients...'
-    call COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex)
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'petsc_modal_coeff_uex',viewer,mpi_ierr))
-    ! PetscCallA(VecView(petsc_modal_coeff_uex,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-    
-    print *, 'Calling solver for modal solution...'
-    PetscCallA(KSPSolve(ksp3, petsc_modal_coeff_uex, petsc_uex, mpi_ierr))
+    if (IS_MatrixFree .eqv. .true.) then
+        print *, 'matrix-free exact solution'
+    else
+        print *, 'Computing modal coefficients...'
+        call COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex)
+        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'petsc_modal_coeff_uex',viewer,mpi_ierr))
+        ! PetscCallA(VecView(petsc_modal_coeff_uex,viewer,mpi_ierr))
+        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
-    ! check time dependence
-    if (IsTime_dependent .eqv. .true.) PetscCallA(VecScale(petsc_uex, time_function(t), mpi_ierr))
+        print *, 'Calling solver for modal solution...'
+        PetscCallA(KSPSolve(ksp3, petsc_modal_coeff_uex, petsc_uex, mpi_ierr))
 
-    PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_uex',viewer,mpi_ierr))
-    PetscCallA(VecView(petsc_uex,viewer,mpi_ierr))
-    PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-    
+        ! check time dependence
+        if (IsTime_dependent .eqv. .true.) then
+            !! WHAT TIME IS THE CORRECT?
+            !t=t-time_step
+            print *, 'Scale modal solution by time function at t = ', t
+            PetscCallA(VecScale(petsc_uex, time_function(t), mpi_ierr))
+        endif
+
+        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_uex',viewer,mpi_ierr))
+        ! PetscCallA(VecView(petsc_uex,viewer,mpi_ierr))
+        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+    endif
+
     print *, 'Done with modal solutions'
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     DESTROYING KSP SOLVERS AND VECTORS ON THE RIGHT HAND SIDE OF THE SYSTEMS
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>  
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    if (IS_MatrixFree .eqv. .true.) then
+        print *, 'matrix free destroy elements'
+    else
+        PetscCallA(KSPDestroy(ksp, mpi_ierr))
+        PetscCallA(KSPDestroy(ksp2, mpi_ierr))
+        PetscCallA(KSPDestroy(ksp3, mpi_ierr))
+        PetscCallA(VecDestroy(petsc_rhs, mpi_ierr))
+        PetscCallA(VecDestroy(petsc_modal_coeff_uex, mpi_ierr))
+    endif
 
-    PetscCallA(KSPDestroy(ksp, mpi_ierr))
-    PetscCallA(KSPDestroy(ksp2, mpi_ierr))
-    PetscCallA(KSPDestroy(ksp3, mpi_ierr))
-    PetscCallA(VecDestroy(petsc_rhs, mpi_ierr))
-    PetscCallA(VecDestroy(petsc_modal_coeff_uex, mpi_ierr))
-
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     POST-PROCESSING: COMPUTING THE ERRORS
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-  
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
     err_L2 = 0.0
     err_DG = 0.0
-    
-    if(mpi_id == 0) print *,'Computing the errors...'
-    
-    call COMPUTE_ERROR_L2(petsc_mass_modal, petsc_sol, petsc_uex, global_dof, err_L2_mpi, local_dof)
-    call COMPUTE_ERROR_DG(mat_dg, petsc_sol, petsc_uex, global_dof, err_DG_mpi, local_dof)
+
+    if (IS_MatrixFree .eqv. .true.) then
+        print *, 'matrix free solver'
+    else
+        if(mpi_id == 0) print *,'Computing the errors...'
+
+        call COMPUTE_ERROR_L2(petsc_mass_modal, petsc_sol, petsc_uex, global_dof, err_L2_mpi, local_dof)
+        call COMPUTE_ERROR_DG(mat_dg, petsc_sol, petsc_uex, global_dof, err_DG_mpi, local_dof)
+    endif
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-    
+
     call MPI_REDUCE(err_L2_mpi, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                     0, MPI_COMM_WORLD, mpi_ierr)
 
@@ -527,7 +613,7 @@ program Lymph3D
     endif
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-    
+
     if (mpi_id == 0) then
         print *,'ERROR IN NORM L2: ', err_L2
         print *,'ERROR IN NORM DG: ', err_DG
@@ -543,47 +629,59 @@ program Lymph3D
     if (mpi_id == 0) print *, 'GRID SIZE: ', hmax
     if (mpi_id == 0) call WRITE_ERRORS(p, err_DG, err_L2, hmax, PolyMesh, IsPoly)
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     DEALLOCATING PETSC MATRICES AND VECTORS
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    if (IS_MatrixFree .eqv. .true.) then
+        print *, 'matrix free destroy vector and matrices'
 
-    PetscCallA(MatDestroy(petsc_stiff, mpi_ierr))
-    PetscCallA(MatDestroy(petsc_mass, mpi_ierr))
-    PetscCallA(MatDestroy(mat_dg, mpi_ierr))
-    PetscCallA(VecDestroy(petsc_sol,mpi_ierr))
-    PetscCallA(VecDestroy(petsc_uex,mpi_ierr))
-    !!! DEALLOCATE NEW OBJECTS
-    PetscCallA(MatDestroy(petsc_mass_modal, mpi_ierr))
-    PetscCallA(VecDestroy(petsc_f, mpi_ierr))
-    PetscCallA(VecDestroy(petsc_tmpv,mpi_ierr))
-    PetscCallA(VecDestroy(petsc_u0,mpi_ierr))
-    PetscCallA(VecDestroy(petsc_v0,mpi_ierr))
+        deallocate(M_loc, M_modal_loc, u0_loc, un_loc, usol_loc, rhs_loc)
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        do i=1,PolyMesh%num_elem_loc
+            !deallocate(K_loc(i)%values, A_dg_loc(i)%values, internal_neigh(i)%values)
+        end do
+
+        !deallocate(K_loc, A_dg_loc, internal_neigh)
+
+    else
+        PetscCallA(MatDestroy(petsc_stiff, mpi_ierr))
+        PetscCallA(MatDestroy(petsc_mass, mpi_ierr))
+        PetscCallA(MatDestroy(mat_dg, mpi_ierr))
+        PetscCallA(VecDestroy(petsc_sol,mpi_ierr))
+        PetscCallA(VecDestroy(petsc_uex,mpi_ierr))
+        !!! DEALLOCATE NEW OBJECTS
+        PetscCallA(MatDestroy(petsc_mass_modal, mpi_ierr))
+        PetscCallA(VecDestroy(petsc_f, mpi_ierr))
+        PetscCallA(VecDestroy(petsc_tmpv,mpi_ierr))
+        PetscCallA(VecDestroy(petsc_u0,mpi_ierr))
+        PetscCallA(VecDestroy(petsc_v0,mpi_ierr))
+    endif
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     POST-PROCESSING: EXPORTING THE SOLUTION
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>   
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     ! call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!    END SETUP 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-       
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!    END SETUP
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
     finish = MPI_WTIME()
     call calc_time(time_hour, time_min, time_sec, int(finish-start))
-    
+
     if (mpi_id == 0) then
-        write(*,'(A)') 
+        write(*,'(A)')
         write(*,'(A)')'-------------------------------------------------------'
         write(*,'(A,I2,A,I2,A,I2,A)') &
                 'Set-up time = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
         write(*,'(A)')'-------------------------------------------------------'
         write(*,'(A)')
     endif
- 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>      
+
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     FINALIZE MPI AND PETSC
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     call PetscFinalize(mpi_ierr)
     call MPI_FINALIZE(mpi_ierr)
