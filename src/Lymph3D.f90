@@ -74,28 +74,36 @@ program Lymph3D
 
 
     ! each local has a matrix
-    real(kind=8), dimension(:,:,:,:,:), allocatable :: M_loc
-    real(kind=8), dimension(:,:,:,:,:), allocatable :: M_modal_loc
+    real(kind=8), dimension(:,:,:), allocatable :: M_loc
+    real(kind=8), dimension(:,:,:), allocatable :: M_modal_loc
     ! real(kind=8), dimension(:,PolyMesh%num_elem_loc,3,3,Np,Np), allocatable, intent(out) :: K_loc
-    real(kind=8), dimension(:,:,:), allocatable :: u0_loc
-    real(kind=8), dimension(:,:,:), allocatable :: un_loc
-    real(kind=8), dimension(:,:,:), allocatable :: usol_loc
-    real(kind=8), dimension(:,:,:), allocatable :: rhs_loc
+    real(kind=8), dimension(:,:), allocatable :: v0_loc
+    real(kind=8), dimension(:,:), allocatable :: u0_loc
+    real(kind=8), dimension(:,:), allocatable :: un_loc
+    real(kind=8), dimension(:,:), allocatable :: usol_loc
+    real(kind=8), dimension(:,:), allocatable :: rhs_loc
 
 
-    real(kind=8), dimension(:,:,:,:,:,:), allocatable :: K_loc
-    real(kind=8), dimension(:,:,:,:,:,:), allocatable :: A_dg_loc
+    real(kind=8), dimension(:,:,:,:), allocatable :: K_loc
+    real(kind=8), dimension(:,:,:,:), allocatable :: A_dg_loc
 
     ! type(KRowArray), dimension(:), allocatable :: K_loc
     ! type(KRowArray), dimension(:), allocatable :: A_dg_loc
 
     ! integer(kind=4), pointer :: internal_neigh(:)
     ! integer(kind=4), allocatable :: tmp_pointer(:)
-    ! integer(kind=4) :: n_neigh 
+    integer(kind=4) :: n_neigh, max_faces
 
     ! IsTime_dependent = .false.
 
+    type(PetscMatStruct), dimension(:,:), allocatable:: massa
+    type(PetscMatStruct), dimension(:,:), allocatable:: massa_modale
+    real(kind=8), dimension(:), allocatable :: tmp
+    Mat :: petsc_m_tmp
+    PetscInt :: irow(1)
 
+    integer(kind=4) :: j,k,m,n,row,col
+    integer(kind=4) :: neighbor
     ! read parameter
     ! iarg = getarg(1,arg)
     ! open(unit=10, file=arg, status="new")
@@ -214,7 +222,22 @@ program Lymph3D
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
     if (IS_MatrixFree .eqv. .true.) then
-        print *, 'matrix-free set matrices and vectors'
+        print *, 'matrix-free - set and assemble al matrices and vectors'
+        ! allocate(internal_neigh(PolyMesh%num_elem_loc))
+        ! allocate(A_dg_loc(PolyMesh%num_elem_loc))
+        ! allocate(K_loc(PolyMesh%num_elem_loc))
+        allocate(massa(PolyMesh%num_elem_loc,3))
+        allocate(massa_modale(PolyMesh%num_elem_loc,3))
+        call MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, A_dg_loc, M_modal_loc, rhs_loc, massa, massa_modale, n_neigh)
+
+        PetscCall(VecCreate(PETSC_COMM_SELF, petsc_tmpv, mpi_ierr))
+        PetscCall(VecSetSizes(petsc_tmpv, Np, Np, mpi_ierr))
+        PetscCall(VecSetFromOptions(petsc_tmpv, mpi_ierr))
+
+        PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
+        PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
+        PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
+        PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
 
     else
         print *, 'SET PETSC MATRICES AND VECTORS'
@@ -239,7 +262,7 @@ program Lymph3D
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     if (IS_MatrixFree .eqv. .true.) then
-        print *, 'assemble matrix-free matrices'
+        print *, 'assemble matrix-free matrices - do nothing'
     else
         print *, 'ASSEMBLE PETSC MATRICES'
 
@@ -271,7 +294,7 @@ program Lymph3D
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     if (IS_MatrixFree .eqv. .true.) then
-        print *, 'assemble matrix-free rsh'
+        print *, 'assemble matrix-free rsh - do nothing'
     else
         print *, 'ASSEMBLE RHS'
 
@@ -287,6 +310,7 @@ program Lymph3D
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
     if (IS_MatrixFree .eqv. .true.) then
         print *, 'set matrix-free solvers'
+        call SOLVER_SETTINGS(petsc_m_tmp,ksp,pc)
     else
         print *, 'SETTING SOLVERS'
 
@@ -321,23 +345,72 @@ program Lymph3D
     if (IS_MatrixFree .eqv. .true.) then
 
         print *, 'matrix free solver'
+        if(mpi_id == 0) print *, "                   TIME LOOP START                   "
+
         t = 0.0
-        ! allocate(internal_neigh(PolyMesh%num_elem_loc))
-        ! allocate(A_dg_loc(PolyMesh%num_elem_loc))
-        ! allocate(K_loc(PolyMesh%num_elem_loc))
-        call MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, A_dg_loc, M_modal_loc, rhs_loc)
+        num_dt = 1 !!! compute number of iteration if start not t=0?
+        time_step = 0.001
+        stop_time = SQRT2/4.0 + 9.0*SQRT2 ! 10 peaks
 
-        !! initial conditions
-        !u0_loc = 
-        !un_loc = 
+        if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", 0, " Time: ", t
 
-        do i = 1,PolyMesh%num_elem_loc
-            !n_neigh = size(internal_neigh(i)%values)
-            call TIME_LOOP_MATRIX_FREE(PolyMesh%Elem_loc(i)%neigh_el(:,2), Np, time_step, t, K_loc(i,:,:,:,:,:), M_loc(i,:,:,:,:), rhs_loc(i,:,:), u0_loc(i,:,:), un_loc, usol_loc(i,:,:))
-            ! update solutions
-            u0_loc(i,:,:) = un_loc(i,:,:)
-            un_loc(i,:,:) = usol_loc(i,:,:)
+        print *, "Assemble initial conditions"
+        ! initial conditions
+        allocate(u0_loc(PolyMesh%num_elem_loc,3*Np))
+        allocate(v0_loc(PolyMesh%num_elem_loc,3*Np))
+        allocate(tmp(3*Np))
+
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_displacement, u0_loc)
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_velocity, v0_loc)
+
+        ! u_1 = M^-1(dt^2/2 * f_0 - dt^2/2*A*u_0) + u0 + dt*v_0
+        !! refactor matrices
+        !! select correct u0_loc
+
+        do ie_loc = 1,PolyMesh%num_elem_loc
+            do k=1,n_neigh
+                neighbor = PolyMesh%Elem_loc(ie_loc)%neigh_el(2,k)
+                !! retrieve from global to local? get from col 4?
+                !! same processor ???
+                row = 1
+                tmp = tmp + matmul(K_loc(row,k,:,:),u0_loc(row,:))
+                tmp = tmp + half_dt2 * rhs_loc(row,:) * time_function(t)
+
+                do i=1,3
+                    ! mass in matrix-free
+                    ! copy vector to petsc
+                    irow(1)=1
+                    PetscCallA(VecSetValues(petsc_tmpv,Np,irow,tmp((i-1)*Np+1:i*Np),INSERT_VALUES,mpi_ierr))
+                    ! solve linear system
+                    PetscCall(KSPSolve(ksp,petsc_tmpv,petsc_sol,mpi_ierr))
+                    ! copy to fortran vector
+
+
+                    ! sum
+                    un_loc(ie_loc,:) = tmp + u0_loc(ie_loc,:) + time_step*v0_loc(ie_loc,:)
+                enddo
+            end do
         end do
+
+        deallocate(v0_loc)
+
+        num_dt = num_dt + 1
+        t = t + time_step
+
+        ! loop start
+        do while (t <= stop_time)
+            if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
+            do ie_loc = 1,PolyMesh%num_elem_loc
+                !n_neigh = 4
+                !n_neigh = size(PolyMesh%Elem_loc(i)%neigh_el(:,2), 1)
+                call TIME_STEP_MATRIX_FREE(PolyMesh%Elem_loc(i)%neigh_el(:,2), n_neigh, Np, time_step, t, K_loc(ie_loc,:,:,:), massa(ie_loc,:), rhs_loc(ie_loc,:), u0_loc(ie_loc,:), un_loc, usol_loc(ie_loc,:))
+            end do
+        end do
+
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        ! update solutions
+        u0_loc(i,:) = un_loc(i,:)
+        un_loc(i,:) = usol_loc(i,:) !! wrong, cannot update unless loop is over
 
     else
         if (IsTime_dependent .eqv. .false.) then
@@ -350,9 +423,9 @@ program Lymph3D
             t = 0.0
             num_dt = 1 !!! compute number of iteration if start not t=0?
             time_step = 0.001
-            !stop_time = SQRT2/4.0 + 9.0*SQRT2 ! 10 peaks
+            stop_time = SQRT2/4.0 + 9.0*SQRT2 ! 10 peaks
             !stop_time = SQRT2/4.0 + 2.0*SQRT2
-            stop_time = 0.01
+            !stop_time = 0.01
 
             if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", 0, " Time: ", t
 

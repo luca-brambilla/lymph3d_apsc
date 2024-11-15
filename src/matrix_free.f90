@@ -27,13 +27,69 @@ module matrix_free
         integer(kind=4), allocatable :: values(:)
     end type VecRowArray
 
+    type :: PetscRowMat
+        Mat :: values_x
+        Mat :: values_y
+        Mat :: values_z
+    end type PetscRowMat
+
+    type :: PetscRowVec
+        Vec :: values_x
+        Vec :: values_y
+        Vec :: values_z
+    end type PetscRowVec
+
+    type :: PetscMatStruct
+        Mat :: data
+    end type
+
+    type :: PetscVecStruct
+        Vec :: data
+    end type
+
     contains
+
+
+subroutine SET_PETSC_MASS_MATRIX_FREE(ne_loc, Np, M)
+
+    integer(kind=4), intent(in) :: ne_loc   !< number of rows
+    integer(kind=4), intent(in) :: Np       !< PETSc square matrix size
+    type(PetscMatStruct), dimension(ne_loc,3), intent(out) :: M
+
+    integer(kind=4) :: ie_loc, i
+
+    do ie_loc=1,ne_loc
+        do i=1,3
+            PetscCall(MatCreate(PETSC_COMM_SELF, M(ie_loc,i)%data, mpi_ierr))
+            PetscCall(MatSetSizes(M(ie_loc,i)%data, Np, Np, Np, Np, mpi_ierr))
+            PetscCall(MatSetFromOptions(M(ie_loc,i)%data, mpi_ierr))
+        enddo
+    enddo
+
+end subroutine SET_PETSC_MASS_MATRIX_FREE
+
+subroutine SET_PETSC_VECTOR_MATRIX_FREE(ne_loc, Np, V)
+
+    integer(kind=4), intent(in) :: ne_loc   !< number of rows
+    integer(kind=4), intent(in) :: Np       !< PETSc vector size
+    type(PetscVecStruct), dimension(ne_loc), intent(out) :: V
+
+    integer(kind=4) :: ie_loc, i
+
+    do ie_loc=1,ne_loc
+        PetscCall(VecCreate(PETSC_COMM_SELF, V(ie_loc)%data, mpi_ierr))
+        PetscCall(VecSetSizes(V(ie_loc)%data, Np, Np, mpi_ierr))
+        PetscCall(VecSetFromOptions(V(ie_loc)%data, mpi_ierr))
+    enddo
+
+end subroutine SET_PETSC_VECTOR_MATRIX_FREE
 
 !> @brief Allocate and compute the mass, stiffness, dg, modal matrices and
 !> rhs vector for each element.
 !> The stiffness and dg matrices for the element E+ are rectangular and contain
 !> the contributions also from neighboring elements E-.
-subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, A_dg_loc, M_modal_loc, rhs_loc)
+!> mass matrix is directly in PETSc for later to solve linear systems.
+subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, A_dg_loc, M_modal_loc, rhs_loc, massa, massa_modale, max_faces)
 
     !TODO variable number of sides, do not count boundaries
     !TODO polytopal elements, face contribution to same matrices
@@ -41,14 +97,20 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
 
     implicit none
 
+    type(Mesh_Structure), intent(inout) :: PolyMesh
+    type(Data_Structure), intent(in) :: PolyData
+    integer(kind=4), intent(in) :: Np, global_dof
+
+    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc,3), intent(out) :: massa
+    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc,3), intent(out) :: massa_modale
+    PetscScalar :: val(1)
+    PetscInt :: irow(1), jcol(1)
+
     real(kind=8) :: present = 0.0
     real(kind=8) :: tmp = 0.0
 
     real(kind=8) :: dt2
 
-    type(Mesh_Structure), intent(inout) :: PolyMesh
-    type(Data_Structure), intent(in) :: PolyData
-    integer(kind=4), intent(in) :: Np, global_dof
 
     integer(kind=4) :: nq3, nq2, p
     real(kind=8) :: theta, alpha, c
@@ -88,7 +150,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     integer(kind=4) :: neigh_count  !< counter for inserting contributions in K_loc
 
     ! integer(kind=4), intent(out) :: internal_neigh(PolyMesh%num_elem_loc,:) !< internal neighbors connectivity - similar to el_neigh from PolyMesh
-    integer(kind=4) :: max_faces !< maximum number of polygon faces
+    integer(kind=4), intent(out) :: max_faces !< maximum number of polygon faces
 
     real(kind=8), dimension(3,Np) :: rhs_tet_loc
     real(kind=8), dimension(3,Np) :: rhs_face_bd_loc
@@ -98,16 +160,23 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     ! each local has a matrix
     ! local square
     real(kind=8), dimension(PolyMesh%num_elem_loc,3,3,Np,Np), intent(out) :: M_loc
+    real(kind=8), dimension(3,3,Np,Np) :: mass_loc
     real(kind=8), dimension(PolyMesh%num_elem_loc,3,3,Np,Np), intent(out) :: M_modal_loc
     ! real(kind=8), dimension(:,PolyMesh%num_elem_loc,3,3,Np,Np), allocatable, intent(out) :: K_loc
 
     ! local rectangular
-    real(kind=8), dimension(:,:,:,:,:,:), allocatable, intent(out) :: K_loc
-    real(kind=8), dimension(:,:,:,:,:,:), allocatable, intent(out) :: A_dg_loc
+    real(kind=8), dimension(:,:,:,:), allocatable, intent(out) :: K_loc
+    real(kind=8), dimension(:,:,:,:), allocatable, intent(out) :: A_dg_loc
     ! local vector
-    real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(out) :: rhs_loc
+    real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np) :: rhs_loc_tmp
+    real(kind=8), dimension(PolyMesh%num_elem_loc,3*Np), intent(out) :: rhs_loc
+
+    integer(kind=4) :: row, col
 
     PRINT *, '***** MATRIX FREE SETUP *****'
+
+    call SET_PETSC_MASS_MATRIX_FREE(PolyMesh%num_elem_loc, Np, massa)
+    call SET_PETSC_MASS_MATRIX_FREE(PolyMesh%num_elem_loc, Np, massa_modale)
 
     dt2 = time_step * time_step
     ! set the properties of the method (see problem_data_and_properties.f90)
@@ -168,13 +237,13 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     ! internal_neigh = 0
 
     !! WASTE OF MEMORY...
-    allocate(K_loc(PolyMesh%num_elem_loc,max_faces,3,3,Np,Np))
-    allocate(A_dg_loc(PolyMesh%num_elem_loc,max_faces,3,3,Np,Np))
+    allocate(K_loc(PolyMesh%num_elem_loc,max_faces,3*Np,3*Np))
+    allocate(A_dg_loc(PolyMesh%num_elem_loc,max_faces,3*Np,3*Np))
     K_loc = 0.0
     A_dg_loc = 0.0
 
     ! loop on the tetrahedra
-    do ie_loc = 1, PolyMesh%num_elem_loc
+    elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
 
         ! count neighbor element contribution only to allocate K_loc
         ! current element E+
@@ -203,6 +272,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
         ! initialization of the rhs term on the volume rhs_tet_loc
         rhs_tet_loc = 0.0
 
+        mass_loc = 0.0
 
         mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
 
@@ -247,16 +317,45 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
         !!! i only need true mass matrix
         call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, rho, M_loc(ie_loc,:,:,:,:))
 
+        ! for petsc
+        call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, 1.0d0, mass_loc)
+
+        ! PETSc populate matrix
+        ! insert the values of M_loc in the 3 blocks of the mass matrix
+        do i=1,3
+            do m=1,Np
+                do n=1,Np
+
+                    irow(1) = m
+                    jcol(1) = n
+                    val(1)  = mass_loc(i,i,m,n)
+
+                    if (val(1) .ne. 0.0) then
+                        PetscCall(MatSetValues(massa_modale(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
+                        val(1) = val(1)*rho
+                        PetscCall(MatSetValues(massa(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
+                    end if
+
+                enddo
+            enddo
+        enddo
+
         ! computation of the local forcing vector, consider rhs with density only if dynamic case.
 
         ! call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
-        call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_loc(ie_loc,:,:), rho*present)
+        call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_loc_tmp(ie_loc,:,:), rho*present)
+        ! copy to output in correct format
+        do i=1,3
+            row = (i-1)*Np+1
+            rhs_loc(ie_loc, row:row+Np) = rhs_loc_tmp(ie_loc,i,:)
+        enddo
 
         ! current element E+
         E1 = ie_loc
 
+        ! stiffness and rhs
         ! begin loop on the faces of the tetrahedron E1
-        do e=1,PolyMesh%Elem_loc(E1)%num_faces
+        face_loop: do e=1,PolyMesh%Elem_loc(E1)%num_faces
 
             face_flag(e) = 0
 
@@ -362,9 +461,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
                 if (E2 == -1 .or. E2 == -2) then
                     do i=1,3
                         do m=1,Np
+                            row = (i-1)*Np+1 + m
                             tmp = rhs_face_bd_loc(i,m)
                             if (tmp .ne. 0.0) then
-                                rhs_loc(ie_loc,i,m) = rhs_loc(ie_loc,i,m) + tmp
+                                rhs_loc(ie_loc,row) = rhs_loc(ie_loc,row) + tmp
                             endif
                         enddo
                     enddo
@@ -381,8 +481,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
                 do i=1,3
                     do j=1,3
                         do m=1,Np
+                            row = (i-1)*Np+1 + m
                             do n=1,Np
-                                K_loc(ie_loc,1,i,j,m,n) = K_loc(ie_loc,1,i,j,m,n) + theta*I_loc(i,j,m,n) - I_loc(j,i,n,m) + S_loc(i,j,m,n)
+                                col = (j-1)*Np+1 + n
+                                K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_loc(i,j,m,n) - I_loc(j,i,n,m) + S_loc(i,j,m,n)
                             enddo
                         enddo
                     enddo
@@ -395,8 +497,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
                     do i=1,3
                         do j=1,3
                             do m=1,Np
+                                row = (i-1)*Np+1 + m
                                 do n=1,Np
-                                    K_loc(ie_loc,e,i,j,m,n) = K_loc(ie_loc,e,i,j,m,n) + theta*IN_loc(i,j,m,n) - IN_loc(j,i,n,m) + SN_loc(i,j,m,n)
+                                    col = (j-1)*Np+1 + n
+                                    K_loc(ie_loc,e,row,col) = K_loc(ie_loc,e,row,col) + theta*IN_loc(i,j,m,n) - IN_loc(j,i,n,m) + SN_loc(i,j,m,n)
                                 enddo
                             enddo
                         enddo
@@ -407,9 +511,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
 
             endif
             !neigh_count = neigh_count + 1
-        enddo
 
-    enddo
+        enddo face_loop
+    enddo elem_loop
 
     !call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
@@ -428,13 +532,227 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     deallocate(nodtria2)
     deallocate(weitet3)
     deallocate(weitria2)
+    !! deallocate(blist)
 
     PRINT *, 'Done with assembling local matrices for matrix free'
 
 end subroutine MAKE_MATRICES_FREE
 
+
+!> Matrix-free context, start from nodal solution and get modal solution coefficients.
+!> Data is scattered already, performed in series by each processor, local PETSc definition of vectors and matrix to use solver.
+subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analytic, modal_coeff)
+
+    implicit none
+
+    ! PASS FUNCTION AS ARGUMENT
+    interface
+        function f_analytic(point) result(res)
+            real(kind=8), dimension(3) :: point, res
+        end function f_analytic
+    end interface
+
+    !real(kind=8), dimension(:,:,:,:,:), intent(in) :: M_modal_loc
+    type(PetscMatStruct), dimension(:,:), intent(in):: massa_modale
+
+    Mat :: petsc_m_tmp     ! temporary matrix for linear systems
+    Vec :: petsc_exact
+    Vec :: petsc_modal_coeff
+    PetscScalar :: val(1)
+    PetscInt :: irow(1)
+    PetscInt :: jcol(1)
+
+    ! PETSc Solver context
+    KSP :: ksp  ! Krylov solver context
+    PC :: pc    ! Preconditioner object for the solver
+
+    type(Mesh_Structure) :: PolyMesh
+    integer(kind=4) :: p, Np
+    integer(kind=4) :: nq3, nq2, Npoly
+    integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, i, m, beg
+    integer(kind=4) :: ipoly_loc, ipoly_glob
+    integer(kind=4), dimension(:,:), allocatable :: blist
+    real(kind=8) :: Jdet
+    real(kind=8), dimension(4) :: x, y, z
+    real(kind=8), dimension(3,4) :: Fk
+    real(kind=8), dimension(3,3) :: Jinv
+    real(kind=8), dimension(:,:), allocatable :: nod2, nod3, nodtet3
+    real(kind=8), dimension(:), allocatable :: wei2, wei3, weitet3
+    real(kind=8), dimension(3) :: points
+    real(kind=8), dimension(:,:), allocatable :: phi
+    real(kind=8), dimension(:,:,:), allocatable :: dphi
+    real(kind=8), dimension(:,:), allocatable, intent(out) :: modal_coeff
+    real(kind=8), dimension(:,:,:), allocatable :: uex_integral
+    real(kind=8), dimension(3) :: eval
+
+    integer(kind=4) :: q, ii, jj
+    integer(kind=4) :: j,n,k
+    integer(kind=4) :: row
+
+    ! logical, intent(in) :: IsTime_dependent
+    ! real(kind=8), intent(in), optional :: time
+
+    p = PolyMesh%Elem_loc(1)%Degree
+    Npoly = PolyMesh%num_poly
+
+    ! Computation of Gauss-Legendre quadrature nodes and weights over the reference square and cube
+    ! (see basis_functions.f90)
+    call quadrature(nod2, wei2, nod3, wei3, p, nq3, nq2)
+
+    allocate(nodtet3(4,nq3))
+    allocate(weitet3(nq3))
+
+    ! Maps to the reference tetrahedron (see Poly_ref_mappings.f90)
+    call mapping_quadrature_3D(nod3, wei3, nq3, nodtet3, weitet3)
+
+    ! list of the degrees of monomials of the Np basis functions up to order p (see basis_functions.f90)
+    allocate(blist(Np,3))
+    call basis_list(blist, p, Np)
+
+    allocate(phi(Np,nq3))
+    allocate(dphi(3,Np,nq3))
+
+    ! use PETSc to compute linear system
+    ! only local to process
+
+    ! 1 block of element local mass matrix out of 3
+    PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
+    PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
+    PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
+    PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
+
+    ! 1 block of element local vectors out of 3
+    PetscCall(VecCreate(PETSC_COMM_SELF, petsc_exact, mpi_ierr))
+    PetscCall(VecSetSizes(petsc_exact, Np, Np, mpi_ierr))
+    PetscCall(VecSetFromOptions(petsc_exact, mpi_ierr))
+
+    PetscCall(VecCreate(PETSC_COMM_SELF, petsc_modal_coeff, mpi_ierr))
+    PetscCall(VecSetSizes(petsc_modal_coeff, Np, Np, mpi_ierr))
+    PetscCall(VecSetFromOptions(petsc_modal_coeff, mpi_ierr))
+
+    ! linear system solver
+    call SOLVER_SETTINGS(petsc_m_tmp,ksp,pc)
+
+    ! solution initializations
+    allocate(uex_integral(PolyMesh%num_elem_loc,3,Np))
+    allocate(modal_coeff(PolyMesh%num_elem_loc,3*Np))
+    uex_integral = 0.0
+    modal_coeff = 0.0
+
+    ! loop on the tetrahedra
+    elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
+
+        ! computation of the coordinates of the tetrahedron
+        do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
+
+            ! see MAKE_PARTITION_AND_MPI_FILES.f90
+            call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+                                    PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)
+
+            x(ivert)=PolyMesh%coord_x(id_node)
+            y(ivert)=PolyMesh%coord_y(id_node)
+            z(ivert)=PolyMesh%coord_z(id_node)
+
+        enddo
+
+        ! computation of the reference map Fk, the inverse Jinv and the determinant Jdet of its jacobian (see Poly_ref_mappings.f90)
+        call jacobians(x, y, z, Fk, Jinv, Jdet)
+
+        ! find the polyhedron ipoly_glob that contains the tetrahedron ie_loc
+        ie_glob = PolyMesh%elem_loc2glo(ie_loc)
+        ipoly_glob = PolyMesh%elem_in_poly(ie_glob)
+
+        ! see subroutine local_search in Poly_global.f90
+        call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
+                                    PolyMesh%num_poly_loc, &
+                                    ipoly_glob,ipoly_loc)
+
+        ! evaluation of the basis functions and their partial derivatives at the 3D quadrature nodes for a given polyhedral element contained in b_box
+        ! (see basis_functions.f90)
+        call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
+
+        ! loop on the 3D quadrature nodes
+        do q = 1,nq3
+            do m=1,Np
+
+                do ii=1,3
+                    points(ii)=0.0
+                    do jj=1,4
+                        points(ii)=points(ii)+Fk(ii,jj)*nodtet3(jj,q)
+                    enddo
+                enddo
+
+                eval = f_analytic(points)
+
+                do i=1,3
+                    uex_integral(ie_loc,i,m) = uex_integral(ie_loc,i,m) + abs(Jdet)*weitet3(q)*eval(i)*phi(m,q)
+                enddo
+
+            end do
+        end do
+
+        ! copy mass matrix and exact solution into PETSc
+        ! insert new values for each loop on element
+        PetscCall(MatZeroEntries(petsc_m_tmp, mpi_ierr))
+        ! PetscCall(VecZeroEntries(petsc_mass_modal(), mpi_ierr))
+        do i=1,3
+
+            ! copy matrix
+            PetscCall(MatCopy(massa_modale(ie_loc,i)%data, petsc_m_tmp,SAME_NONZERO_PATTERN, mpi_ierr))
+
+            ! vector assignment
+            !! copy whole vector at once
+            do m=1,Np
+                irow(1) = m
+                val(1) = uex_integral(ie_loc,i,m)
+                if (val(1) .ne. 0.0) then
+                    PetscCall(VecSetValues(petsc_exact, 1, irow, val, INSERT_VALUES, mpi_ierr))
+                endif
+            enddo
+            ! finalize copy process
+            PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+            PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+            PetscCall(VecAssemblyBegin(petsc_exact,mpi_ierr))
+            PetscCall(VecAssemblyEnd(petsc_exact,mpi_ierr))
+
+            ! solve linear system matrix-free on block (i,i) and save solution
+            PetscCall(KSPSolve(ksp, petsc_exact, petsc_modal_coeff, mpi_ierr))
+
+            ! copy solution
+            !! copy whole matrix at once ???
+            do m=1,Np
+                irow(1) = m
+                row = (Np-1)*i+1 + m
+                PetscCall(VecGetValues(petsc_modal_coeff, 1, irow, val, mpi_ierr))
+                modal_coeff(ie_loc,row) = val(1)
+            enddo
+
+        enddo
+
+    enddo elem_loop
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    print *, 'Done with computing modal coefficients'
+
+    PetscCall(MatDestroy(petsc_m_tmp, mpi_ierr))
+    PetscCall(VecDestroy(petsc_exact, mpi_ierr))
+    PetscCall(VecDestroy(petsc_modal_coeff, mpi_ierr))
+
+    deallocate(phi)
+    deallocate(dphi)
+
+    deallocate(nodtet3)
+    deallocate(weitet3)
+    !! deallocate(blist)
+
+    deallocate(uex_integral)
+
+end subroutine COMPUTE_MODAL_COEFFICIENTS_FREE
+
+
 !> @brief solver for matrix free considering only one element with time dependence
-subroutine TIME_LOOP_MATRIX_FREE(neighbors, Np, time_step, t, K_loc_e, M_loc_e, rhs_loc_e, u0_loc, un_loc, usol_loc)
+subroutine TIME_STEP_MATRIX_FREE(neighbors, n_neigh, Np, time_step, t, K_loc_el, massa_el, rhs_el, u0_el, un_loc, usol_el)
 
     !TODO consider different Np
     !TODO compute inverse of mass matrix only once
@@ -453,82 +771,186 @@ subroutine TIME_LOOP_MATRIX_FREE(neighbors, Np, time_step, t, K_loc_e, M_loc_e, 
     !> degrees of freedom for local polynomial basis
     integer(kind=4), intent(in) :: Np
     !> mass matrix for E+
-    real(kind=8), dimension(3,3,Np,Np), intent(in) :: M_loc_e
+    real(kind=8), dimension(3,3,Np,Np) :: M_loc_el
+    type(PetscMatStruct), dimension(3), intent(in) :: massa_el
+
+    Mat :: petsc_m_tmp !! PASS AS ARGUMENT? AVOID MULTIPLE SETUP?
+    ! PETSc Solver context
+    KSP :: ksp  ! Krylov solver context
+    PC :: pc    ! Preconditioner object for the solver
+
     !> stiffness matrix with contributions only from element E+ and neighbors E-
-    real(kind=8), dimension(:,:,:,:,:), intent(in) :: K_loc_e
+    real(kind=8), dimension(:,:,:), intent(in) :: K_loc_el
     !> forcing term vector on E+
-    real(kind=8), dimension(3,Np), intent(in) :: rhs_loc_e
+    real(kind=8), dimension(3*Np), intent(in) :: rhs_el
     !> solution from two previous timesteps u^{(n-1)} for element E+
-    real(kind=8), dimension(3,Np), intent(in) :: u0_loc
+    real(kind=8), dimension(3*Np), intent(in) :: u0_el
     !> solution from previous timestep for u^{(n)} with contributions from E+ and neighbors E-
-    real(kind=8), dimension(:,:,:), intent(in) :: un_loc
+    real(kind=8), dimension(:,:), intent(in) :: un_loc
     !> output solution for the element E+
-    real(kind=8), dimension(3,Np), intent(out) :: usol_loc
+    real(kind=8), dimension(3*Np), intent(out) :: usol_el
+    Vec :: petsc_sol
+    Vec :: petsc_v_tmp
 
     !> number of contribution from neighbours E- (excluding boundary sides) - varies from element to element
-    integer(kind=4) :: n_neigh
+    integer(kind=4), intent(in) :: n_neigh
 
     !> partial result for contribution from stiffness and forcing term
     real(kind=8), dimension(3,Np) :: b
+    real(kind=8), dimension(3*Np) :: tmp_v
+    real(kind=8), dimension(:), pointer :: v_ptr
 
-    real(kind=8) :: dt2half
+    real(kind=8) :: dt2half, dt2
     integer(kind=4) :: i,j,m,n,k
+    integer(kind=4) :: row, col
+    PetscScalar :: val(Np)
+    PetscInt :: irow(1)
+    PetscInt :: jcol(1)
 
     !! HOW TO EXTRACT UN_LOC and U0_LOC ???
 
     ! u_loc = M_loc^-1 * ( - dt2 * K_loc*un_loc  + dt2*rhs_loc*time_function(t) ) +  2*un_loc - u0_loc
-
-    dt2half = time_step*time_step/2.0
+    dt2 = time_step*time_step
+    dt2half = dt2/2.0
 
     ! initialize partial result vector
     b = 0.0
+    tmp_v = 0.0
     ! get local stiffness matrix dimensions - number of faces contributions
     ! n_neigh = 0
     ! n_neigh = size(K_loc_e, 1)
-    neigh = size(neighbours)
+    !neigh = size(neighbors)
+
+    ! 1 block of element local mass matrix out of 3
+    PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
+    PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
+    PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
+    PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
+    ! linear system solver
+    call SOLVER_SETTINGS(petsc_m_tmp,ksp,pc)
+
+    ! 1 block of element local vectors out of 3
+    PetscCall(VecCreate(PETSC_COMM_SELF, petsc_sol, mpi_ierr))
+    PetscCall(VecSetSizes(petsc_sol, Np, Np, mpi_ierr))
+    PetscCall(VecSetFromOptions(petsc_sol, mpi_ierr))
+
+    PetscCall(VecCreate(PETSC_COMM_SELF, petsc_v_tmp, mpi_ierr))
+    PetscCall(VecSetSizes(petsc_v_tmp, Np, Np, mpi_ierr))
+    PetscCall(VecSetFromOptions(petsc_v_tmp, mpi_ierr))
 
     ! compute effects of stiffness - matrix free in stiffness
     ! Contribution from E+ and neighbors E-
+
+    ! all 3 dimensions -> 3*Np
     ! b(ie_loc) = K(ie_loc)*uh(ie_loc)
+    ! tmp_v(ie_loc) = K(ie_loc)*uh(ie_loc)
     do k=1,n_neigh
         !if BC boundary, skip
         if (neighbors(k) < 0) cycle
-        do i=1,3
-            do j=1,3
-                do m=1,Np
-                    do n=1,Np
-                        b(i,m) = b(i,m) + K_loc_e(k,i,j,m,n)*un_loc(k,j,n)
-                    end do
-                end do
-            end do
-        end do
+        ! do i=1,3
+        !     do j=1,3
+        !         do m=1,Np
+        !             do n=1,Np
+        !                 b(i,m) = b(i,m) + K_loc_el(k,i,j,m,n)*un_loc(k,j,n)
+        !             end do
+        !         end do
+        !     end do
+        ! end do
+
+        ! direct matrix multiplication
+        tmp_v = tmp_v + matmul(K_loc_el(k,:,:), un_loc(k,:))
     end do
+
+    ! element number
+    k=1
+    ! tmp_v = dt^2*(f-K*u)
+    tmp_v = (-tmp_v + rhs_el*time_function(t)) * dt2
 
     ! compute effects of forcing term and solutions from previous time steps
     ! matrix free in mass
     !! check if no time dependence
-    do j=1,3
-        do n=1,Np
-            ! Add local forcing term once
-            ! b(ie_loc) = -K(ie_loc)*uh(ie_loc) + fh(ie_loc)*g(t)
-            b(j,n) = - b(j,n) + rhs_loc_e(j,n)*time_function(t)
-        end do
 
-        ! matrix free solution of 3 different blocks of mass matrix
-        !! FACTORIZATION AND SUBSTITUTION REPEATED FOR EACH TIME STEP
-        !! USE PETSC
-        usol_loc(j,:) = linear_system(Np,M_loc_e(j,j,:,:),b(j,:),0)
+    ! one dimension at a time - 3 separate blocks of Np
+    PetscCall(MatZeroEntries(petsc_m_tmp, mpi_ierr))
+    irow(1) = 1
+    do i=1,3
+        row = (i-1)*Np+1
+        ! tmp_v = dt^2*(f-K*u)
+        ! tmp_v(row:row+Np) = - tmp_v(row:row+Np) + rhs_el(row:row+Np)*time_function(t)
+        ! tmp_v(row:row+Np) = dt2 * tmp_v(row:row+Np)
 
-        ! update solution adding solution from previous time steps
-        ! usol_loc(0,:,:) has the modal coefficient corresponding to the current element E+ only
-        ! u_{n+i} = 1/2*dt^2 (M^-1)*b + 2*u_n - u_{n-1}
-        do n=1,Np
-            usol_loc(j,n) = dt2half * usol_loc(j,n) + 2.0*un_loc(1,j,n) - u0_loc(j,n)
-        end do
+        ! vector assignment
+        ! copy whole vector at once - #Np values
+        val = tmp_v(row:row+Np)
+        PetscCall(VecSetValues(petsc_v_tmp, Np, irow, val, INSERT_VALUES, mpi_ierr))
 
-    end  do
+        ! elemnt-wise copy
+        ! do m=1,Np
+        !     row = (i-1)*Np+1+m
+        !     irow(1) = m
+        !     val(1) = b(i,m)
+        !     val(1) = tmp_v(row)
+        !     if (val(1) .ne. 0.0) then
+        !         PetscCall(VecSetValues(petsc_v_tmp, 1, irow, val, INSERT_VALUES, mpi_ierr))
+        !     endif
+        ! enddo
 
-end subroutine SOLVE_MATRIX_FREE
+        ! finalize copy process
+        PetscCall(VecAssemblyBegin(petsc_v_tmp,mpi_ierr))
+        PetscCall(VecAssemblyEnd(petsc_v_tmp,mpi_ierr))
+
+        ! copy matrix
+        PetscCall(MatCopy(massa_el(i)%data, petsc_m_tmp, SAME_NONZERO_PATTERN, mpi_ierr))
+        ! finalize copy process
+        PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+        PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+
+        ! solve linear system matrix-free on block (i,i) and save solution
+        PetscCall(KSPSolve(ksp, petsc_v_tmp, petsc_sol, mpi_ierr))
+
+        ! copy solution
+        ! copy whole vector at once ???
+        PetscCall(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
+        usol_el(row:row+Np) = v_ptr
+        PetscCall(VecRestoreArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
+
+        ! element-wise copy
+        ! do m=1,Np
+        !     irow(1) = m
+        !     PetscCall(VecGetValues(petsc_sol, 1, irow, val, mpi_ierr))
+        !     usol_el(m) = val(1)
+        ! enddo
+
+        ! u_{n+i} = dt^2 (M^-1)*tmp_v + 2*u_n - u_{n-1}
+
+        usol_el(row:row+Np) = usol_el(row:row+Np) + 2*un_loc(k,:) - u0_el(row:row+Np)
+
+    enddo
+
+    ! do j=1,3
+    !     do n=1,Np
+    !         ! Add local forcing term once
+    !         ! b(ie_loc) = -K(ie_loc)*uh(ie_loc) + fh(ie_loc)*g(t)
+    !         row = (j-1)*Np+1 + n
+    !         b(j,n) = - b(j,n) + rhs_el(row)*time_function(t)
+    !     enddo
+
+    !     ! matrix free solution of 3 different blocks of mass matrix
+    !     !! FACTORIZATION AND SUBSTITUTION REPEATED FOR EACH TIME STEP
+    !     !! USE PETSC
+    !     !usol_loc(j,:) = linear_system(Np,M_loc_e(j,j,:,:),b(j,:),0)
+
+
+    !     ! update solution adding solution from previous time steps
+    !     ! usol_loc(0,:,:) has the modal coefficient corresponding to the current element E+ only
+    !     ! u_{n+i} = 1/2*dt^2 (M^-1)*b + 2*u_n - u_{n-1}
+    !     do n=1,Np
+    !         usol_el(j,n) = dt2half * usol_el(j,n) + 2.0*un_loc(1,j,n) - u0_el(j,n)
+    !     enddo
+
+    ! enddo
+
+end subroutine TIME_STEP_MATRIX_FREE
 
 ! subroutine COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, uh_loc, uex_loc, err_L2_mpi)
 
