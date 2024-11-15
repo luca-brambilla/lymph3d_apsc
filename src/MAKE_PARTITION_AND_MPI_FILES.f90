@@ -24,7 +24,7 @@
 !> @note A new partition is made if elementdomain.mpi is absent in the
 !! workig directory or in the folder given in SPEED.input (MPIFILE). 
 
-     subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
+subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
       
      use mpi
      use Poly_setup_mpi
@@ -2013,11 +2013,11 @@ end subroutine CREATE_GLOBAL_POLY_MAP
                       space_fun_tag = PolyMesh%con_tria(Row2,5)
                       ie    = con_tria_loc(i,2); 
 
-                      !! PROBLEM
-                      ! TODO - case with more faces? case with different BC? make automatic
-                      ! Dirichlet bc identifier
-                      if(mat_ne == 2 .or. mat_ne == 3 .or. mat_ne == 4) ie_ne = -1
-                      ! if(mat_ne == 2) ie_ne = -1
+                     !! PROBLEM
+                     ! TODO - case with more faces? case with different BC? make automatic
+                     ! Dirichlet bc identifier
+                     if(mat_ne == 2 .or. mat_ne == 3 .or. mat_ne == 4) ie_ne = -1
+                     ! if(mat_ne == 2) ie_ne = -1
 
                       ! Neumann bc identifier
                       if(mat_ne == 5 .or. mat_ne == 6 .or. mat_ne == 7) ie_ne = -2
@@ -2689,9 +2689,8 @@ end subroutine CREATE_GLOBAL_POLY_MAP
 
          enddo
          
-         write(unit_mpi,*) 'Neighbouring Elements: shared by'
-         write(unit_mpi,*) '                    mpi-proc, mat_id/face_tag, el_id, face_id, poly id, space_fun_tag'
-         write(unit_mpi,*) 'Neigh Face #1: ', PolyMesh%Elem_loc(ie)%neigh_el(1,:)
+         write(unit_mpi,*) 'Neighbouring Elements: shared by (mpi-proc/mat_id/el_id/face_id/poly id/space_fun_tag)'
+         write(unit_mpi,*) 'Neigh Face #1 :', PolyMesh%Elem_loc(ie)%neigh_el(1,:)
          write(unit_mpi,*) 'Neigh Face #2: ', PolyMesh%Elem_loc(ie)%neigh_el(2,:)
          write(unit_mpi,*) 'Neigh Face #3: ', PolyMesh%Elem_loc(ie)%neigh_el(3,:)
          write(unit_mpi,*) 'Neigh Face #4: ', PolyMesh%Elem_loc(ie)%neigh_el(4,:)

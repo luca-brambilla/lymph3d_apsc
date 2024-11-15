@@ -31,7 +31,7 @@ module Poly_setup_MPI
      logical(kind=4) :: flag
 
      PetscErrorCode :: ierr
-     PetscMPIInt :: size,rank
+     PetscMPIInt :: mpi_size,rank
 
      !integer*4 POLYSPEED_COMM
      !integer*4 POLYSPEED_TAG, POLYSPEED_TAG_MIN, POLYSPEED_TAG_MAX
@@ -58,12 +58,12 @@ module Poly_setup_MPI
      call MPI_COMM_SIZE(MPI_COMM_WORLD, mpi_np, mpi_ierr)
 
      PetscCall(PetscInitialize(ierr))
-     PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,size,ierr))
+     PetscCallMPI(MPI_Comm_size(PETSC_COMM_WORLD,mpi_size,ierr))
      PetscCallMPI(MPI_Comm_rank(PETSC_COMM_WORLD,rank,ierr))
 
      ! Initialize PETSc
      ! call PetscInitialize(PETSC_NULL_CHARACTER, ierr)
-     !call MPI_Comm_size(PETSC_COMM_WORLD, size, ierr)
+     !call MPI_Comm_size(PETSC_COMM_WORLD, mpi_size, ierr)
      !call MPI_Comm_rank(PETSC_COMM_WORLD, rank, ierr)
 
      !> Console output in case of error
