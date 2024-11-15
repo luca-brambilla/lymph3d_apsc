@@ -1879,128 +1879,136 @@ end subroutine WRITE_PARTITION
 
 !> stores the information of the neighbouring tetrahedra and polyhedra by reading data from con_tri.mpi;
 !>
-      subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
+subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
 
-      use mpi
-      use Poly_setup_MPI, only: mpi_ierr
-      use Poly_mesh
-      use qsort
-      use local_search
-      use Poly_exit_codes, only: EXIT_NEIGHBOUR_EL_ERROR
+   use mpi
+   use Poly_setup_MPI, only: mpi_ierr
+   use Poly_mesh
+   use qsort
+   use local_search
+   use Poly_exit_codes, only: EXIT_NEIGHBOUR_EL_ERROR
 
-      implicit none
+   implicit none
 
-      character(len=70), intent(in) :: mpifile
-      character(len=70) :: mpi_file_tri
-      integer(kind=4), intent(in)  :: mpi_np, mpi_id
-      integer (kind=4) :: status(MPI_STATUS_SIZE)
-      integer(kind=4)  :: unit_mpi, num_elem_list, num_tria_loc, i, j,Row,Row2, &
-                          num_tria_send, ie, iface, mat, ie_ne, iface_ne, mat_ne, &
-                          ie_loc, ipoly_glob,ipoly2_glob,ipoly_loc,ipoly2_loc,ie_ne_loc, ip, &
-                          num_tria_send_mpi, kiter,kiter2, num_tria_send_loc,face_glob,&
-                          iface_poly,num_tet_in_poly
-      integer (kind=4), dimension(:), allocatable :: faces_found_loc,faces_to_find_send
-      integer (kind=4) :: num_faces_send_mpi,iter_face,iter_face_2
+   character(len=70), intent(in) :: mpifile
+   character(len=70) :: mpi_file_tri
+   integer(kind=4), intent(in)  :: mpi_np, mpi_id
+   integer(kind=4) :: status(MPI_STATUS_SIZE)
+   integer(kind=4) :: unit_mpi, num_elem_list, num_tria_loc, i, j,Row,Row2, &
+                        num_tria_send, ie, iface, mat, ie_ne, iface_ne, mat_ne, &
+                        ie_loc, ipoly_glob,ipoly2_glob,ipoly_loc,ipoly2_loc,ie_ne_loc, ip, &
+                        num_tria_send_mpi, kiter,kiter2, num_tria_send_loc,face_glob,&
+                        iface_poly,num_tet_in_poly
+   integer (kind=4), dimension(:), allocatable :: faces_found_loc,faces_to_find_send
+   integer (kind=4) :: num_faces_send_mpi,iter_face,iter_face_2
 
-      integer(kind=4), dimension(:,:), allocatable :: con_tria_loc, con_tria_recv_mpi
-      integer(kind=4), dimension(:),   allocatable :: con_tria_send, &
-                                                      con_tria_send_mpi
-      integer(kind=4),dimension(:), allocatable :: faces_to_find_send_mpi
-      integer(kind=4), dimension(1) :: one = 1
+   integer(kind=4), dimension(:,:), allocatable :: con_tria_loc, con_tria_recv_mpi
+   integer(kind=4), dimension(:),   allocatable :: con_tria_send, &
+                                                   con_tria_send_mpi
+   integer(kind=4), dimension(:), allocatable :: faces_to_find_send_mpi
+   integer(kind=4), dimension(1) :: one = 1
 
-      real(kind=8),dimension(:,:), allocatable :: xx_loc
-      real(kind=8),dimension(:,:), allocatable :: yy_loc
-      real(kind=8),dimension(:,:), allocatable :: zz_loc
-      real(kind=8),dimension(:),allocatable :: hk_send,hk_send_mpi
-      real(kind=8),dimension(:),allocatable :: xx_send
-      real(kind=8),dimension(:),allocatable :: yy_send
-      real(kind=8),dimension(:),allocatable :: zz_send
-      real(kind=8),dimension(:),allocatable :: x1_send_mpi,x2_send_mpi
-      real(kind=8),dimension(:),allocatable :: y1_send_mpi,y2_send_mpi
-      real(kind=8),dimension(:),allocatable :: z1_send_mpi,z2_send_mpi
-      real(kind=8),dimension(:,:),allocatable :: xx_recv_mpi,yy_recv_mpi,zz_recv_mpi
+   real(kind=8), dimension(:,:), allocatable :: xx_loc
+   real(kind=8), dimension(:,:), allocatable :: yy_loc
+   real(kind=8), dimension(:,:), allocatable :: zz_loc
+   real(kind=8), dimension(:), allocatable :: hk_send,hk_send_mpi
+   real(kind=8), dimension(:), allocatable :: xx_send
+   real(kind=8), dimension(:), allocatable :: yy_send
+   real(kind=8), dimension(:), allocatable :: zz_send
+   real(kind=8), dimension(:), allocatable :: x1_send_mpi,x2_send_mpi
+   real(kind=8), dimension(:), allocatable :: y1_send_mpi,y2_send_mpi
+   real(kind=8), dimension(:), allocatable :: z1_send_mpi,z2_send_mpi
+   real(kind=8), dimension(:,:), allocatable :: xx_recv_mpi,yy_recv_mpi,zz_recv_mpi
 
-      integer(kind=4), dimension(:),allocatable :: index_loc,index_send,index_send_mpi
-      integer(kind=4) :: num_poly_send,num_poly_send_loc,num_poly_send_mpi,num_index_send_mpi,num_hk_send_mpi
-      integer(kind=4) :: space_fun_tag
+   integer(kind=4), dimension(:), allocatable :: index_loc,index_send,index_send_mpi
+   integer(kind=4) :: num_poly_send,num_poly_send_loc,num_poly_send_mpi,num_index_send_mpi,num_hk_send_mpi
+   integer(kind=4) :: space_fun_tag
 
-      logical :: IsFound_int, IsFound_bnd, IsQuad
+   logical :: IsFound_int, IsFound_bnd, IsQuad
 
-      type(Mesh_Structure), intent(inout) :: PolyMesh
+   type(Mesh_Structure), intent(inout) :: PolyMesh
 
+   ! ----------
+   ! 1 - Reoder con_quad structure
+   ! ----------
 
-     !1 - Reoder con_quad structure
-      do ie = 1, PolyMesh%num_tria
+   do ie = 1, PolyMesh%num_tria
 
-         call QsortC(PolyMesh%con_tria(ie,2:4))
+      call QsortC(PolyMesh%con_tria(ie,2:4))
 
-      enddo
+   enddo
+   ! ----------
+   ! 2 - read con_tria_000000.mpi and load faces
+   ! ----------
 
-      !3 read con_tria_000000.mpi and load faces
-      mpi_file_tri = 'con_tri_000000.mpi'
+   mpi_file_tri = 'con_tri_000000.mpi'
 
-      unit_mpi = 40 + mpi_id
-      if (mpi_id < 10) then
-         write(mpi_file_tri(14:14),'(i1)') mpi_id
-      elseif (mpi_id < 100) then
-         write(mpi_file_tri(13:14),'(i2)') mpi_id
-      elseif (mpi_id < 1000) then
-         write(mpi_file_tri(12:14),'(i3)') mpi_id
-      elseif (mpi_id < 10000) then
-         write(mpi_file_tri(11:14),'(i4)') mpi_id
-      elseif (mpi_id < 100000) then
-         write(mpi_file_tri(10:14),'(i5)') mpi_id
-      elseif (mpi_id < 1000000) then
-         write(mpi_file_tri(9:14),'(i6)') mpi_id
-      endif
+   unit_mpi = 40 + mpi_id
+   if (mpi_id < 10) then
+      write(mpi_file_tri(14:14),'(i1)') mpi_id
+   elseif (mpi_id < 100) then
+      write(mpi_file_tri(13:14),'(i2)') mpi_id
+   elseif (mpi_id < 1000) then
+      write(mpi_file_tri(12:14),'(i3)') mpi_id
+   elseif (mpi_id < 10000) then
+      write(mpi_file_tri(11:14),'(i4)') mpi_id
+   elseif (mpi_id < 100000) then
+      write(mpi_file_tri(10:14),'(i5)') mpi_id
+   elseif (mpi_id < 1000000) then
+      write(mpi_file_tri(9:14),'(i6)') mpi_id
+   endif
 
-      mpi_file_tri = mpifile(1:len_trim(mpifile)) // '/' // mpi_file_tri
+   mpi_file_tri = mpifile(1:len_trim(mpifile)) // '/' // mpi_file_tri
 
-      open(unit_mpi,file=mpi_file_tri)
-      read(unit_mpi,*) num_elem_list
+   open(unit_mpi,file=mpi_file_tri)
+   read(unit_mpi,*) num_elem_list
 
-      num_tria_loc =  num_elem_list/6
-      num_tria_send = 0
-      num_poly_send = 0
+   num_tria_loc =  num_elem_list/6
+   num_tria_send = 0
+   num_poly_send = 0
 
-      !write(*,*) num_tria_loc
+   !write(*,*) num_tria_loc
 
-      allocate(con_tria_loc(num_tria_loc,6))
+   allocate(con_tria_loc(num_tria_loc,6))
 
-      allocate(xx_loc(PolyMesh%num_poly_loc,2))
-      allocate(yy_loc(PolyMesh%num_poly_loc,2))
-      allocate(zz_loc(PolyMesh%num_poly_loc,2))
-      allocate(index_send(PolyMesh%num_poly_loc))
-      allocate(hk_send(PolyMesh%num_poly_loc))
+   allocate(xx_loc(PolyMesh%num_poly_loc,2))
+   allocate(yy_loc(PolyMesh%num_poly_loc,2))
+   allocate(zz_loc(PolyMesh%num_poly_loc,2))
+   allocate(index_send(PolyMesh%num_poly_loc))
+   allocate(hk_send(PolyMesh%num_poly_loc))
 
-      do i = 1, num_tria_loc
-          read(unit_mpi,*) con_tria_loc(i,1:6)
-      enddo
+   do i = 1, num_tria_loc
+         read(unit_mpi,*) con_tria_loc(i,1:6)
+   enddo
 
-      do i=1,PolyMesh%num_poly_loc
-         xx_loc(i,1:2)=PolyMesh%Poly(i)%b_box(1,1:2)
-         yy_loc(i,1:2)=PolyMesh%Poly(i)%b_box(2,1:2)
-         zz_loc(i,1:2)=PolyMesh%Poly(i)%b_box(3,1:2)
-         hk_send(i)=PolyMesh%Poly(i)%hk
-         !if (index_loc(i)==2866) print *,'index_loc',i
-      enddo
+   do i=1,PolyMesh%num_poly_loc
+      xx_loc(i,1:2)=PolyMesh%Poly(i)%b_box(1,1:2)
+      yy_loc(i,1:2)=PolyMesh%Poly(i)%b_box(2,1:2)
+      zz_loc(i,1:2)=PolyMesh%Poly(i)%b_box(3,1:2)
+      hk_send(i)=PolyMesh%Poly(i)%hk
+      !if (index_loc(i)==2866) print *,'index_loc',i
+   enddo
 
-     !3 - Find neighbouring elements between elements in the same processor
-     ! first internal faces, than boundary faces
-      IsQuad = .false.
-      do i = 1, num_tria_loc
-         isFound_int = .false.
-         isFound_bnd = .false.
+   ! ----------
+   ! 3 - Find neighbouring elements between elements in the same processor
+   ! first internal faces, than boundary faces
+   ! ----------
 
-            !if (mpi_id == 0) write(*,*) 'before', con_tria_loc(i,:)
+   IsQuad = .false.
+   tria_loop: do i = 1, num_tria_loc
+      isFound_int = .false.
+      isFound_bnd = .false.
 
-            if (con_tria_loc(i,1) /= 0) then
-                call FIND_NEIGHBOUR_EL(i, con_tria_loc, num_tria_loc,&
-                                       IsFound_int, Row2, IsQuad)
-                if(IsFound_int) then
-                   mat   = con_tria_loc(i,1); mat_ne   = con_tria_loc(Row2,1)
-                   ie    = con_tria_loc(i,2); ie_ne    = con_tria_loc(Row2,2)
-                   iface = con_tria_loc(i,3); iface_ne = con_tria_loc(Row2,3)
+         !if (mpi_id == 0) write(*,*) 'before', con_tria_loc(i,:)
+
+         if (con_tria_loc(i,1) /= 0) then
+            call FIND_NEIGHBOUR_EL(i, con_tria_loc, num_tria_loc,&
+                                    IsFound_int, Row2, IsQuad)
+            ! internal face
+            if(IsFound_int) then
+               mat   = con_tria_loc(i,1); mat_ne   = con_tria_loc(Row2,1)
+               ie    = con_tria_loc(i,2); ie_ne    = con_tria_loc(Row2,2)
+               iface = con_tria_loc(i,3); iface_ne = con_tria_loc(Row2,3)
 !                   write(*,*) con_quad_loc(i,:)
 !                   write(*,*) con_quad_loc(Row2,:)
 !                   write(*,*) mat, ie, iface
@@ -2010,400 +2018,406 @@ end subroutine WRITE_PARTITION
 !                   write(*,*) ie_ne, iface_ne, PolyMesh%Elem_loc(ie_ne)%neigh_el(iface_ne,:)
 !                   read(*,*)
 
-                   call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
-                                               PolyMesh%num_elem_loc, &
-                                               ie,ie_loc)
-
-                   call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
-                                               PolyMesh%num_elem_loc, &
-                                               ie_ne,ie_ne_loc)
-
-                  ipoly_glob=PolyMesh%elem_in_poly(ie)
-                  ipoly2_glob=PolyMesh%elem_in_poly(ie_ne)
-
-                   PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = mpi_id
-                   PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1:4) = [mat_ne, ie_ne, iface_ne,ipoly2_glob]
-
-                   PolyMesh%Elem_loc(ie_ne_loc)%neigh_el(iface_ne,0) = mpi_id
-                   PolyMesh%Elem_loc(ie_ne_loc)%neigh_el(iface_ne,1:4) = [mat, ie, iface,ipoly_glob]
-
-                   !write(*,*) 'el', PolyMesh%Elem_loc(ie)%neigh_el(iface,1:3)
-                   !write(*,*) 'ne', PolyMesh%Elem_loc(ie_ne)%neigh_el(iface_ne,1:3)
-                   !read(*,*)
-                   !PolyMesh%Elem_loc(ie_loc)%flag(iface)=1
-                   !PolyMesh%Elem_loc(ie_ne_loc)%flag(iface_ne)=0
-
-
-                   con_tria_loc(i,:) = 0;
-                   con_tria_loc(Row2,:) = 0;
-                   !print *,ipoly_loc
-                   !faces_found_loc(i)=1;
-                   !print *,'local internal'
-                   !print *,i,Row2
-                   !faces_found_loc(Row2)=1;
-                else
-                   !if (mpi_id == 1 .and. i == 18) then
-                   call FIND_BOUNDARY_EL(i,con_tria_loc,num_tria_loc,&
-                                         PolyMesh%con_tria, PolyMesh%num_tria, &
-                                         IsFound_bnd,Row2,IsQuad)
-                     !write(*,*) IsFound_bnd
-                   !endif
-                   if(IsFound_bnd) then
-                      mat   = con_tria_loc(i,1); mat_ne   =   PolyMesh%con_tria(Row2,1)
-                      space_fun_tag = PolyMesh%con_tria(Row2,5)
-                      ie    = con_tria_loc(i,2);
-
-                     !! PROBLEM
-                     ! TODO - case with more faces? case with different BC? make automatic
-                     ! Dirichlet bc identifier
-                     if(mat_ne == 2 .or. mat_ne == 3 .or. mat_ne == 4) ie_ne = -1
-                     ! if(mat_ne == 2) ie_ne = -1
-
-                      ! Neumann bc identifier
-                      if(mat_ne == 5 .or. mat_ne == 6 .or. mat_ne == 7) ie_ne = -2
-                      ! if(mat_ne == 3 .or. mat_ne == 4 .or. mat_ne == 5 .or. mat_ne == 6 .or. mat_ne == 7) ie_ne = -2
-
-                      iface = con_tria_loc(i,3); iface_ne =   con_tria_loc(i,3);
-
-                      call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
-                                                  PolyMesh%num_elem_loc, &
-                                                  ie,ie_loc)
-
-                     ipoly_glob=PolyMesh%elem_in_poly(ie)
-
-                      PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = mpi_id
-                      PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1:5) = &
-                                                             [mat_ne, ie_ne, iface_ne, ipoly_glob, space_fun_tag]
-
-                     ! print *, "neigh_el: ", PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,:)
-                     ! print *, ""
-
-                      !PolyMesh%Elem_loc(ie_loc)%flag(iface)=0;
-                      con_tria_loc(i,:) = 0;
-                      PolyMesh%con_tria(Row2,:) = 0;
-                      !faces_found_loc(i)=1;
-                     !  print *,'boundary'
-                     !  print *,i,Row2
-                      !faces_found_loc(Row2)=1;
-                   endif
-                endif
-           endif
-           !if(mpi_id == 1) write(*,*) IsFound_int, IsFound_bnd, 'el', i, con_quad_loc(i,4:7)
-           !read(*,*)
-
-           if((IsFound_int .eqv. .false.) .and. (IsFound_bnd .eqv. .false.) &
-                .and. con_tria_loc(i,4) /= 0) &
-               num_tria_send =  num_tria_send + 1
-
-      enddo
-
-      num_tria_send_loc = num_tria_send
-
-      num_poly_send=PolyMesh%num_poly_loc
-
-      num_poly_send_loc = num_poly_send
-
-      !print *,num_tria_send
-
-      !print *,'___________________'
-      !print *,num_poly_send_loc
-
-      !if(mpi_id == 1)  write(*,*) num_tria_send_loc
-      !read(*,*)
-
-      !callMPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-      ! 4 - Preparation for sending triangular faces
-      allocate(con_tria_send(6*num_tria_send))
-      !allocate(faces_to_find_send(num_tria_send))
-
-      kiter = 0
-
-      do i = 1, num_tria_loc
-         if (con_tria_loc(i,1) /= 0) then
-             con_tria_send(kiter+1:kiter+6) = con_tria_loc(i,1:6)
-             kiter = kiter + 6
-             !if(mpi_id == 1) write(*,*) mpi_id, 'ctria', con_tria_loc(i,1:6)
-          endif
-      enddo
-
-      allocate(xx_send(2*num_poly_send),yy_send(2*num_poly_send),zz_send(2*num_poly_send))
-
-      kiter2 = 0
-
-      do i=1,PolyMesh%num_poly_loc
-
-         xx_send(kiter2+1:kiter2+2) = xx_loc(i,1:2)
-         yy_send(kiter2+1:kiter2+2)=yy_loc(i,1:2)
-         zz_send(kiter2+1:kiter2+2)=zz_loc(i,1:2)
-         !print *,'proc',mpi_id,'i',i,xx_send(kiter2+1:kiter2+2),yy_send(kiter2+1:kiter2+2),zz_send(kiter2+1:kiter2+2)
-         index_send(i)=PolyMesh%poly_loc2glo(i)
-         !print *,'index_loc',i,'index_glob',index_send(i)
-         kiter2=kiter2+2
-         !endif
-      enddo
-
-       !if(mpi_id ==1) write(*,*) mpi_id, con_quad_send
-       !if(mpi_id ==1) write(*,*) '========================'
-      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-      !5 - Broadcasting elements
-
-      do ip = 1, mpi_np
-
-         if(mpi_id == ip-1) num_tria_send_mpi = 6*num_tria_send;
-         !print *,num_tria_send_mpi
-         call MPI_BCAST(num_tria_send_mpi, 1, MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
-
-         !call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         allocate(con_tria_send_mpi(num_tria_send_mpi))
-         if(mpi_id == ip-1) con_tria_send_mpi = con_tria_send;
-         !print *,num_tria_send_mpi
-         call MPI_BCAST(con_tria_send_mpi,num_tria_send_mpi,&
-                        MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
-
-         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         allocate(con_tria_recv_mpi(num_tria_send_mpi/6,6))
-
-         kiter = 1
-
-         do i = 1, num_tria_send_mpi, 6
-            !print *,'i',i
-            !print *,'kiter',kiter
-            !print *,con_tria_send_mpi(i:i+5)
-            con_tria_recv_mpi(kiter,1:6) = con_tria_send_mpi(i:i+5)
-            !if(mpi_id == 1) write(*,*) i,i+6,con_quad_send_mpi(i:i+6)
-            !if(mpi_id == 1) write(*,*) 'con_tria_rcv', con_tria_recv_mpi(kiter,1:6)
-            kiter = kiter + 1
-         enddo
-
-         if(mpi_id==ip-1) num_index_send_mpi=PolyMesh%num_poly_loc
-
-         call MPI_BCAST(num_index_send_mpi, 1, MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
-
-         allocate(index_send_mpi(num_index_send_mpi))
-
-         if(mpi_id==ip-1) index_send_mpi=index_send
-
-         call MPI_BCAST(index_send_mpi,num_index_send_mpi,&
-                        MPI_INTEGER,ip-1,MPI_COMM_WORLD,mpi_ierr)
-
-         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         if(mpi_id==ip-1) num_hk_send_mpi=PolyMesh%num_poly_loc
-
-         call MPI_BCAST(num_hk_send_mpi, 1, MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
-
-         allocate(hk_send_mpi(num_hk_send_mpi))
-
-         if(mpi_id==ip-1) hk_send_mpi=hk_send
-
-         call MPI_BCAST(hk_send_mpi,2*num_hk_send_mpi,&
-                        MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
-
-         ! unpaking the elements
-         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         if (mpi_id==ip-1) num_poly_send_mpi = num_poly_send
-         !print *,num_poly_send_mpi
-
-         call MPI_BCAST(num_poly_send_mpi,1,MPI_INTEGER,ip-1,MPI_COMM_WORLD,mpi_ierr)
-         !print *,num_poly_send_mpi
-
-         allocate(x1_send_mpi(num_poly_send_mpi))
-
-         if (mpi_id==ip-1) then
-            kiter2=1
-            do i=1,2*num_poly_send_mpi,2
-               x1_send_mpi(kiter2)=xx_send(i)
-               kiter2=kiter2+1;
-            enddo
-         endif
-
-         call MPI_BCAST(x1_send_mpi,2*num_poly_send_mpi,&
-                        MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
-
-         ! unpaking the elements
-         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         allocate(x2_send_mpi(num_poly_send_mpi))
-
-         if (mpi_id==ip-1) then
-            kiter2=1
-            do i=1,2*num_poly_send_mpi,2
-               x2_send_mpi(kiter2)=xx_send(i+1)
-               kiter2=kiter2+1;
-            enddo
-         endif
-
-         call MPI_BCAST(x2_send_mpi,2*num_poly_send_mpi,&
-                        MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
-
-         ! unpaking the elements
-         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         allocate(y1_send_mpi(num_poly_send_mpi))
-
-         if (mpi_id==ip-1) then
-            kiter2=1
-            do i=1,2*num_poly_send_mpi,2
-               y1_send_mpi(kiter2)=yy_send(i)
-               kiter2=kiter2+1;
-            enddo
-         endif
-
-         call MPI_BCAST(y1_send_mpi,2*num_poly_send_mpi,&
-                        MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
-
-         ! unpaking the elements
-         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         allocate(y2_send_mpi(num_poly_send_mpi))
-
-         if (mpi_id==ip-1) then
-            kiter2=1
-            do i=1,2*num_poly_send_mpi,2
-               y2_send_mpi(kiter2)=yy_send(i+1)
-               kiter2=kiter2+1;
-            enddo
-         endif
-
-         call MPI_BCAST(y2_send_mpi,2*num_poly_send_mpi,&
-                        MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
-
-         ! unpaking the elements
-         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         allocate(z1_send_mpi(num_poly_send_mpi))
-
-         if (mpi_id==ip-1) then
-            kiter2=1;
-            do i=1,2*num_poly_send_mpi,2
-               z1_send_mpi(kiter2)=zz_send(i)
-               kiter2=kiter2+1;
-            enddo
-         endif
-
-         call MPI_BCAST(z1_send_mpi,2*num_poly_send_mpi,&
-                        MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
-
-         ! unpaking the elements
-         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         allocate(z2_send_mpi(num_poly_send_mpi))
-
-         if (mpi_id==ip-1) then
-            kiter2=1;
-
-            do i=1,2*num_poly_send_mpi,2
-               z2_send_mpi(kiter2)=zz_send(i+1)
-               kiter2=kiter2+1;
-            enddo
-         endif
-
-         call MPI_BCAST(z2_send_mpi,2*num_poly_send_mpi,&
-                        MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
-
-         !unpaking the elements
-         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-         !find neighbouring elements
-         !iter_face=1;
-         do i = 1, num_tria_loc
-            !flag=0;
-            !iface_poly=1;
-            isFound_int = .false.
-            if (con_tria_loc(i,1) /= 0 .and. mpi_id /= ip-1) then
-               !print *,'PROC:',mpi_id
-               call FIND_NEIGHBOURING_EL_MPI(i,con_tria_loc, num_tria_loc,&
-                                             con_tria_recv_mpi, num_tria_send_mpi/6, &
-                                             IsFound_int, Row2, IsQuad)
-
-               if(IsFound_int) then
-                  mat   = con_tria_loc(i,1); mat_ne   = con_tria_recv_mpi(Row2,1)
-                  ie    = con_tria_loc(i,2); ie_ne    = con_tria_recv_mpi(Row2,2)
-                  iface = con_tria_loc(i,3); iface_ne = con_tria_recv_mpi(Row2,3);
+               call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
+                                          PolyMesh%num_elem_loc, &
+                                          ie,ie_loc)
+
+               call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
+                                          PolyMesh%num_elem_loc, &
+                                          ie_ne,ie_ne_loc)
+
+               ipoly_glob=PolyMesh%elem_in_poly(ie)
+               ipoly2_glob=PolyMesh%elem_in_poly(ie_ne)
+
+               PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = mpi_id
+               PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1:4) = [mat_ne, ie_ne, iface_ne,ipoly2_glob]
+
+               PolyMesh%Elem_loc(ie_ne_loc)%neigh_el(iface_ne,0) = mpi_id
+               PolyMesh%Elem_loc(ie_ne_loc)%neigh_el(iface_ne,1:4) = [mat, ie, iface,ipoly_glob]
+
+               !write(*,*) 'el', PolyMesh%Elem_loc(ie)%neigh_el(iface,1:3)
+               !write(*,*) 'ne', PolyMesh%Elem_loc(ie_ne)%neigh_el(iface_ne,1:3)
+               !read(*,*)
+               !PolyMesh%Elem_loc(ie_loc)%flag(iface)=1
+               !PolyMesh%Elem_loc(ie_ne_loc)%flag(iface_ne)=0
+
+
+               con_tria_loc(i,:) = 0;
+               con_tria_loc(Row2,:) = 0;
+               !print *,ipoly_loc
+               !faces_found_loc(i)=1;
+               !print *,'local internal'
+               !print *,i,Row2
+               !faces_found_loc(Row2)=1;
+
+            ! boundary face
+            else
+               !if (mpi_id == 1 .and. i == 18) then
+               call FIND_BOUNDARY_EL(i,con_tria_loc,num_tria_loc,&
+                                    PolyMesh%con_tria, PolyMesh%num_tria, &
+                                    IsFound_bnd,Row2,IsQuad)
+               !write(*,*) IsFound_bnd
+               !endif
+                  if(IsFound_bnd) then
+                  mat   = con_tria_loc(i,1); mat_ne   =   PolyMesh%con_tria(Row2,1)
+                  space_fun_tag = PolyMesh%con_tria(Row2,5)
+                  ie    = con_tria_loc(i,2);
+
+                  !! PROBLEM
+                  ! TODO - case with more faces on domain? case with different BC? make automatic
+                  ! Dirichlet bc identifier
+                  if(mat_ne == 2 .or. mat_ne == 3 .or. mat_ne == 4) ie_ne = -1
+                  ! if(mat_ne == 2) ie_ne = -1
+
+                  ! Neumann bc identifier
+                  if(mat_ne == 5 .or. mat_ne == 6 .or. mat_ne == 7) ie_ne = -2
+                  ! if(mat_ne == 3 .or. mat_ne == 4 .or. mat_ne == 5 .or. mat_ne == 6 .or. mat_ne == 7) ie_ne = -2
+
+                  iface = con_tria_loc(i,3); iface_ne =   con_tria_loc(i,3);
 
                   call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
-                                                PolyMesh%num_elem_loc, &
-                                                ie,ie_loc)
+                                             PolyMesh%num_elem_loc, &
+                                             ie,ie_loc)
 
                   ipoly_glob=PolyMesh%elem_in_poly(ie)
-                  ipoly2_glob=PolyMesh%elem_in_poly(ie_ne)
 
-                  PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = ip-1
-                  PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1:4) = [mat_ne, ie_ne, iface_ne,ipoly2_glob]
+                  PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = mpi_id
+                  PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1:5) = &
+                                                         [mat_ne, ie_ne, iface_ne, ipoly_glob, space_fun_tag]
 
+                  ! print *, "neigh_el: ", PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,:)
+                  ! print *, ""
 
-                  if (ipoly_glob /= ipoly2_glob) then
-                     !print *,'neighbor tet',ie,ie_ne
-
-                     call GET_EL_LOC_FROM_EL_GLO(index_send_mpi,num_poly_send_mpi,ipoly2_glob,ipoly2_loc)
-
-                     call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
-                                                PolyMesh%num_poly_loc, &
-                                                ipoly_glob,ipoly_loc)
-                     !print *,'tet',ie,' belongs to global poly',ipoly_glob,'local:',ipoly_loc,'in processor',PolyMesh%part_elem(ie),'iface',iface
-                     !print *,'tet',ie_ne,'belongs to global poly',ipoly2_glob,'local:',ipoly2_loc,'in processor',PolyMesh%part_elem(ie_ne),'iface_ne',iface_ne
-
-                     !print *,'bbbox:',x1_send_mpi(ipoly2_loc),x2_send_mpi(ipoly2_loc),&
-                     !                  y1_send_mpi(ipoly2_loc),y2_send_mpi(ipoly2_loc),&
-                     !                  z1_send_mpi(ipoly2_loc),z2_send_mpi(ipoly2_loc)
-                     !print *,'hk',hk_send_mpi(ipoly2_loc)
-
-                     num_tet_in_poly=PolyMesh%Poly(ipoly_loc)%num_tet_in_poly
-                     !print *,num_tet_in_poly
-
-                     do j=1,num_tet_in_poly
-                        !print *,PolyMesh%Poly(ipoly_loc)%tet_in_poly(j)
-                        if (PolyMesh%Poly(ipoly_loc)%tet_in_poly(j)==ie) then
-                           iface_poly=PolyMesh%Elem_loc(ie_loc)%num_faces*(j-1)+iface
-                           !print *,ie,iface,iface_poly
-                        endif
-                     enddo
-                     !print *,iface_poly
-                     PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,1,1:2)=[x1_send_mpi(ipoly2_loc),x2_send_mpi(ipoly2_loc)]
-                     PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,2,1:2)=[y1_send_mpi(ipoly2_loc),y2_send_mpi(ipoly2_loc)]
-                     PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,3,1:2)=[z1_send_mpi(ipoly2_loc),z2_send_mpi(ipoly2_loc)]
-                     PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly)=hk_send_mpi(ipoly2_loc)
-                     !index_loc(ipoly2_loc)=0;
-
-                     !print *,'_______'
-
-                  endif
-
+                  !PolyMesh%Elem_loc(ie_loc)%flag(iface)=0;
                   con_tria_loc(i,:) = 0;
-                  con_tria_recv_mpi(Row2,:) = 0;
-                  num_tria_send_loc = num_tria_send_loc - 1
+                  PolyMesh%con_tria(Row2,:) = 0;
+                     !faces_found_loc(i)=1;
+                  !  print *,'boundary'
+                  !  print *,i,Row2
+                     !faces_found_loc(Row2)=1;
                endif
             endif
-         enddo
-         !go to next processor
-         deallocate(con_tria_send_mpi,con_tria_recv_mpi)
-         deallocate(x1_send_mpi,x2_send_mpi)
-         deallocate(y1_send_mpi,y2_send_mpi)
-         deallocate (z1_send_mpi,z2_send_mpi)
-         !deallocate(xx_recv_mpi,yy_recv_mpi,zz_recv_mpi)
-         deallocate(index_send_mpi,hk_send_mpi)
+         endif
+         !if(mpi_id == 1) write(*,*) IsFound_int, IsFound_bnd, 'el', i, con_quad_loc(i,4:7)
+         !read(*,*)
 
-      enddo
+         if((IsFound_int .eqv. .false.) .and. (IsFound_bnd .eqv. .false.) &
+               .and. con_tria_loc(i,4) /= 0) &
+               num_tria_send =  num_tria_send + 1
 
-      !deallocate(faces_to_find_send,faces_to_find_send_mpi)
+   enddo tria_loop
 
-      if(num_tria_send_loc == 0) then
-           write(*,*) 'Proc ', mpi_id, ':', ' found all tria interfaces!'
-      else
-           write(*,*) 'Proc ', mpi_id, ':',  num_tria_send_loc, ' tria interfaces not found!'
-           !call EXIT(EXIT_NEIGHBOUR_EL_ERROR)
-      endif
+   num_tria_send_loc = num_tria_send
+
+   num_poly_send = PolyMesh%num_poly_loc
+
+   num_poly_send_loc = num_poly_send
+
+   !print *,num_tria_send
+
+   !print *,'___________________'
+   !print *,num_poly_send_loc
+
+   !if(mpi_id == 1)  write(*,*) num_tria_send_loc
+   !read(*,*)
+
+   !callMPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+   ! ----------
+   ! 4 - Preparation for sending triangular faces
+   ! ----------
+
+   allocate(con_tria_send(6*num_tria_send))
+   !allocate(faces_to_find_send(num_tria_send))
+
+   kiter = 0
+
+   do i = 1, num_tria_loc
+      if (con_tria_loc(i,1) /= 0) then
+            con_tria_send(kiter+1:kiter+6) = con_tria_loc(i,1:6)
+            kiter = kiter + 6
+            !if(mpi_id == 1) write(*,*) mpi_id, 'ctria', con_tria_loc(i,1:6)
+         endif
+   enddo
+
+   allocate(xx_send(2*num_poly_send),yy_send(2*num_poly_send),zz_send(2*num_poly_send))
+
+   kiter2 = 0
+
+   do i=1,PolyMesh%num_poly_loc
+
+      xx_send(kiter2+1:kiter2+2) = xx_loc(i,1:2)
+      yy_send(kiter2+1:kiter2+2)=yy_loc(i,1:2)
+      zz_send(kiter2+1:kiter2+2)=zz_loc(i,1:2)
+      !print *,'proc',mpi_id,'i',i,xx_send(kiter2+1:kiter2+2),yy_send(kiter2+1:kiter2+2),zz_send(kiter2+1:kiter2+2)
+      index_send(i)=PolyMesh%poly_loc2glo(i)
+      !print *,'index_loc',i,'index_glob',index_send(i)
+      kiter2=kiter2+2
+      !endif
+   enddo
+
+   !if(mpi_id ==1) write(*,*) mpi_id, con_quad_send
+   !if(mpi_id ==1) write(*,*) '========================'
+   call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+   ! ----------
+   ! 5 - Broadcasting elements
+   ! ----------
+
+   proc_loop: do ip = 1, mpi_np
+
+      if(mpi_id == ip-1) num_tria_send_mpi = 6*num_tria_send;
+      !print *,num_tria_send_mpi
+      call MPI_BCAST(num_tria_send_mpi, 1, MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
+
+      !call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+      allocate(con_tria_send_mpi(num_tria_send_mpi))
+      if(mpi_id == ip-1) con_tria_send_mpi = con_tria_send;
+      !print *,num_tria_send_mpi
+      call MPI_BCAST(con_tria_send_mpi,num_tria_send_mpi,&
+                     MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
 
       call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
+      allocate(con_tria_recv_mpi(num_tria_send_mpi/6,6))
+
+      kiter = 1
+
+      do i = 1, num_tria_send_mpi, 6
+         !print *,'i',i
+         !print *,'kiter',kiter
+         !print *,con_tria_send_mpi(i:i+5)
+         con_tria_recv_mpi(kiter,1:6) = con_tria_send_mpi(i:i+5)
+         !if(mpi_id == 1) write(*,*) i,i+6,con_quad_send_mpi(i:i+6)
+         !if(mpi_id == 1) write(*,*) 'con_tria_rcv', con_tria_recv_mpi(kiter,1:6)
+         kiter = kiter + 1
+      enddo
+
+      if(mpi_id==ip-1) num_index_send_mpi=PolyMesh%num_poly_loc
+
+      call MPI_BCAST(num_index_send_mpi, 1, MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
+
+      allocate(index_send_mpi(num_index_send_mpi))
+
+      if(mpi_id==ip-1) index_send_mpi=index_send
+
+      call MPI_BCAST(index_send_mpi,num_index_send_mpi,&
+                     MPI_INTEGER,ip-1,MPI_COMM_WORLD,mpi_ierr)
+
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+      if(mpi_id==ip-1) num_hk_send_mpi=PolyMesh%num_poly_loc
+
+      call MPI_BCAST(num_hk_send_mpi, 1, MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
+
+      allocate(hk_send_mpi(num_hk_send_mpi))
+
+      if(mpi_id==ip-1) hk_send_mpi=hk_send
+
+      call MPI_BCAST(hk_send_mpi,2*num_hk_send_mpi,&
+                     MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
+
+      ! unpaking the elements
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+      if (mpi_id==ip-1) num_poly_send_mpi = num_poly_send
+      !print *,num_poly_send_mpi
+
+      call MPI_BCAST(num_poly_send_mpi,1,MPI_INTEGER,ip-1,MPI_COMM_WORLD,mpi_ierr)
+      !print *,num_poly_send_mpi
+
+      allocate(x1_send_mpi(num_poly_send_mpi))
+
+      if (mpi_id==ip-1) then
+         kiter2=1
+         do i=1,2*num_poly_send_mpi,2
+            x1_send_mpi(kiter2)=xx_send(i)
+            kiter2=kiter2+1;
+         enddo
+      endif
+
+      call MPI_BCAST(x1_send_mpi,2*num_poly_send_mpi,&
+                     MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
+
+      ! unpaking the elements
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+      allocate(x2_send_mpi(num_poly_send_mpi))
+
+      if (mpi_id==ip-1) then
+         kiter2=1
+         do i=1,2*num_poly_send_mpi,2
+            x2_send_mpi(kiter2)=xx_send(i+1)
+            kiter2=kiter2+1;
+         enddo
+      endif
+
+      call MPI_BCAST(x2_send_mpi,2*num_poly_send_mpi,&
+                     MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
+
+      ! unpaking the elements
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+      allocate(y1_send_mpi(num_poly_send_mpi))
+
+      if (mpi_id==ip-1) then
+         kiter2=1
+         do i=1,2*num_poly_send_mpi,2
+            y1_send_mpi(kiter2)=yy_send(i)
+            kiter2=kiter2+1;
+         enddo
+      endif
+
+      call MPI_BCAST(y1_send_mpi,2*num_poly_send_mpi,&
+                     MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
+
+      ! unpaking the elements
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+      allocate(y2_send_mpi(num_poly_send_mpi))
+
+      if (mpi_id==ip-1) then
+         kiter2=1
+         do i=1,2*num_poly_send_mpi,2
+            y2_send_mpi(kiter2)=yy_send(i+1)
+            kiter2=kiter2+1;
+         enddo
+      endif
+
+      call MPI_BCAST(y2_send_mpi,2*num_poly_send_mpi,&
+                     MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
+
+      ! unpaking the elements
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+      allocate(z1_send_mpi(num_poly_send_mpi))
+
+      if (mpi_id==ip-1) then
+         kiter2=1;
+         do i=1,2*num_poly_send_mpi,2
+            z1_send_mpi(kiter2)=zz_send(i)
+            kiter2=kiter2+1;
+         enddo
+      endif
+
+      call MPI_BCAST(z1_send_mpi,2*num_poly_send_mpi,&
+                     MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
+
+      ! unpaking the elements
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+      allocate(z2_send_mpi(num_poly_send_mpi))
+
+      if (mpi_id==ip-1) then
+         kiter2=1;
+
+         do i=1,2*num_poly_send_mpi,2
+            z2_send_mpi(kiter2)=zz_send(i+1)
+            kiter2=kiter2+1;
+         enddo
+      endif
+
+      call MPI_BCAST(z2_send_mpi,2*num_poly_send_mpi,&
+                     MPI_REAL,ip-1,MPI_COMM_WORLD,mpi_ierr)
+
+      !unpaking the elements
+      call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+      !find neighbouring elements
+      !iter_face=1;
+      do i = 1, num_tria_loc
+         !flag=0;
+         !iface_poly=1;
+         isFound_int = .false.
+         if (con_tria_loc(i,1) /= 0 .and. mpi_id /= ip-1) then
+            !print *,'PROC:',mpi_id
+            call FIND_NEIGHBOURING_EL_MPI(i, con_tria_loc, num_tria_loc,&
+                                          con_tria_recv_mpi, num_tria_send_mpi/6, &
+                                          IsFound_int, Row2, IsQuad)
+
+            if(IsFound_int) then
+               mat   = con_tria_loc(i,1); mat_ne   = con_tria_recv_mpi(Row2,1)
+               ie    = con_tria_loc(i,2); ie_ne    = con_tria_recv_mpi(Row2,2)
+               iface = con_tria_loc(i,3); iface_ne = con_tria_recv_mpi(Row2,3);
+
+               call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
+                                             PolyMesh%num_elem_loc, &
+                                             ie,ie_loc)
+
+               ipoly_glob=PolyMesh%elem_in_poly(ie)
+               ipoly2_glob=PolyMesh%elem_in_poly(ie_ne)
+
+               PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = ip-1
+               PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1:4) = [mat_ne, ie_ne, iface_ne,ipoly2_glob]
 
 
-      end subroutine CREATE_NEIGH_EL_TRIA
+               if (ipoly_glob /= ipoly2_glob) then
+                  !print *,'neighbor tet',ie,ie_ne
+
+                  call GET_EL_LOC_FROM_EL_GLO(index_send_mpi,num_poly_send_mpi,ipoly2_glob,ipoly2_loc)
+
+                  call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
+                                             PolyMesh%num_poly_loc, &
+                                             ipoly_glob,ipoly_loc)
+                  !print *,'tet',ie,' belongs to global poly',ipoly_glob,'local:',ipoly_loc,'in processor',PolyMesh%part_elem(ie),'iface',iface
+                  !print *,'tet',ie_ne,'belongs to global poly',ipoly2_glob,'local:',ipoly2_loc,'in processor',PolyMesh%part_elem(ie_ne),'iface_ne',iface_ne
+
+                  !print *,'bbbox:',x1_send_mpi(ipoly2_loc),x2_send_mpi(ipoly2_loc),&
+                  !                  y1_send_mpi(ipoly2_loc),y2_send_mpi(ipoly2_loc),&
+                  !                  z1_send_mpi(ipoly2_loc),z2_send_mpi(ipoly2_loc)
+                  !print *,'hk',hk_send_mpi(ipoly2_loc)
+
+                  num_tet_in_poly=PolyMesh%Poly(ipoly_loc)%num_tet_in_poly
+                  !print *,num_tet_in_poly
+
+                  do j=1,num_tet_in_poly
+                     !print *,PolyMesh%Poly(ipoly_loc)%tet_in_poly(j)
+                     if (PolyMesh%Poly(ipoly_loc)%tet_in_poly(j)==ie) then
+                        iface_poly=PolyMesh%Elem_loc(ie_loc)%num_faces*(j-1)+iface
+                        !print *,ie,iface,iface_poly
+                     endif
+                  enddo
+                  !print *,iface_poly
+                  PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,1,1:2)=[x1_send_mpi(ipoly2_loc),x2_send_mpi(ipoly2_loc)]
+                  PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,2,1:2)=[y1_send_mpi(ipoly2_loc),y2_send_mpi(ipoly2_loc)]
+                  PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,3,1:2)=[z1_send_mpi(ipoly2_loc),z2_send_mpi(ipoly2_loc)]
+                  PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly)=hk_send_mpi(ipoly2_loc)
+                  !index_loc(ipoly2_loc)=0;
+
+                  !print *,'_______'
+
+               endif
+
+               con_tria_loc(i,:) = 0;
+               con_tria_recv_mpi(Row2,:) = 0;
+               num_tria_send_loc = num_tria_send_loc - 1
+            endif
+         endif
+      enddo
+
+      !go to next processor
+      deallocate(con_tria_send_mpi,con_tria_recv_mpi)
+      deallocate(x1_send_mpi,x2_send_mpi)
+      deallocate(y1_send_mpi,y2_send_mpi)
+      deallocate(z1_send_mpi,z2_send_mpi)
+      !deallocate(xx_recv_mpi,yy_recv_mpi,zz_recv_mpi)
+      deallocate(index_send_mpi,hk_send_mpi)
+
+   enddo proc_loop
+
+   !deallocate(faces_to_find_send,faces_to_find_send_mpi)
+
+   if(num_tria_send_loc == 0) then
+         write(*,*) 'Proc ', mpi_id, ':', ' found all tria interfaces!'
+   else
+         write(*,*) 'Proc ', mpi_id, ':',  num_tria_send_loc, ' tria interfaces not found!'
+         !call EXIT(EXIT_NEIGHBOUR_EL_ERROR)
+   endif
+
+   call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+end subroutine CREATE_NEIGH_EL_TRIA
 
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -2579,254 +2593,288 @@ end subroutine WRITE_PARTITION
 
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-      !> ???
-      !>
-      subroutine FIND_NEIGHBOURING_EL_MPI(iRow, con_int, num_int,&
+!> ???
+!>
+subroutine FIND_NEIGHBOURING_EL_MPI(iRow, con_int, num_int,&
                                           con_recv, num_recv, &
                                           IsFound, jRow, IsQuad)
 
+   implicit none
 
-      implicit none
+   integer(kind=4), intent(in) :: iRow, num_int, num_recv
+   integer(kind=4), dimension(num_int,*),  intent(in) :: con_int
+   integer(kind=4), dimension(num_recv,*), intent(in) :: con_recv
+   logical, intent(inout) :: IsFound, IsQuad
 
-      integer(kind=4), intent(in) :: iRow, num_int, num_recv
-      integer(kind=4), dimension(num_int,*),  intent(in) :: con_int
-      integer(kind=4), dimension(num_recv,*), intent(in) :: con_recv
-      logical, intent(inout) :: IsFound, IsQuad
+   integer(kind=4), intent(out) :: jRow
 
-      integer(kind=4), intent(out) :: jRow
+   integer(kind=4) :: i
 
-      integer(kind=4) :: i
+   IsFound = .false.
+   jRow = 0
 
-      IsFound = .false.
-      jRow = 0
+   if(IsQuad) then
+      do i = 1, num_recv
+         !write(*,*) i, con_bc(i,1)
+         if(con_recv(i,1) /= 0) then
+            if (con_int(iRow,4) == con_recv(i,4) .and. &
+               con_int(iRow,5) == con_recv(i,5) .and. &
+               con_int(iRow,6) == con_recv(i,6) .and. &
+               con_int(iRow,7) == con_recv(i,7)) then
+               IsFound = .true.
+               jRow = i
+            endif
+         endif
+      enddo
+   else
+      do i = 1, num_recv
+         !write(*,*) i, con_bc(i,1)
+         if(con_recv(i,1) /= 0) then
+            if (con_int(iRow,4) == con_recv(i,4) .and. &
+               con_int(iRow,5) == con_recv(i,5) .and. &
+               con_int(iRow,6) == con_recv(i,6)) then
+               IsFound = .true.
+               jRow = i
+            endif
+         endif
+      enddo
+   endif
 
-      if(IsQuad) then
-        do i = 1, num_recv
-          !write(*,*) i, con_bc(i,1)
-          if(con_recv(i,1) /= 0) then
-             if (con_int(iRow,4) == con_recv(i,4) .and. &
-                 con_int(iRow,5) == con_recv(i,5) .and. &
-                 con_int(iRow,6) == con_recv(i,6) .and. &
-                 con_int(iRow,7) == con_recv(i,7)) then
-                 IsFound = .true.
-                 jRow = i
-             endif
-           endif
-        enddo
-      else
-        do i = 1, num_recv
-          !write(*,*) i, con_bc(i,1)
-          if(con_recv(i,1) /= 0) then
-             if (con_int(iRow,4) == con_recv(i,4) .and. &
-                 con_int(iRow,5) == con_recv(i,5) .and. &
-                 con_int(iRow,6) == con_recv(i,6)) then
-                 IsFound = .true.
-                 jRow = i
-             endif
-           endif
-        enddo
-
-      endif
-
-      end subroutine FIND_NEIGHBOURING_EL_MPI
+end subroutine FIND_NEIGHBOURING_EL_MPI
 
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-      !> finds the id of the node of the mesh starting from the vertex of an element;
-      !>
-      subroutine FIND_POS_LOC_NODE(vect, dim_vect, is, it)
+!> finds the id of the node of the mesh starting from the vertex of an element;
+!>
+subroutine FIND_POS_LOC_NODE(vect, dim_vect, is, it)
 
-      implicit none
+   implicit none
 
-      integer(kind=4), intent(in) :: dim_vect, is
-      integer(kind=4), dimension(dim_vect), intent(in) :: vect
+   integer(kind=4), intent(in) :: dim_vect, is
+   integer(kind=4), dimension(dim_vect), intent(in) :: vect
 
-      integer(kind=4), intent(out) :: it
-      integer(kind=4) :: i
+   integer(kind=4), intent(out) :: it
+   integer(kind=4) :: i
 
-      it = 0
+   it = 0
 
-      do i = 1, dim_vect
-         if (vect(i) == is ) then
-            it = i;
-            return
+   do i = 1, dim_vect
+      if (vect(i) == is ) then
+         it = i;
+         return
+      endif
+   enddo
+
+   if (it==0) write(*,*) 'Error! Index not found in FIND_POS_LOC_NODE'
+
+end subroutine FIND_POS_LOC_NODE
+
+
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+!> writes the mesh properties for the elements contained in each processor in the mpi files mesh.mpi;
+!>
+subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
+
+   use Poly_mesh
+   use local_search
+
+   implicit none
+
+   character(len=70), intent(in) :: mpi_file    !< folder_mpi where to store files
+   character(len=70) :: mpi_file_mesh = 'mesh_000000.mpi'
+   character(len=70) :: mat_file_mesh = 'matf0000000.m'
+   character(len=70) :: mat_file_mesh_1
+   character(len=70) :: mpi_file_interface = 'interface_000000.mpi'
+
+   integer(kind=4), intent(in)  :: mpi_id
+   integer(kind=4)  :: i, ie, unit_mpi, ivert,ipoly_loc,ipoly_glob, id_node, unit_mat, unit_int
+
+   integer(kind=4) :: num_interface
+   type(Mesh_Structure), intent(inout) :: PolyMesh
+
+   unit_mpi = 40 + mpi_id
+   unit_mat = 4000 + mpi_id
+   unit_int = 40000 + mpi_id
+
+   if (mpi_id < 10) then
+      write(mpi_file_mesh(11:11),'(i1)') mpi_id
+      write(mpi_file_interface(16:16),'(i1)') mpi_id
+   elseif (mpi_id < 100) then
+      write(mpi_file_mesh(10:11),'(i2)') mpi_id
+   elseif (mpi_id < 1000) then
+      write(mpi_file_mesh(9:11),'(i3)') mpi_id
+   elseif (mpi_id < 10000) then
+      write(mpi_file_mesh(8:11),'(i4)') mpi_id
+   elseif (mpi_id < 100000) then
+      write(mpi_file_mesh(7:11),'(i5)') mpi_id
+   elseif (mpi_id < 1000000) then
+      write(mpi_file_mesh(6:11),'(i6)') mpi_id
+   endif
+
+   mpi_file_mesh = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_mesh
+   open(unit_mpi,file=mpi_file_mesh)
+
+   mpi_file_interface = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_interface
+   open(unit_int,file=mpi_file_interface)
+
+   num_interface = 0
+   do ie = 1, PolyMesh%num_elem_loc
+      do i = 1, PolyMesh%Elem_loc(ie)%num_faces
+         ! check process and store IDs if in a different one and count
+         if (mpi_id /= PolyMesh%Elem_loc(ie)%neigh_el(i,0)) then
+            num_interface = num_interface + 1
+         endif
+      enddo
+   enddo
+   write(unit_int,*) num_interface
+
+   do ie = 1, PolyMesh%num_elem_loc
+      write(unit_mpi,*) &
+            'Loc. Element #: ', ie, ' Glo. Element #: ', PolyMesh%elem_loc2glo(ie)
+
+      write(unit_mpi,*) 'Global Dof: ', PolyMesh%Elem_loc(ie)%Dof_glo
+
+
+      write(unit_mpi,*) 'Element type: ', PolyMesh%Elem_loc(ie)%el_type
+      write(unit_mpi,*) 'Num Vert: ',     PolyMesh%Elem_loc(ie)%num_vert
+      write(unit_mpi,*) 'Vertices #: ',   PolyMesh%Elem_loc(ie)%vert
+
+      ipoly_glob=PolyMesh%elem_in_poly(PolyMesh%elem_loc2glo(ie));
+      call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
+                                                PolyMesh%num_poly_loc, &
+                                                ipoly_glob,ipoly_loc)
+
+      write(unit_mpi,*) 'Belongs to Glo. Polyhedra', ipoly_glob, 'Loc. Polyhedra',ipoly_loc
+
+      do ivert = 1, PolyMesh%Elem_loc(ie)%num_vert
+
+         call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+                                 PolyMesh%Elem_loc(ie)%vert(ivert),id_node);
+
+         write(unit_mpi,*) 'Vertices # ', PolyMesh%Elem_loc(ie)%vert(ivert), &
+                           'of coords : ', PolyMesh%coord_x(id_node), &
+                                          PolyMesh%coord_y(id_node), &
+                                          PolyMesh%coord_z(id_node)
+      enddo
+
+      write(unit_mpi,*) 'BBox x_coord : ', PolyMesh%Poly(ipoly_loc)%b_box(1,:)
+      write(unit_mpi,*) 'BBox y_coord : ', PolyMesh%Poly(ipoly_loc)%b_box(2,:)
+      write(unit_mpi,*) 'BBox z_coord : ', PolyMesh%Poly(ipoly_loc)%b_box(3,:)
+      write(unit_mpi,*) 'Diameter hk : ', PolyMesh%Poly(ipoly_loc)%hk
+      write(unit_mpi,*) 'Num Faces: ',    PolyMesh%Elem_loc(ie)%num_faces
+
+      do i = 1, PolyMesh%Elem_loc(ie)%num_faces
+         write(unit_mpi,*) 'Face #',i ,': ',  PolyMesh%Elem_loc(ie)%faces(i,:)
+         write(unit_mpi,*) 'Normal : ',    PolyMesh%Elem_loc(ie)%normal(i,:)
+         write(unit_mpi,*) 'Area : ',      PolyMesh%Elem_loc(ie)%area(i)
+
+         ! check process and store IDs if in a different one and count
+         ! if (mpi_id /= PolyMesh%Elem_loc(ie)%neigh_el(i,0)) then
+         !    num_interface = num_interface + 1
+         ! endif
+
+         if (mpi_id /= PolyMesh%Elem_loc(ie)%neigh_el(i,0)) then
+            write(unit_int,*) PolyMesh%Elem_loc(ie)%neigh_el(i,0), PolyMesh%Elem_loc(ie)%neigh_el(i,2)
          endif
       enddo
 
-      if (it==0) write(*,*) 'Error! Index not found in FIND_POS_LOC_NODE'
+      ! if (num_interface /= 0) then
+      !    do i = 1, PolyMesh%Elem_loc(ie)%num_faces
+      !       ! check process and store IDs if in a different one and store process and element ID
+      !       if (mpi_id /= PolyMesh%Elem_loc(ie)%neigh_el(i,0)) then
+      !          write(unit_int,*) PolyMesh%Elem_loc(ie)%neigh_el(i,0), PolyMesh%Elem_loc(ie)%neigh_el(i,2)
+      !       endif
+      !    enddo
+      ! endif
 
-      end subroutine FIND_POS_LOC_NODE
+      write(unit_mpi,*) 'Neighbouring Elements: shared by (mpi-proc/mat_id/el_id/face_id/poly id/space_fun_tag)'
+      write(unit_mpi,*) 'Neigh Face #1: ', PolyMesh%Elem_loc(ie)%neigh_el(1,:)
+      write(unit_mpi,*) 'Neigh Face #2: ', PolyMesh%Elem_loc(ie)%neigh_el(2,:)
+      write(unit_mpi,*) 'Neigh Face #3: ', PolyMesh%Elem_loc(ie)%neigh_el(3,:)
+      write(unit_mpi,*) 'Neigh Face #4: ', PolyMesh%Elem_loc(ie)%neigh_el(4,:)
 
-
-! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-      !> writes the mesh properties for the elements contained in each processor in the mpi files mesh.mpi;
-      !>
-      subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
-
-      use Poly_mesh
-      use local_search
-
-      implicit none
-
-      character(len=70), intent(in) :: mpi_file
-      character(len=70) :: mpi_file_mesh = 'mesh_000000.mpi'
-      character(len=70) :: mat_file_mesh = 'matf0000000.m'
-      character(len=70) :: mat_file_mesh_1
-
-      integer(kind=4), intent(in)  :: mpi_id
-      integer(kind=4)  :: i, ie, unit_mpi, ivert,ipoly_loc,ipoly_glob, id_node, unit_mat
-
-      type(Mesh_Structure), intent(inout) :: PolyMesh
-
-      unit_mpi = 40 + mpi_id
-      unit_mat = 4000 + mpi_id
-
-      if (mpi_id < 10) then
-         write(mpi_file_mesh(11:11),'(i1)') mpi_id
-      elseif (mpi_id < 100) then
-         write(mpi_file_mesh(10:11),'(i2)') mpi_id
-      elseif (mpi_id < 1000) then
-         write(mpi_file_mesh(9:11),'(i3)') mpi_id
-      elseif (mpi_id < 10000) then
-         write(mpi_file_mesh(8:11),'(i4)') mpi_id
-      elseif (mpi_id < 100000) then
-         write(mpi_file_mesh(7:11),'(i5)') mpi_id
-      elseif (mpi_id < 1000000) then
-         write(mpi_file_mesh(6:11),'(i6)') mpi_id
-      endif
-
-      mpi_file_mesh = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_mesh
-      open(unit_mpi,file=mpi_file_mesh)
-
-      do ie = 1, PolyMesh%num_elem_loc
-         write(unit_mpi,*) &
-               'Loc. Element #: ', ie, ' Glo. Element #: ', PolyMesh%elem_loc2glo(ie)
-
-         write(unit_mpi,*) 'Global Dof: ', PolyMesh%Elem_loc(ie)%Dof_glo
+      !write(unit_mpi,*) 'Flag to see if the faces needs  to be integrated'
+      !write(unit_mpi,*) 'Face #1 :', PolyMesh%Elem_loc(ie)%flag(1)
+      !write(unit_mpi,*) 'Face #2: ', PolyMesh%Elem_loc(ie)%flag(2)
+      !write(unit_mpi,*) 'Face #3: ', PolyMesh%Elem_loc(ie)%flag(3)
+      !write(unit_mpi,*) 'Face #4: ', PolyMesh%Elem_loc(ie)%flag(4)
 
 
-         write(unit_mpi,*) 'Element type: ', PolyMesh%Elem_loc(ie)%el_type
-         write(unit_mpi,*) 'Num Vert: ',     PolyMesh%Elem_loc(ie)%num_vert
-         write(unit_mpi,*) 'Vertices #: ',   PolyMesh%Elem_loc(ie)%vert
+      if(PolyMesh%Elem_loc(ie)%el_type == 'PRY' .or. &
+            PolyMesh%Elem_loc(ie)%el_type == 'HEX') &
+      write(unit_mpi,*) 'Neigh Face #5: ',PolyMesh%Elem_loc(ie)%neigh_el(5,:)
 
-         ipoly_glob=PolyMesh%elem_in_poly(PolyMesh%elem_loc2glo(ie));
-         call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
-                                                   PolyMesh%num_poly_loc, &
-                                                   ipoly_glob,ipoly_loc)
+      if(PolyMesh%Elem_loc(ie)%el_type == 'HEX') &
+      write(unit_mpi,*) 'Neigh Face #6: ',PolyMesh%Elem_loc(ie)%neigh_el(6,:)
+      write(unit_mpi,*) '--------------------------------'
 
-         write(unit_mpi,*) 'Belongs to Glo. Polyhedra', ipoly_glob, 'Loc. Polyhedra',ipoly_loc
+   enddo
 
-         do ivert = 1, PolyMesh%Elem_loc(ie)%num_vert
+   close(unit_mpi)
+   close(unit_int)
 
-           call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                  PolyMesh%Elem_loc(ie)%vert(ivert),id_node);
+   ! matfile output for debugging
+   !-----------------------------------------------------------------------------
 
-           write(unit_mpi,*) 'Vertices # ', PolyMesh%Elem_loc(ie)%vert(ivert), &
-                             'of coords : ', PolyMesh%coord_x(id_node), &
-                                             PolyMesh%coord_y(id_node), &
-                                             PolyMesh%coord_z(id_node)
-         enddo
+   !do ie = 1, PolyMesh%num_elem_loc
 
-         write(unit_mpi,*) 'BBox x_coord : ', PolyMesh%Poly(ipoly_loc)%b_box(1,:)
-         write(unit_mpi,*) 'BBox y_coord : ', PolyMesh%Poly(ipoly_loc)%b_box(2,:)
-         write(unit_mpi,*) 'BBox z_coord : ', PolyMesh%Poly(ipoly_loc)%b_box(3,:)
-         write(unit_mpi,*) 'Diameter hk : ', PolyMesh%Poly(ipoly_loc)%hk
-         write(unit_mpi,*) 'Num Faces: ',    PolyMesh%Elem_loc(ie)%num_faces
+   !  if (ie < 10) then
+   !     write(mat_file_mesh(11:11),'(i1)') ie
+   !  elseif (ie < 100) then
+   !     write(mat_file_mesh(10:11),'(i2)') ie
+   !  elseif (ie < 1000) then
+   !     write(mat_file_mesh(9:11),'(i3)') ie
+   !  elseif (ie < 10000) then
+   !     write(mat_file_mesh(8:11),'(i4)') ie
+   !  elseif (ie < 100000) then
+   !     write(mat_file_mesh(7:11),'(i5)') ie
+   !  elseif (ie < 1000000) then
+   !     write(mat_file_mesh(6:11),'(i6)') ie
+   !  endif
 
-         do i = 1, PolyMesh%Elem_loc(ie)%num_faces
-           write(unit_mpi,*) 'Face #',i ,': ',  PolyMesh%Elem_loc(ie)%faces(i,:)
-           write(unit_mpi,*) 'Normal : ',    PolyMesh%Elem_loc(ie)%normal(i,:)
-           write(unit_mpi,*) 'Area : ',      PolyMesh%Elem_loc(ie)%area(i)
+   !  mat_file_mesh_1 = mpi_file(1:len_trim(mpi_file)) // '/' // mat_file_mesh
+   !  open(unit_mat,file=mat_file_mesh_1)
 
-         enddo
+   !  write(unit_mat,*) 'vert = [ '
 
-         write(unit_mpi,*) 'Neighbouring Elements: shared by (mpi-proc/mat_id/el_id/face_id/poly id/space_fun_tag)'
-         write(unit_mpi,*) 'Neigh Face #1 :', PolyMesh%Elem_loc(ie)%neigh_el(1,:)
-         write(unit_mpi,*) 'Neigh Face #2: ', PolyMesh%Elem_loc(ie)%neigh_el(2,:)
-         write(unit_mpi,*) 'Neigh Face #3: ', PolyMesh%Elem_loc(ie)%neigh_el(3,:)
-         write(unit_mpi,*) 'Neigh Face #4: ', PolyMesh%Elem_loc(ie)%neigh_el(4,:)
+   !  do ivert = 1, PolyMesh%Elem_loc(ie)%num_vert
 
-         !write(unit_mpi,*) 'Flag to see if the faces needs  to be integrated'
-         !write(unit_mpi,*) 'Face #1 :', PolyMesh%Elem_loc(ie)%flag(1)
-         !write(unit_mpi,*) 'Face #2: ', PolyMesh%Elem_loc(ie)%flag(2)
-         !write(unit_mpi,*) 'Face #3: ', PolyMesh%Elem_loc(ie)%flag(3)
-         !write(unit_mpi,*) 'Face #4: ', PolyMesh%Elem_loc(ie)%flag(4)
+   !    call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+   !                            PolyMesh%Elem_loc(ie)%vert(ivert),id_node);
 
+   !    write(unit_mat,*) PolyMesh%coord_x(id_node), &
+   !                     PolyMesh%coord_y(id_node), &
+   !                     PolyMesh%coord_z(id_node)
+   !   enddo
 
-         if(PolyMesh%Elem_loc(ie)%el_type == 'PRY' .or. &
-              PolyMesh%Elem_loc(ie)%el_type == 'HEX') &
-         write(unit_mpi,*) 'Neigh Face #5: ',PolyMesh%Elem_loc(ie)%neigh_el(5,:)
+   !   write(unit_mat,*) ' ];'
+   !   write(unit_mat,*)
 
-         if(PolyMesh%Elem_loc(ie)%el_type == 'HEX') &
-         write(unit_mpi,*) 'Neigh Face #6: ',PolyMesh%Elem_loc(ie)%neigh_el(6,:)
-         write(unit_mpi,*) '--------------------------------'
+   !   write(unit_mat,*) 'faces = ['
+   !   do i = 1, PolyMesh%Elem_loc(ie)%num_faces
+   !     write(unit_mat,*) PolyMesh%Elem_loc(ie)%faces(i,:)
+   !   enddo
+   !   write(unit_mat,*)  '];'
 
-      enddo
+   !   write(unit_mat,*) 'normal = ['
+   !   do i = 1, PolyMesh%Elem_loc(ie)%num_faces
+   !     write(unit_mat,*) PolyMesh%Elem_loc(ie)%normal(i,:)
+   !   enddo
+   !   write(unit_mat,*)  '];'
 
-      close(unit_mpi)
+   !   write(unit_mat,*) 'bbox = ['
+   !   do i = 1,3
+   !     write(unit_mat,*) PolyMesh%Elem_loc(ie)%b_box(i,:)
+   !   enddo
+   !   write(unit_mat,*)  '];'
 
-      ! matfile output for debugging
-      !-----------------------------------------------------------------------------
+   !   close(unit_mat)
 
-      !do ie = 1, PolyMesh%num_elem_loc
-
-      !  if (ie < 10) then
-      !     write(mat_file_mesh(11:11),'(i1)') ie
-      !  elseif (ie < 100) then
-      !     write(mat_file_mesh(10:11),'(i2)') ie
-      !  elseif (ie < 1000) then
-      !     write(mat_file_mesh(9:11),'(i3)') ie
-      !  elseif (ie < 10000) then
-      !     write(mat_file_mesh(8:11),'(i4)') ie
-      !  elseif (ie < 100000) then
-      !     write(mat_file_mesh(7:11),'(i5)') ie
-      !  elseif (ie < 1000000) then
-      !     write(mat_file_mesh(6:11),'(i6)') ie
-      !  endif
-
-      !  mat_file_mesh_1 = mpi_file(1:len_trim(mpi_file)) // '/' // mat_file_mesh
-      !  open(unit_mat,file=mat_file_mesh_1)
-
-      !  write(unit_mat,*) 'vert = [ '
-
-      !  do ivert = 1, PolyMesh%Elem_loc(ie)%num_vert
-
-      !    call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-      !                            PolyMesh%Elem_loc(ie)%vert(ivert),id_node);
-
-      !    write(unit_mat,*) PolyMesh%coord_x(id_node), &
-      !                     PolyMesh%coord_y(id_node), &
-      !                     PolyMesh%coord_z(id_node)
-      !   enddo
-
-      !   write(unit_mat,*) ' ];'
-      !   write(unit_mat,*)
-
-      !   write(unit_mat,*) 'faces = ['
-      !   do i = 1, PolyMesh%Elem_loc(ie)%num_faces
-      !     write(unit_mat,*) PolyMesh%Elem_loc(ie)%faces(i,:)
-      !   enddo
-      !   write(unit_mat,*)  '];'
-
-      !   write(unit_mat,*) 'normal = ['
-      !   do i = 1, PolyMesh%Elem_loc(ie)%num_faces
-      !     write(unit_mat,*) PolyMesh%Elem_loc(ie)%normal(i,:)
-      !   enddo
-      !   write(unit_mat,*)  '];'
-
-      !   write(unit_mat,*) 'bbox = ['
-      !   do i = 1,3
-      !     write(unit_mat,*) PolyMesh%Elem_loc(ie)%b_box(i,:)
-      !   enddo
-      !   write(unit_mat,*)  '];'
-
-      !   close(unit_mat)
-
-      ! enddo
+   ! enddo
 
 
 
-       end subroutine WRITE_MESH_INFO
+end subroutine WRITE_MESH_INFO
 
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
