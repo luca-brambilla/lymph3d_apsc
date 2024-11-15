@@ -922,7 +922,7 @@ end subroutine READ_HEADER
          
          read(inline(1:ileft),*) trash, mat_code
          
-         ! 3D, 2nd column for material tag (MATE)
+         ! 3D, 2nd column for material tag (MATE) - mate
          if ((keyword == 'hex') .or. (keyword =='HEX')) then
             control = 0
             do i = 1, PolyData%nmat
@@ -963,7 +963,7 @@ end subroutine READ_HEADER
                read(inline(iright:str_len),*)(PolyMesh%con_prysm(iprysm,j),j=2,6)
             endif
 
-         ! 2D, 2nd column is the face tag
+         ! 2D, 2nd column is the face tag - mate
          ! TODO - assign space function tag for quads and poly?
          elseif ((keyword == 'quad') .or. (keyword == 'QUAD')) then
            control = 0
@@ -1042,6 +1042,7 @@ end subroutine READ_HEADER
          endif
       enddo
 
+      ! if not a polygon, set to 0 number of elements in polygon
       if (check_poly == 0) then
          PolyMesh%num_poly=PolyMesh%num_elem
          do i=1,PolyMesh%num_poly

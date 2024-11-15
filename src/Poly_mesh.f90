@@ -25,8 +25,8 @@ module Poly_mesh
         !> 0 - mpi_proc: processor containing the neighbor element data
         !> 1 - mat_id: ID of the neighbor material or tag of boundary face
         !> 2 - el_id: global element across face ID with -1 for Dirichlet boundary, -2 for Neumann boundary
-        !> 3 - face_id: global face ID? !! DO NOT KNOW
-        !> 4 - poly_id: numbering for processors dof ID? !! DO NOT KNOW - FUTURE CHECK WITH POLYGONS
+        !> 3 - face_id: Id of neighbor local face ID (1-4 tetrahedron, 1-6 exahedron)
+        !> 4 - poly_id: global ID of the polyhedron the element belongs to
         !> 5 - tag: tag from .mate file, numbering of BC with 0 if internal face
         integer(kind=4), dimension(:,:), pointer :: neigh_el
 
