@@ -8,89 +8,201 @@ module MOD_VTK
     contains
 
     !>
-    subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nnode_per_el, n_elem, s_name, s, PolyMesh)
+    !! RENAME EVERYTHING, change types?
+    !! hardcoded 3 for 3D and 4 for tetrahedra vertices
+    !! hardcoded VTK type for tetrahedra 10
+subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nnode_per_el, n_elem, n_elem_tot, s_name, s, PolyMesh)
 
-      implicit none
+    use mpi
+    use Poly_setup_MPI
 
-      ! Input arguments
-      character(len=*), intent(in) :: filename
-      integer*4, intent(in) :: n_elem,nnode_per_el
-      real*8, dimension(4,n_elem), intent(in) :: xx,yy,zz
-      integer*4,dimension(n_elem,4) :: tnew
-      type(Mesh_Structure), intent(in) :: PolyMesh
+    implicit none
 
-      ! Optional input arguments
-      character(len=*), intent(in), optional :: s_name
-      real*8, dimension(3,4,n_elem), intent(inout), optional :: s
+    ! Input arguments
+    character(len=*), intent(in) :: filename
+    integer*4, intent(in) :: n_elem,nnode_per_el
+    real*8, dimension(4,n_elem), intent(in) :: xx,yy,zz       !< coordinates of 4 vertices of tetrahedron
+    integer*4,dimension(n_elem_tot,4) :: tnew
+    type(Mesh_Structure), intent(in) :: PolyMesh
 
-      ! Internal variables
-      integer*4 :: VTK_file_unit
-      integer*4 :: i,j
+    ! Optional input arguments
+    character(len=*), intent(in), optional :: s_name            !< solution name
+    real*8, dimension(3,4,n_elem), intent(inout), optional :: s !< solution
 
-      ! Capping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
-      real*8, parameter :: cap = 1E-40
+    ! Internal variables
+    integer*4 :: VTK_file_unit
+    integer*4 :: i,j,k
 
-      do i=1,n_elem
-        do j=1,4
-          tnew(i,j)=(i-1)*4+j-1
-        end do
-      end do
+    ! added
+    integer*4, intent(in) :: n_elem_tot
 
-      open(newunit=VTK_file_unit, action='WRITE', file=filename, &
+    integer*4 :: tmp_nelem
+    real*8, dimension(:,:,:), allocatable :: tmp_solution
+    real*8, dimension(:,:), allocatable :: tmp_xx, tmp_yy, tmp_zz
+    integer*8, dimension(:), allocatable :: tmp_poly
+    !integer(kind=4), intent(in) :: mpi_id
+
+    ! Capping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
+    real*8, parameter :: cap = 1E-40
+
+        ! call MPI_REDUCE(err_L2_mpi, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+        ! 0, MPI_COMM_WORLD, mpi_ierr)
+
+    ! do i=1,n_elem
+    !     do j=1,4
+    !         tnew(i,j)=(i-1)*4+j-1
+    !     end do
+    ! end do
+
+    if (mpi_id /= 0) then
+        ! tag=1 before MPI_COMM_WORLD
+        ! send size
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        ! send coordinates
+        call MPI_Send(xx, n_elem*4, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(yy, n_elem*4, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(zz, n_elem*4, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        ! send solution
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(s, n_elem*4*3, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        ! send polyhedra
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(PolyMesh%elem_in_poly_loc, n_elem*4, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+
+    elseif (mpi_id == 0) then
+
+        open(newunit=VTK_file_unit, action='WRITE', file=filename, &
             form='FORMATTED', status='replace')
 
-            write(VTK_file_unit,'(A)')'# vtk DataFile Version 3.0'
-            write(VTK_file_unit,'(A)')'VTKFile'
-            write(VTK_file_unit,'(A)')'ASCII'
-            write(VTK_file_unit,'(A)')
-            write(VTK_file_unit,'(A)')'DATASET UNSTRUCTURED_GRID'
-
-      write(VTK_file_unit,'(A7,I12,A7)')'POINTS ',n_elem*4,' double';
-            POINT_LOOP: do i=1,n_elem
-            !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
-              do j=1,4
-                write(VTK_file_unit,'(3F16.8,1X)') xx(j,i),yy(j,i),zz(j,i)
-              end do
-            end do POINT_LOOP
-      write(VTK_file_unit,'(A)')
-
-      write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem, n_elem*(nnode_per_el+1);
-            ELEM_LOOP: do i=1,n_elem
-              write(VTK_file_unit,'(I12,8I12)')nnode_per_el, tnew(i,:);
-              !write(VTK_file_unit,'(I12,8I12)')nnode_per_el, PolyMesh%con_tet(i,2)-1,PolyMesh%con_tet(i,3)-1,&
-              !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1;
-            end do ELEM_LOOP
-      write(VTK_file_unit,'(A)')
-
-      write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem;
-            ELEM_TYPE_LOOP: do i=1,n_elem
-              write(VTK_file_unit,'(I2)')10;
-            end do ELEM_TYPE_LOOP
-      write(VTK_file_unit,'(A)')
-
-      if (present(s_name) .and. present(s)) then
-        write(VTK_file_unit,'(A11,I12)')'POINT_DATA ', n_elem*4;
-        write(VTK_file_unit,'(A8,A12,A7)')'VECTORS ', s_name, ' double'
-        !write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
-              VECTOR_FIELD_LOOP: do i=1,n_elem
-                do j=1,4
-                  write(VTK_file_unit,'(3F16.8)') s(1,j,i), s(2,j,i), s(3,j,i)
-                  !write(VTK_file_unit,'(3F16.8)') s(1:3,j,i)
-                enddo
-              end do VECTOR_FIELD_LOOP
+        write(VTK_file_unit,'(A)')'# vtk DataFile Version 3.0'
+        write(VTK_file_unit,'(A)')'VTKFile'
+        write(VTK_file_unit,'(A)')'ASCII'
         write(VTK_file_unit,'(A)')
-      endif
+        write(VTK_file_unit,'(A)')'DATASET UNSTRUCTURED_GRID'
 
-      write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem;
-      write(VTK_file_unit,'(A8,A12,A9)')'SCALARS ','POLYHEDRA', ' int 1'
-      write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
-            POLY_LOOP1: do i=1,n_elem
-              write(VTK_file_unit,'(I6)') PolyMesh%elem_in_poly_loc(i)
-            end do POLY_LOOP1
+        ! ******************
+        ! POINTS
+        ! ******************
+        write(VTK_file_unit,'(A7,I12,A7)')'POINTS ', n_elem_tot*4,' double';
+        POINT_LOOP: do i=1,n_elem
+        !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
+            do j=1,4
+                write(VTK_file_unit,'(3F16.8,1X)') xx(j,i),yy(j,i),zz(j,i)
+            end do
+        end do POINT_LOOP
 
-      write(VTK_file_unit,'(A)')
+        ! mpi loop
+        do k=1,mpi_np-1
+            ! receive size
+            call MPI_Recv(tmp_nelem, 1, MPI_INTEGER, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+            ! allocate and receive coordinates - different sizes
+            allocate(tmp_xx(4,tmp_nelem))
+            allocate(tmp_yy(4,tmp_nelem))
+            allocate(tmp_zz(4,tmp_nelem))
+            call MPI_Recv(tmp_xx, tmp_nelem*4, MPI_DOUBLE_PRECISION, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+            call MPI_Recv(tmp_yy, tmp_nelem*4, MPI_DOUBLE_PRECISION, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+            call MPI_Recv(tmp_zz, tmp_nelem*4, MPI_DOUBLE_PRECISION, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+            ! write to file
+            POINT_LOOP_k: do i=1,tmp_nelem
+                do j=1,4
+                    write(VTK_file_unit,'(3F16.8,1X)') tmp_xx(j,i),tmp_yy(j,i),tmp_zz(j,i)
+                end do
+            end do POINT_LOOP_k
+            ! deallocate coordinates, different sizes
+            deallocate(tmp_xx, tmp_yy, tmp_zz)
+        enddo
+        write(VTK_file_unit,'(A)')
 
-      close(unit=VTK_file_unit)
+        ! **************
+        ! CELLS
+        ! **************
+        write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem_tot, n_elem_tot*(nnode_per_el+1);
+        ELEM_LOOP: do i=1,n_elem_tot
+            ! ordering
+            !! 4 hardcoded
+            do j=1,4
+                tnew(i,j)=(i-1)*4+j-1
+            end do
+            ! write ordering
+            write(VTK_file_unit,'(I12,8I12)')nnode_per_el, tnew(i,:);
+            !write(VTK_file_unit,'(I12,8I12)')nnode_per_el, PolyMesh%con_tet(i,2)-1,PolyMesh%con_tet(i,3)-1,&
+            !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1;
+        end do ELEM_LOOP
+        write(VTK_file_unit,'(A)')
+
+        ! ******************
+        ! CELL TYPES
+        ! ******************
+        !! hardcoded tetrahedra
+        write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem_tot;
+            ELEM_TYPE_LOOP: do i=1,n_elem_tot
+                write(VTK_file_unit,'(I2)')10;
+            end do ELEM_TYPE_LOOP
+        write(VTK_file_unit,'(A)')
+
+        ! *********************
+        ! SOLUTION
+        ! *********************
+        if (present(s_name) .and. present(s)) then
+            write(VTK_file_unit,'(A11,I12)')'POINT_DATA ', n_elem_tot*4;
+            write(VTK_file_unit,'(A8,A12,A7)')'VECTORS ', s_name, ' double'
+            !write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
+            VECTOR_FIELD_LOOP: do i=1,n_elem
+                do j=1,4
+                    write(VTK_file_unit,'(3F16.8)') s(1,j,i), s(2,j,i), s(3,j,i)
+                    !write(VTK_file_unit,'(3F16.8)') s(1:3,j,i)
+                enddo
+            end do VECTOR_FIELD_LOOP
+
+            ! mpi loop
+            do k=1,mpi_np-1
+                ! receive size
+                call MPI_Recv(tmp_nelem, 1, MPI_INTEGER, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+                ! allocate and receive solution - different sizes
+                allocate(tmp_solution(3,4,tmp_nelem))
+                call MPI_Recv(tmp_solution, tmp_nelem*4*3, MPI_DOUBLE_PRECISION, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+                ! write solution
+                VECTOR_FIELD_LOOP_k: do i=1,tmp_nelem
+                    do j=1,4
+                        write(VTK_file_unit,'(3F16.8)') tmp_solution(1,j,i), tmp_solution(2,j,i), tmp_solution(3,j,i)
+                    enddo
+                end do VECTOR_FIELD_LOOP_k
+                ! deallocate solution - different sizes
+                deallocate(tmp_solution)
+            enddo
+            write(VTK_file_unit,'(A)')
+        endif
+
+        ! **********************
+        ! POLYHEDRA
+        ! **********************
+        ! write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem_tot;
+        ! write(VTK_file_unit,'(A8,A12,A9)')'SCALARS ','POLYHEDRA', ' int 1'
+        ! write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
+
+        ! POLY_LOOP1: do i=1,n_elem
+        !     write(VTK_file_unit,'(I6)') PolyMesh%elem_in_poly_loc(i)
+        ! end do POLY_LOOP1
+
+        ! ! mpi loop
+        ! do k=1,mpi_np-1
+        !     ! receive size
+        !     call MPI_Recv(tmp_nelem, 1, MPI_INTEGER, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+        !     ! allocate and receive polyhedra - different sizes
+        !     allocate(tmp_poly(tmp_nelem))
+        !     call MPI_Recv(tmp_poly, tmp_nelem, MPI_INTEGER, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+        !     ! write polyhedra
+        !     POLY_LOOP_k: do i=1,tmp_nelem
+        !         write(VTK_file_unit,'(I10)') tmp_poly(i)
+        !     end do POLY_LOOP_k
+        !     ! deallocate polyhedra - different sizes
+        !     deallocate(tmp_poly)
+        ! enddo
+
+        ! write(VTK_file_unit,'(A)')
+
+        close(unit=VTK_file_unit)
+    endif
 
     end subroutine VTK_WRITE_SOLUTION
 
@@ -324,6 +436,7 @@ module MOD_VTK
     end subroutine
 
     !> Store the numerical solution in an appropriate file
+    !! HARDCODED 4 FOR 4 VERTICES OF TET
     subroutine WRITE_SOLUTION_VTK(nelem, PolyMesh, u, IsPoly, mpi_id, num_dt)
 
       use problem_data_and_properties
@@ -334,7 +447,7 @@ module MOD_VTK
 
       type(Mesh_Structure), intent(inout) :: PolyMesh
       integer(kind=4), intent(in) :: nelem
-      real(kind=8), dimension(3,4,nelem), intent(inout) :: u
+      real(kind=8), dimension(3,4,nelem), intent(inout) :: u !< 3D, 4 vertices, nelem
       integer(kind=4), intent(in) :: mpi_id
       logical, intent(in) :: IsPoly
       real(kind=8), dimension(4,nelem) :: xx, yy, zz
@@ -378,7 +491,7 @@ module MOD_VTK
       else
 
         ! write(vtk_filename, '(A,I0,A)') 'MONITORS/sol_tet_', PolyMesh%num_tet, '.vtk'
-        vtk_filename_num = 'MONITORS/sol_tet_000000_000000.vtk'
+        vtk_filename_num = 'MONITORS/sol_tet_000000.vtk'
 
         ! num_dt
         if (num_dt < 10) then
@@ -395,25 +508,25 @@ module MOD_VTK
           write(vtk_filename_num(18:23),'(i6)') num_dt
         endif
 
-        ! timestep
-        if (mpi_id < 10) then
-          write(vtk_filename_num(30:30),'(i1)') mpi_id
-        elseif (mpi_id < 100) then
-          write(vtk_filename_num(29:30),'(i2)') mpi_id
-        elseif (mpi_id < 1000) then
-          write(vtk_filename_num(28:30),'(i3)') mpi_id
-        elseif (mpi_id < 10000) then
-          write(vtk_filename_num(27:30),'(i4)') mpi_id
-        elseif (mpi_id < 100000) then
-          write(vtk_filename_num(26:30),'(i5)') mpi_id
-        elseif (mpi_id < 1000000) then
-          write(vtk_filename_num(25:30),'(i6)') mpi_id
-        endif
+        ! mpi id
+        ! if (mpi_id < 10) then
+        !   write(vtk_filename_num(30:30),'(i1)') mpi_id
+        ! elseif (mpi_id < 100) then
+        !   write(vtk_filename_num(29:30),'(i2)') mpi_id
+        ! elseif (mpi_id < 1000) then
+        !   write(vtk_filename_num(28:30),'(i3)') mpi_id
+        ! elseif (mpi_id < 10000) then
+        !   write(vtk_filename_num(27:30),'(i4)') mpi_id
+        ! elseif (mpi_id < 100000) then
+        !   write(vtk_filename_num(26:30),'(i5)') mpi_id
+        ! elseif (mpi_id < 1000000) then
+        !   write(vtk_filename_num(25:30),'(i6)') mpi_id
+        ! endif
 
 
       endif
 
-      call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, 4, nelem, 'solution', u, PolyMesh)
+      call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, 4, nelem, PolyMesh%num_elem, 'solution', u, PolyMesh)
 
       return
 
