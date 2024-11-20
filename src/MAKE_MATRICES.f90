@@ -1,3 +1,4 @@
+!> Set up PETSc matrices for stiffness, mass, DG and mass modal
 subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal)
 
 #include<petsc/finclude/petscksp.h>
@@ -17,14 +18,18 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
 
     ! petsc_stiff, petsc_mass and mat_dg are provided by SET_PETSC_MATRIX.f90
 
-    Mat :: petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal
+    Mat, intent(inout) :: petsc_stiff          !< stiffnes matrix
+    Mat, intent(inout) :: petsc_mass           !< mass matrix
+    Mat, intent(inout) :: mat_dg               !< DG matrix
+    Mat, intent(inout) :: petsc_mass_modal     !< mass modal matrix
     PetscScalar :: val(1), val1(1), val2(1), val3(1), val4(1)
     PetscInt :: irow(1), jcol(1), irow2(1), jcol2(1), irow3(1), jcol3(1)
 
-    type(Mesh_Structure), intent(inout) :: PolyMesh
-    type(Data_Structure), intent(in) :: PolyData
-    integer(kind=4), intent(in) :: Np, global_dof
-    integer(kind=4), dimension(global_dof), intent(in) :: petsc_num
+    type(Mesh_Structure), intent(inout) :: PolyMesh     !< Mesh
+    type(Data_Structure), intent(in) :: PolyData        !< Data
+    integer(kind=4), intent(in) :: Np                   !< Number of dofs for each element
+    integer(kind=4), intent(in) :: global_dof           !< Number of global dofs
+    integer(kind=4), dimension(global_dof), intent(in) :: petsc_num !< PETSc numberbering starting from 0 not 1
 
     integer(kind=4) :: nq3, nq2, p
     real(kind=8) :: theta, alpha, c

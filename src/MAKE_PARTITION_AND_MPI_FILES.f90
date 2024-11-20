@@ -1,20 +1,6 @@
 !    Copyright (C) 2012 The SPEED FOUNDATION
 !    Author: Ilario Mazzieri
 !
-!    This file is part of SPEED.
-!
-!    SPEED is free software; you can redistribute it and/or modify it
-!    under the terms of the GNU Affero General Public License as
-!    published by the Free Software Foundation, either version 3 of the
-!    License, or (at your option) any later version.
-!
-!    SPEED is distributed in the hope that it will be useful, but
-!    WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-!    Affero General Public License for more details.
-!
-!    You should have received a copy of the GNU Affero General Public License
-!    along with SPEED.  If not, see <http://www.gnu.org/licenses/>.
 
 !> @brief Makes Partitioning and writes files *.mpi
 !! @author Ilario Mazzieri
@@ -184,7 +170,7 @@ end subroutine MAKE_PARTITION_AND_MPI_FILES
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> performs a contigous partition of the mesh into different processors using METIS and writes the mpi file elem4proc.mpi;
-!> Mesh partitioning using METIS. Create `elem4proc.mpi` assigning an element
+!> Mesh partitioning using METIS. Create `elem4proc.mpi` assigning an element (poly)
 !> to each processor
 subroutine MESH_PARTITIONING(mpi_file, nelem, nnode, nparts, &
                                    num_hex, con_hex, &
@@ -198,16 +184,16 @@ subroutine MESH_PARTITIONING(mpi_file, nelem, nnode, nparts, &
 
    implicit none
 
-   integer(idx_t), intent(in) :: nelem    ! number of elements
-   integer(idx_t), intent(in) :: nnode    ! number of nodes
+   integer(idx_t), intent(in) :: nelem    !< number of elements
+   integer(idx_t), intent(in) :: nnode    !< number of nodes
    integer(idx_t), parameter :: ncommon = 3
 
    integer(idx_t) :: eptr(nelem+1), &
-                     eind(8*num_hex+4*num_tet+5*num_prysm)   ! arrays storing mesh structure
+                     eind(8*num_hex+4*num_tet+5*num_prysm)   !< arrays storing mesh structure
    integer(idx_t) :: epart(nelem), npart(nnode)       ! element and node partition vectors
 
-   integer(idx_t) :: opts(0:METIS_NOPTIONS-1), ios, objval, nparts
-
+   integer(idx_t) :: opts(0:METIS_NOPTIONS-1), ios, objval
+   integer(idx_t), intent(in) :: nparts         !< number of parts in partition (number of processes)
    integer(idx_t), pointer :: vsize(:)  => NULL()
    integer(idx_t), pointer :: vwgt(:)   => NULL()
    integer(idx_t), pointer :: tpwgts(:) => NULL()
@@ -1413,72 +1399,66 @@ end subroutine WRITE_PARTITION
 
 !> computes the coordinates of the normal vector for each face and determines the area associated with each face;
 !>
-      subroutine CREATE_NORMAL_FACE(PolyMesh, mpi_id)
+subroutine CREATE_NORMAL_FACE(PolyMesh, mpi_id)
 
-      use Poly_mesh
+   use Poly_mesh
 
-      implicit none
+   implicit none
 
-      integer(kind=4), intent(in) :: mpi_id
-      integer(kind=4) :: ie, iface, id_node1, id_node2, id_node3
+   integer(kind=4), intent(in) :: mpi_id
+   integer(kind=4) :: ie, iface, id_node1, id_node2, id_node3
 
-      integer(kind=4), dimension(3) :: ivert
-      real(kind=8) :: Px, Py, Pz, Qx, Qy, Qz, n1, n2, n3, norm_n
+   integer(kind=4), dimension(3) :: ivert
+   real(kind=8) :: Px, Py, Pz, Qx, Qy, Qz, n1, n2, n3, norm_n
 
-      type(Mesh_Structure), intent(inout) :: PolyMesh
+   type(Mesh_Structure), intent(inout) :: PolyMesh
 
+   do ie = 1, PolyMesh%num_elem_loc
 
-      do ie = 1, PolyMesh%num_elem_loc
+      allocate(PolyMesh%Elem_loc(ie)%normal(PolyMesh%Elem_loc(ie)%num_faces,3))
+      allocate(PolyMesh%Elem_loc(ie)%area(PolyMesh%Elem_loc(ie)%num_faces))
 
-         allocate(PolyMesh%Elem_loc(ie)%normal(PolyMesh%Elem_loc(ie)%num_faces,3))
-         allocate(PolyMesh%Elem_loc(ie)%area(PolyMesh%Elem_loc(ie)%num_faces))
+      do iface = 1, PolyMesh%Elem_loc(ie)%num_faces
 
-         do iface = 1, PolyMesh%Elem_loc(ie)%num_faces
+         ivert = PolyMesh%Elem_loc(ie)%faces(iface,1:3)
 
-            ivert = PolyMesh%Elem_loc(ie)%faces(iface,1:3)
-
-            call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                   ivert(1),id_node1);
-            call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                   ivert(2),id_node2);
-            call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                   ivert(3),id_node3);
-
-
-            Qx = PolyMesh%coord_x(id_node1) - PolyMesh%coord_x(id_node2);
-            Qy = PolyMesh%coord_y(id_node1) - PolyMesh%coord_y(id_node2);
-            Qz = PolyMesh%coord_z(id_node1) - PolyMesh%coord_z(id_node2);
-
-            Px = PolyMesh%coord_x(id_node3) - PolyMesh%coord_x(id_node2);
-            Py = PolyMesh%coord_y(id_node3) - PolyMesh%coord_y(id_node2);
-            Pz = PolyMesh%coord_z(id_node3) - PolyMesh%coord_z(id_node2);
-
-            !write(*,*) Px, Py, Pz
-            !write(*,*) Qx, Qy, Qz
-
-            n1 = Py*Qz - Pz*Qy;
-            n2 = - Px*Qz + Pz*Qx;
-            n3 = Px*Qy - Py*Qx;
-
-            !write(*,*) n1, n2, n3
-            !read(*,*)
-
-            norm_n = dsqrt(n1**2+n2**2+n3**2)
+         call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+                                 ivert(1),id_node1);
+         call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+                                 ivert(2),id_node2);
+         call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+                                 ivert(3),id_node3);
 
 
-            PolyMesh%Elem_loc(ie)%normal(iface,1) = n1/norm_n
+         Qx = PolyMesh%coord_x(id_node1) - PolyMesh%coord_x(id_node2);
+         Qy = PolyMesh%coord_y(id_node1) - PolyMesh%coord_y(id_node2);
+         Qz = PolyMesh%coord_z(id_node1) - PolyMesh%coord_z(id_node2);
 
-            PolyMesh%Elem_loc(ie)%normal(iface,2) = n2/norm_n
+         Px = PolyMesh%coord_x(id_node3) - PolyMesh%coord_x(id_node2);
+         Py = PolyMesh%coord_y(id_node3) - PolyMesh%coord_y(id_node2);
+         Pz = PolyMesh%coord_z(id_node3) - PolyMesh%coord_z(id_node2);
 
-            PolyMesh%Elem_loc(ie)%normal(iface,3) = n3/norm_n
+         !write(*,*) Px, Py, Pz
+         !write(*,*) Qx, Qy, Qz
 
-            PolyMesh%Elem_loc(ie)%area(iface) = norm_n
+         n1 = Py*Qz - Pz*Qy;
+         n2 = - Px*Qz + Pz*Qx;
+         n3 = Px*Qy - Py*Qx;
 
-         enddo
+         !write(*,*) n1, n2, n3
+         !read(*,*)
 
-       enddo
+         norm_n = dsqrt(n1**2+n2**2+n3**2)
 
-      end subroutine CREATE_NORMAL_FACE
+         PolyMesh%Elem_loc(ie)%normal(iface,1) = n1/norm_n
+         PolyMesh%Elem_loc(ie)%normal(iface,2) = n2/norm_n
+         PolyMesh%Elem_loc(ie)%normal(iface,3) = n3/norm_n
+         PolyMesh%Elem_loc(ie)%area(iface) = norm_n
+
+      enddo
+   enddo
+
+end subroutine CREATE_NORMAL_FACE
 
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
@@ -2718,6 +2698,7 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
    mpi_file_interface = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_interface
    open(unit_int,file=mpi_file_interface)
 
+   !! loop over elements and faces twice to count the number of interfaces
    num_interface = 0
    do ie = 1, PolyMesh%num_elem_loc
       do i = 1, PolyMesh%Elem_loc(ie)%num_faces

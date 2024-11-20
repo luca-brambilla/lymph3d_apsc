@@ -1,20 +1,5 @@
 !    Copyright (C) 2021 The SPEED FOUNDATION
 !    Author: Ilario Mazzieri
-!
-!    This file is part of PolyWAVE.
-!
-!    PolyWAVE is free software; you can redistribute it and/or modify it
-!    under the terms of the GNU Affero General Public License as
-!    published by the Free Software Foundation, either version 3 of the
-!    License, or (at your option) any later version.
-!
-!    PolyWAVE is distributed in the hope that it will be useful, but
-!    WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-!    Affero General Public License for more details.
-!
-!    You should have received a copy of the GNU Affero General Public License
-!    along with PolyWAVE.  If not, see <http://www.gnu.org/licenses/>.
 
 !> @brief Module for initialization of the MPI and PETSc envinronments with variables declaration.
 module Poly_setup_MPI
@@ -22,7 +7,6 @@ module Poly_setup_MPI
 
      use mpi
      use petscksp
-
 
      implicit none
 
@@ -47,8 +31,8 @@ module Poly_setup_MPI
 
      contains
 
-     !> @brief Subroutine for initialization of the MPI and PETSc envinronments.
-     subroutine INITIALIZATION()
+!> @brief Subroutine for initialization of the MPI and PETSc envinronments.
+subroutine INITIALIZATION()
 
      !> MPI INITIALIZATION
 
@@ -77,7 +61,7 @@ module Poly_setup_MPI
      !speed_tag = speed_tag_min
      !return
 
-     end subroutine INITIALIZATION
+end subroutine INITIALIZATION
 
 end module Poly_setup_MPI
 

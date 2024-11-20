@@ -9,7 +9,7 @@ module Poly_mesh
 
     implicit none
 
-    !> Properties of each element
+    !> Properties of each element - tetrahedron (or hexahedron?)
     type Element
 
         character(len=3) :: el_type     !< Type of the element
@@ -17,7 +17,7 @@ module Poly_mesh
         integer(kind=4)  :: num_vert    !< Number of vertices of the element
         integer(kind=4)  :: num_faces   !< Number of faces of the element
         integer(kind=4)  :: Degree      !< Local degree of the basis function for the element
-        integer(kind=4)  :: NDof_loc    !< Local number of degrees of freedom
+        integer(kind=4)  :: NDof_loc    !< Local number of degrees of freedom per dimension
         integer(kind=4), dimension(:),   pointer :: vert    !< Indexes of the vertices of the element
         integer(kind=4), dimension(:,:), pointer :: faces   !< Indexes of the vertices for every face of the element
 
@@ -33,7 +33,7 @@ module Poly_mesh
         integer(kind=4), dimension(:), pointer :: Dof_glo       !< Mapping to global degrees of freedom
         real(kind=8), dimension(:,:), pointer :: normal     !< Coordinates of the normal to each face
         real(kind=8), dimension(:), pointer :: area         !< Area of each face
-        integer(kind=4), dimension(:), pointer :: flag      !!<
+        integer(kind=4), dimension(:), pointer :: flag      !! not used?
 
     end type Element
 
@@ -45,7 +45,7 @@ module Poly_mesh
         real(kind=8), dimension(3,2) :: b_box   !< Coordinates of two diametrically opposite points of the bounding box of the polyhedron
         real(kind=8) :: hk  !< Diameter of the polyhedron
         real(kind=8), dimension(:,:,:), allocatable :: neigh_bbox !< Coordinates of two diametrically opposite points of the bounding box of the neighbouring polyhedra
-        real(kind=8), dimension(:),allocatable :: neigh_hk !< Diameters of the neighbouring polyhedra
+        real(kind=8), dimension(:), allocatable :: neigh_hk !< Diameters of the neighbouring polyhedra
 
     end type Polyhedron
 
@@ -61,8 +61,8 @@ module Poly_mesh
         integer(kind=4) :: num_prysm        !< Total number of prysms
         integer(kind=4) :: num_quad         !< Total number of quadrilateral faces
         integer(kind=4) :: num_tria         !< Total number of triangular faces
-        integer(kind=4) :: id_node          !< 
-        integer(kind=4) :: num_elem         !< 
+        integer(kind=4) :: id_node          !! not used?
+        integer(kind=4) :: num_elem         !< Sum of number of tetrahedra, hexahedra and prysms
 
         integer(kind=4), dimension(:,:), allocatable :: con_hex         !< Connettivity matrix of the hexahedra
         integer(kind=4), dimension(:,:), allocatable :: con_quad        !< Connettivity matrix of the quadrilaterals on the boundary
@@ -70,9 +70,9 @@ module Poly_mesh
         integer(kind=4), dimension(:,:), allocatable :: con_tria        !< Connettivity matrix of the triangles on the boundary
         integer(kind=4), dimension(:,:), allocatable :: con_prysm       !< Connettivity matrix of the prysms
 
-        integer(kind=4), dimension(:), allocatable :: part_elem
-        integer(kind=4), dimension(:), allocatable :: elem_in_poly
-        integer(kind=4), dimension(:), allocatable :: elem_in_poly_loc
+        integer(kind=4), dimension(:), allocatable :: part_elem         !< For each tetrahedron, it stores the ID of the process to which it belongs to after the partition
+        integer(kind=4), dimension(:), allocatable :: elem_in_poly      !< For each tetrahedron, it stores the index of the polyhedron to which it belongs to
+        integer(kind=4), dimension(:), allocatable :: elem_in_poly_loc  !< For each local tetrahedron, it stores the global index of the polyhedron to which it belongs to
 
         real(kind=8), dimension(:), allocatable :: coord_x  !< Coordinates of the vertices in x
         real(kind=8), dimension(:), allocatable :: coord_y  !< Coordinates of the vertices in y
@@ -91,70 +91,70 @@ module Poly_mesh
 
     end type Mesh_Structure
 
-    contains
+contains
 
-    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    !> Print properties of the mesh
-    subroutine print_Dime_Mesh_Structure(Struct)
+!> Print properties of the mesh
+subroutine print_Dime_Mesh_Structure(Struct)
 
-        implicit none
+    implicit none
 
-        type(Mesh_Structure), intent(inout) :: Struct
+    type(Mesh_Structure), intent(inout) :: Struct
 
-        write(*,'(A,I8)')'#Nodes          : ', Struct%num_node
-        write(*,'(A,I8)')'#Hexahedra      : ', Struct%num_hex
-        write(*,'(A,I8)')'#Tetrahedra     : ', Struct%num_tet
-        write(*,'(A,I8)')'#Prysms         : ', Struct%num_prysm
-        write(*,'(A,I8)')'#Quad faces     : ', Struct%num_quad
-        write(*,'(A,I8)')'#Tria faces     : ', Struct%num_tria
-
-
-    end subroutine print_Dime_Mesh_Structure
+    write(*,'(A,I8)')'#Nodes          : ', Struct%num_node
+    write(*,'(A,I8)')'#Hexahedra      : ', Struct%num_hex
+    write(*,'(A,I8)')'#Tetrahedra     : ', Struct%num_tet
+    write(*,'(A,I8)')'#Prysms         : ', Struct%num_prysm
+    write(*,'(A,I8)')'#Quad faces     : ', Struct%num_quad
+    write(*,'(A,I8)')'#Tria faces     : ', Struct%num_tria
 
 
-    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+end subroutine print_Dime_Mesh_Structure
 
-    !> Allocate memory for mesh properties
-    subroutine allocate_Mesh_Structure(Struct)
 
-        implicit none
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-        type(Mesh_Structure), intent(inout) :: Struct
+!> Allocate memory for mesh properties
+subroutine allocate_Mesh_Structure(Struct)
 
-        Struct%num_elem = Struct%num_hex + Struct%num_tet + Struct%num_prysm
+    implicit none
 
-        if (Struct%num_elem  == 0) then
-            write(*,'(A)')'ERROR! NUM OF ELEMENTS = 0'
-            call EXIT(EXIT_NO_ELEMENTS)
-        endif
-        if (Struct%num_hex > 0) then
-            allocate (Struct%con_hex(Struct%num_hex,9))
-            Struct%con_hex = 0;
-        endif
-        if (Struct%num_tet > 0) then
-            allocate (Struct%con_tet(Struct%num_tet,5))
-            Struct%con_tet = 0;
-        endif
-        if (Struct%num_prysm > 0) then
-            allocate (Struct%con_prysm(Struct%num_prysm,6))
-            Struct%con_prysm = 0;
-        endif
+    type(Mesh_Structure), intent(inout) :: Struct
 
-        !write(*,*) Struct%num_hex, Struct%num_tet, Struct%num_prysm, Struct%con_tet
-        !read(*,*)
+    Struct%num_elem = Struct%num_hex + Struct%num_tet + Struct%num_prysm
 
-        if (Struct%num_quad > 0) allocate (Struct%con_quad(Struct%num_quad,5))
-        if (Struct%num_tria > 0) allocate (Struct%con_tria(Struct%num_tria,5)) !it is modified so that it contains the tag of the boundary
+    if (Struct%num_elem  == 0) then
+        write(*,'(A)')'ERROR! NUM OF ELEMENTS = 0'
+        call EXIT(EXIT_NO_ELEMENTS)
+    endif
+    if (Struct%num_hex > 0) then
+        allocate (Struct%con_hex(Struct%num_hex,9))
+        Struct%con_hex = 0;
+    endif
+    if (Struct%num_tet > 0) then
+        allocate (Struct%con_tet(Struct%num_tet,5))
+        Struct%con_tet = 0;
+    endif
+    if (Struct%num_prysm > 0) then
+        allocate (Struct%con_prysm(Struct%num_prysm,6))
+        Struct%con_prysm = 0;
+    endif
 
-        !Remove this for big simulation
-        !allocate(Struct%vert_x(Struct%num_node), &
-        !         Struct%vert_y(Struct%num_node), &
-        !         Struct%vert_z(Struct%num_node))
-        !allocate(Struct%part_elem(Struct%num_elem))
-        allocate(Struct%elem_in_poly(Struct%num_elem))
+    !write(*,*) Struct%num_hex, Struct%num_tet, Struct%num_prysm, Struct%con_tet
+    !read(*,*)
 
-    end subroutine allocate_Mesh_Structure
+    if (Struct%num_quad > 0) allocate (Struct%con_quad(Struct%num_quad,5))
+    if (Struct%num_tria > 0) allocate (Struct%con_tria(Struct%num_tria,5)) !it is modified so that it contains the tag of the boundary
+
+    !Remove this for big simulation
+    !allocate(Struct%vert_x(Struct%num_node), &
+    !         Struct%vert_y(Struct%num_node), &
+    !         Struct%vert_z(Struct%num_node))
+    !allocate(Struct%part_elem(Struct%num_elem))
+    allocate(Struct%elem_in_poly(Struct%num_elem))
+
+end subroutine allocate_Mesh_Structure
 
 
         !subroutine allocate_Poly_in_Mesh_Structure(Struct)
@@ -175,75 +175,75 @@ module Poly_mesh
         !end subroutine allocate_Poly_in_Mesh_Structure
 
 
-        !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        ! IT WORKS ONLY IN SERIAL
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+!! IT WORKS ONLY IN SERIAL
 
-    !> Save to a different file the mesh for each processor
-    subroutine print_Local_Mesh_Structure_VTK(Struct)
+!> Save to a different file the mesh for each processor
+subroutine print_Local_Mesh_Structure_VTK(Struct)
 
-        implicit none
+    implicit none
 
-        type(Mesh_Structure), intent(inout) :: Struct
-        integer(kind=4) :: i
+    type(Mesh_Structure), intent(inout) :: Struct
+    integer(kind=4) :: i
 
-        open(50,file='mesh_visualization/mesh_partition.vtk')
+    open(50,file='mesh_visualization/mesh_partition.vtk')
 
-        write(50,'(A)') '# vtk DataFile Version 2.0'
-        write(50,'(A)') 'Comment'
-        write(50,'(A)') 'ASCII'
-        write(50,'(A)') 'DATASET UNSTRUCTURED_GRID'
-        write(50,*)     'POINTS  ', Struct%num_node, '  float'
+    write(50,'(A)') '# vtk DataFile Version 2.0'
+    write(50,'(A)') 'Comment'
+    write(50,'(A)') 'ASCII'
+    write(50,'(A)') 'DATASET UNSTRUCTURED_GRID'
+    write(50,*)     'POINTS  ', Struct%num_node, '  float'
 
-        do i = 1, Struct%num_node
-            write(50,*) Struct%coord_x(i), Struct%coord_y(i), Struct%coord_z(i)
-        enddo
+    do i = 1, Struct%num_node
+        write(50,*) Struct%coord_x(i), Struct%coord_y(i), Struct%coord_z(i)
+    enddo
 
-        write(50,*) 'CELLS ', Struct%num_elem, 9*Struct%num_hex &
-                            + 5*Struct%num_tet + 6*Struct%num_prysm
+    write(50,*) 'CELLS ', Struct%num_elem, 9*Struct%num_hex &
+                        + 5*Struct%num_tet + 6*Struct%num_prysm
 
-        do i = 1, Struct%num_hex
-            write(50,*) 8, Struct%con_hex(i,2)-1, Struct%con_hex(i,3)-1, &
-                        Struct%con_hex(i,4)-1, Struct%con_hex(i,5)-1, &
-                        Struct%con_hex(i,6)-1, Struct%con_hex(i,7)-1, &
-                        Struct%con_hex(i,8)-1, Struct%con_hex(i,9)-1
-        enddo
-        do i = 1, Struct%num_tet
-            write(50,*) 4, Struct%con_tet(i,2)-1, Struct%con_tet(i,3)-1, &
-                        Struct%con_tet(i,4)-1, Struct%con_tet(i,5)-1
-        enddo
-        do i = 1, Struct%num_prysm
-            write(50,*) 5, Struct%con_prysm(i,2)-1, Struct%con_prysm(i,3)-1, &
-                        Struct%con_prysm(i,4)-1, Struct%con_prysm(i,5)-1, &
-                        Struct%con_prysm(i,6)-1
-        enddo
+    do i = 1, Struct%num_hex
+        write(50,*) 8, Struct%con_hex(i,2)-1, Struct%con_hex(i,3)-1, &
+                    Struct%con_hex(i,4)-1, Struct%con_hex(i,5)-1, &
+                    Struct%con_hex(i,6)-1, Struct%con_hex(i,7)-1, &
+                    Struct%con_hex(i,8)-1, Struct%con_hex(i,9)-1
+    enddo
+    do i = 1, Struct%num_tet
+        write(50,*) 4, Struct%con_tet(i,2)-1, Struct%con_tet(i,3)-1, &
+                    Struct%con_tet(i,4)-1, Struct%con_tet(i,5)-1
+    enddo
+    do i = 1, Struct%num_prysm
+        write(50,*) 5, Struct%con_prysm(i,2)-1, Struct%con_prysm(i,3)-1, &
+                    Struct%con_prysm(i,4)-1, Struct%con_prysm(i,5)-1, &
+                    Struct%con_prysm(i,6)-1
+    enddo
 
-        ! Vtk Cell type file formats
-        write(50,*) 'CELL_TYPES ', Struct%num_elem
-        do i = 1, Struct%num_hex
-            write(50,*) 12  ! hexahedra
-        enddo
-        do i = 1, Struct%num_tet
-            write(50,*) 10  ! tetrahedra
-        enddo
-        do i = 1, Struct%num_prysm
-            write(50,*) 14 ! pyramids? !!
-        enddo
+    ! Vtk Cell type file formats
+    write(50,*) 'CELL_TYPES ', Struct%num_elem
+    do i = 1, Struct%num_hex
+        write(50,*) 12  ! hexahedra
+    enddo
+    do i = 1, Struct%num_tet
+        write(50,*) 10  ! tetrahedra
+    enddo
+    do i = 1, Struct%num_prysm
+        write(50,*) 14 ! pyramids? !!
+    enddo
 
-        write(50,*) 'CELL_DATA ', Struct%num_elem
+    write(50,*) 'CELL_DATA ', Struct%num_elem
 
-        write(50,*) 'SCALARS  mpi_id int 1'
-        !write(50,*) 'SCALARS  poly_id int 1'
-        write(50,*) 'LOOKUP_TABLE default'
+    write(50,*) 'SCALARS  mpi_id int 1'
+    !write(50,*) 'SCALARS  poly_id int 1'
+    write(50,*) 'LOOKUP_TABLE default'
 
-        do i = 1, Struct%num_elem
-            write(50,*) Struct%part_elem(i)
-            !write(50,*) Struct%elem_in_poly(i)
-        enddo
+    do i = 1, Struct%num_elem
+        write(50,*) Struct%part_elem(i)
+        !write(50,*) Struct%elem_in_poly(i)
+    enddo
 
-        close(50);
+    close(50);
 
-    end subroutine print_Local_Mesh_Structure_VTK
+end subroutine print_Local_Mesh_Structure_VTK
 
-    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 end module Poly_mesh
