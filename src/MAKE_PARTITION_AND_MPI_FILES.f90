@@ -172,7 +172,7 @@ end subroutine MAKE_PARTITION_AND_MPI_FILES
 !> performs a contigous partition of the mesh into different processors using METIS and writes the mpi file elem4proc.mpi;
 !> Mesh partitioning using METIS. Create `elem4proc.mpi` assigning an element (poly)
 !> to each processor
-subroutine MESH_PARTITIONING(mpi_file, nelem, nnode, nparts, &
+subroutine MESH_PARTITIONING(mpi_file, n_elem, nnode, nparts, &
                                    num_hex, con_hex, &
                                    num_tet, con_tet, &
                                    num_prysm, con_prysm)
@@ -184,13 +184,13 @@ subroutine MESH_PARTITIONING(mpi_file, nelem, nnode, nparts, &
 
    implicit none
 
-   integer(idx_t), intent(in) :: nelem    !< number of elements
+   integer(idx_t), intent(in) :: n_elem    !< number of elements
    integer(idx_t), intent(in) :: nnode    !< number of nodes
    integer(idx_t), parameter :: ncommon = 3
 
-   integer(idx_t) :: eptr(nelem+1), &
+   integer(idx_t) :: eptr(n_elem+1), &
                      eind(8*num_hex+4*num_tet+5*num_prysm)   !< arrays storing mesh structure
-   integer(idx_t) :: epart(nelem), npart(nnode)       ! element and node partition vectors
+   integer(idx_t) :: epart(n_elem), npart(nnode)       ! element and node partition vectors
 
    integer(idx_t) :: opts(0:METIS_NOPTIONS-1), ios, objval
    integer(idx_t), intent(in) :: nparts         !< number of parts in partition (number of processes)
@@ -214,13 +214,13 @@ subroutine MESH_PARTITIONING(mpi_file, nelem, nnode, nparts, &
       u_name = 'elem4proc.mpi'
    endif
 
-   !write(*,*) nelem
+   !write(*,*) n_elem
    !read(*,*)
 
    if (nparts == 1) then
       open(u_mpi,file = u_name)
-      write(u_mpi,*) nelem
-      do i = 1, nelem
+      write(u_mpi,*) n_elem
+      do i = 1, n_elem
          write(u_mpi,*) i, 0
       enddo
       close(u_mpi)
@@ -271,10 +271,10 @@ subroutine MESH_PARTITIONING(mpi_file, nelem, nnode, nparts, &
       ! call print_metis_options(opts)
 
 
-!        ios = METIS_PartMeshNodal(nelem,nnode,eptr,eind,nparts=nparts,options=opts, &
+!        ios = METIS_PartMeshNodal(n_elem,nnode,eptr,eind,nparts=nparts,options=opts, &
 !                              objval=objval,epart=epart,npart=npart)
 
-      ios = METIS_PartMeshDual(nelem,nnode,eptr,eind, vwgt, vsize, &
+      ios = METIS_PartMeshDual(n_elem,nnode,eptr,eind, vwgt, vsize, &
                               ncommon, nparts, tpwgts, options=opts, objval=objval, &
                               epart=epart, npart=npart)
 
@@ -285,8 +285,8 @@ subroutine MESH_PARTITIONING(mpi_file, nelem, nnode, nparts, &
       end if
 
       open(u_mpi,file = u_name)
-      write(u_mpi,*) nelem
-      do i = 1, nelem
+      write(u_mpi,*) n_elem
+      do i = 1, n_elem
          write(u_mpi,*) i, epart(i)-1
       enddo
       close(u_mpi)
@@ -423,7 +423,7 @@ subroutine MESH_AGGLOMERATION(mpi_file, PolyMesh,nelem_loc, nnode, nparts, con_t
    ! call print_metis_options(opts)
 
 
-   !        ios = METIS_PartMeshNodal(nelem,nnode,eptr,eind,nparts=nparts,options=opts, &
+   !        ios = METIS_PartMeshNodal(n_elem,nnode,eptr,eind,nparts=nparts,options=opts, &
    !                              objval=objval,epart=epart,npart=npart)
 
    ios = METIS_PartMeshDual(nelem_loc,nnode,eptr, eind, vwgt, vsize, &
@@ -466,10 +466,10 @@ subroutine WRITE_POLY_INFO(mpi_file,PolyMesh,mpi_id,mpi_np)
 
    character(len=70) :: mpi_file, u_name
    integer(kind=4), intent(in)  :: mpi_np, mpi_id
-   integer(kind=4)  :: unit_mpi
+   !integer(kind=4)  :: unit_mpi
    integer(kind=4) :: num_elem_send,last_elem_send
-   integer(kind=4), dimension(:), allocatable :: index_glob
-   integer(kind=4) :: num_faces_in_poly
+   !integer(kind=4), dimension(:), allocatable :: index_glob
+   !integer(kind=4) :: num_faces_in_poly
    integer(kind=4) :: i,ip
    integer(kind=4) :: u_mpi = 400
 
@@ -624,7 +624,7 @@ subroutine WRITE_PARTITION(mpi_file, PolyMesh, mpi_np, mpi_id)
    character(len=70) :: mpi_file_hex, mpi_file_tet, mpi_file_pry, &
                         mpi_file_quad, mpi_file_tria
    integer(kind=4), intent(in)  :: mpi_np, mpi_id
-   integer(kind=4)  :: i, ie, unit_mpi, kiter, unit_mpi_2, unit_mpi_3, &
+   integer(kind=4)  :: ie, unit_mpi, kiter, unit_mpi_2, unit_mpi_3, &
                         num_hex_mpi, num_tet_mpi, num_prysm_mpi, &
                         num_node_hex_mpi, num_node_tet_mpi, num_node_prysm_mpi, &
                         num_node_quad_mpi, num_node_tria_mpi
@@ -1166,7 +1166,7 @@ end subroutine WRITE_PARTITION
 
       integer(kind=4), intent(in) :: mpi_id
       integer(kind=4) :: ie, ivert, i,k, kiter,num_node, elem_total, id_node
-      integer(kind=4) :: num_vert_with_duplicate, num_local_vert
+      integer(kind=4) :: num_vert_with_duplicate!, num_local_vert
       integer(kind=4), dimension(:), allocatable :: vert_with_duplicate
 
       real(kind=8) :: xx,yy,zz
@@ -1282,8 +1282,8 @@ end subroutine WRITE_PARTITION
       implicit none
 
       integer(kind=4), intent(in) :: mpi_id
-      integer(kind=4) :: ie_loc,ie_glob, i,j,k, kiter,num_poly, ipoly,num_tet_in_poly,num_faces_in_poly
-      integer(kind=4) :: num_poly_with_duplicate, num_local_poly
+      integer(kind=4) :: ie_loc, i,j,k, kiter, ipoly,num_tet_in_poly,num_faces_in_poly
+      integer(kind=4) :: num_poly_with_duplicate!, num_local_poly
       integer(kind=4), dimension(:), allocatable :: poly_with_duplicate,index_glob
 
       type(Mesh_Structure), intent(inout) :: PolyMesh
@@ -1477,8 +1477,8 @@ end subroutine CREATE_NORMAL_FACE
       real(kind=8) :: dist
 
       real(kind=8), dimension(:), allocatable :: xx_vert, yy_vert, zz_vert
-      real(kind=8), dimension(:), allocatable :: xx_send, yy_send, zz_send
-      real(kind=8), dimension(:), allocatable :: xx_recv, yy_recv, zz_recv
+      !real(kind=8), dimension(:), allocatable :: xx_send, yy_send, zz_send
+      !real(kind=8), dimension(:), allocatable :: xx_recv, yy_recv, zz_recv
 
       type(Mesh_Structure), intent(inout) :: PolyMesh
 
@@ -1586,7 +1586,7 @@ end subroutine CREATE_NORMAL_FACE
       character(len=70), intent(in) :: mpifile
       character(len=70) :: mpi_file_qua
       integer(kind=4), intent(in)  :: mpi_np, mpi_id
-      integer(kind=4)  :: unit_mpi, num_elem_list, num_quad_loc, i, j, Row2, &
+      integer(kind=4)  :: unit_mpi, num_elem_list, num_quad_loc, i, Row2, &
                           num_quad_send, ie, iface, mat, ie_ne, iface_ne, mat_ne, &
                           ie_loc, ie_ne_loc, ip, num_quad_send_mpi, kiter, &
                           num_quad_send_loc

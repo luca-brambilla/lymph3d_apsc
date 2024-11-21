@@ -55,7 +55,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
     integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, ipoly_loc, ipoly_glob, ipoly2_loc, ipoly2_glob
     integer(kind=4) :: n_tet_in_poly, iface_poly
     integer(kind=4) :: Npoly
-    integer(kind=4) :: i, j, m, n
+    integer(kind=4) :: i, j, m
     integer(kind=4) :: beg
 
     integer(kind=4) :: e, E1, E2

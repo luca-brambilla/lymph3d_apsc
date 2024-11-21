@@ -341,7 +341,7 @@ end subroutine READ_HEADER
      character(len=4)      :: keyword
 
      integer(kind=4) :: status
-     integer(kind=4) :: tagel_func, func_typec, nfunc_datac, ileft, iright
+     integer(kind=4) :: ileft, iright!, tagel_func, func_typec, nfunc_datac
      integer(kind=4) :: im, im_nle, im_rnd, icase, &
                         idX, idY, idZ, inX, inY, inZ, inN, &
                         ipX, ipY, ipZ, iplX, iplY, iplZ, &

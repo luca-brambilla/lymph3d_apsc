@@ -23,7 +23,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     Mat, intent(inout) :: mat_dg               !< DG matrix
     Mat, intent(inout) :: petsc_mass_modal     !< mass modal matrix
     PetscScalar :: val(1), val1(1), val2(1), val3(1), val4(1)
-    PetscInt :: irow(1), jcol(1), irow2(1), jcol2(1), irow3(1), jcol3(1)
+    PetscInt :: irow(1), jcol(1), irow2(1), jcol2(1)!, irow3(1), jcol3(1)
 
     type(Mesh_Structure), intent(inout) :: PolyMesh     !< Mesh
     type(Data_Structure), intent(in) :: PolyData        !< Data

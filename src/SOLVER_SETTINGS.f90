@@ -15,15 +15,15 @@ subroutine SOLVER_SETTINGS(stiff,ksp,pc)
 
     !> FEM Matrices for acoustic materials
     Mat :: stiff ! stiffness matrices
-    Mat :: RR
+    !Mat :: RR
 
     !> Further PetSc variables
-    PetscBool :: flg
+    !PetscBool :: flg
     PetscReal :: rel_tolerance
     PetscInt :: max_krylov_it
 
     !> Index variables
-    PetscInt icntl, ival
+    !PetscInt icntl, ival
 
     !> PETSc Solver context
     KSP :: ksp ! Krylov solver context
