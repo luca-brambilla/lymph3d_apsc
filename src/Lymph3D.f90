@@ -41,7 +41,7 @@ program Lymph3D
     Vec :: petsc_tmpv, petsc_f ! temp vectors to store solution for sums
     Vec :: petsc_u0, petsc_v0 ! initial condition read from data
 
-    PetscViewer viewer ! abstract PETSc object for displaying PETSc objects and their data
+    !PetscViewer viewer ! abstract PETSc object for displaying PETSc objects and their data
 
     KSP :: ksp, ksp2, ksp3 ! linear system solvers
     PC :: pc, pc2, pc3 ! preconditioners
@@ -55,11 +55,11 @@ program Lymph3D
     real(kind=8) :: err_DG, err_DG_mpi
     real(kind=8) :: hmax, hmax_mpi
     real(kind=8), pointer :: sol_ptr(:)
-    real(kind=8), dimension(:), allocatable :: u_loc, u_glo
+    !real(kind=8), dimension(:), allocatable :: u_loc, u_glo
     real(kind=8), dimension(:,:), allocatable :: u
     integer(kind=4), dimension(:), allocatable :: gathered_sizes, displacements
 
-    real(kind=8) :: E, nu
+    !real(kind=8) :: E, nu
     integer(kind=4) :: i, mat_id, ie_loc
 
     type(Data_Structure) :: PolyData
@@ -92,7 +92,7 @@ program Lymph3D
 
     ! integer(kind=4), pointer :: internal_neigh(:)
     ! integer(kind=4), allocatable :: tmp_pointer(:)
-    integer(kind=4) :: n_neigh, max_faces
+    integer(kind=4) :: n_neigh !, max_faces
 
     ! IsTime_dependent = .false.
 
@@ -102,7 +102,8 @@ program Lymph3D
     Mat :: petsc_m_tmp
     PetscInt :: irow(1)
 
-    integer(kind=4) :: j,k,m,n,row,col
+    !integer(kind=4) :: j,k,m,n,row,col
+    integer(kind=4) :: k, row
     integer(kind=4) :: neighbor
     ! read parameter
     ! iarg = getarg(1,arg)
@@ -192,6 +193,7 @@ program Lymph3D
     local_dof = 3*PolyMesh%num_poly_loc*Np;
     PRINT *, 'Local number of degrees of freedom: ', local_dof
 
+    ! PETSc numbering starting from 0 not 1
     allocate(petsc_num(global_dof))
     do i=1,global_dof
         petsc_num(i) = i-1
@@ -342,6 +344,9 @@ program Lymph3D
     ! end do
     ! n_neigh = size(internal_neigh)
 
+    ! allocate nnod_num, gathered_sizes, displacements, u
+    call PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
+
     if (IS_MatrixFree .eqv. .true.) then
 
         print *, 'matrix free solver'
@@ -356,8 +361,8 @@ program Lymph3D
 
         print *, "Assemble initial conditions"
         ! initial conditions
-        allocate(u0_loc(PolyMesh%num_elem_loc,3*Np))
-        allocate(v0_loc(PolyMesh%num_elem_loc,3*Np))
+        allocate(u0_loc(PolyMesh%num_poly_loc,3*Np))
+        allocate(v0_loc(PolyMesh%num_poly_loc,3*Np))
         allocate(tmp(3*Np))
 
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_displacement, u0_loc)
@@ -422,10 +427,12 @@ program Lymph3D
             ! initialization for time problem
             t = 0.0
             num_dt = 1 !!! compute number of iteration if start not t=0?
-            time_step = 0.001
-            stop_time = SQRT2/4.0 + 9.0*SQRT2 ! 10 peaks
+            !time_step = 0.001
+            IsSave_output = .true.
+            num_dt_mon = 50
+            !stop_time = SQRT2/4.0 + 9.0*SQRT2 ! 10 peaks
             !stop_time = SQRT2/4.0 + 2.0*SQRT2
-            !stop_time = 0.01
+            stop_time = 0.01
 
             if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", 0, " Time: ", t
 
@@ -434,6 +441,14 @@ program Lymph3D
             ! vectors initial conditions
             ! compute modal coefficients of initial conditions
             call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_u0, ic_displacement)
+
+            ! SAVE SOLUTION
+            if (IsSave_output .eqv. .true.) then
+                call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+                call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_u0, sol_ptr, u, nnod_num, gathered_sizes, displacements)
+                call EXPORT_SOLUTION(PolyMesh, u, IsPoly, 0)
+            endif
+
             call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_v0, ic_velocity)
             PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
             PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
@@ -477,12 +492,12 @@ program Lymph3D
             ! M u1 = F
             PetscCallA(KSPSolve(ksp2, petsc_f, petsc_sol, mpi_ierr))
 
-            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-            !!! SAVE SOLUTION
-            if (IsSave_output .eqv. .true.) then
-                call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
-                call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
-            endif
+            ! SAVE SOLUTION
+            ! if (IsSave_output .eqv. .true.) then
+            !     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+            !     call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, u, nnod_num, gathered_sizes, displacements)
+            !     call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
+            ! endif
 
             num_dt = num_dt + 1
             t = t + time_step
@@ -524,11 +539,11 @@ program Lymph3D
                 ! solve linear system M u_{n+1} = F
                 PetscCallA(KSPSolve(ksp2, petsc_f, petsc_sol, mpi_ierr))
 
-                call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-                !!! SAVE SOLUTION
+                ! SAVE SOLUTION
                 if ( (IsSave_output .eqv. .true.) .and. (mod(num_dt, num_dt_mon) == 0) ) then
-                    call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
-                    call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
+                    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+                    call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, u, nnod_num, gathered_sizes, displacements)
+                    call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
                 endif
 
                 num_dt = num_dt + 1
@@ -540,9 +555,19 @@ program Lymph3D
 
         end if
 
-        call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
-        call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
+        ! final timestep save solution
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, u,  nnod_num, gathered_sizes, displacements)
+        call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
     endif
+
+    ! deallocate solution for post-processing
+    deallocate(u)
+    deallocate(nnod_num)
+    deallocate(displacements)
+    deallocate(gathered_sizes)
+
+    call PVD_SETUP(num_dt_mon, 0, num_dt)
 
     ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'petsc_sol',viewer,mpi_ierr))
     ! PetscCallA(VecView(petsc_sol,viewer,mpi_ierr))

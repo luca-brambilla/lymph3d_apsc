@@ -1,7 +1,7 @@
 module post_processing
 
 #include<petsc/finclude/petscksp.h>
-    
+
     use petscksp
     use Poly_setup_mpi
     use Poly_global
@@ -16,81 +16,173 @@ module post_processing
 
     contains
 
-    subroutine POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, mpi_id, u)
+    !> allocate solution and prepare size and displacement vectors for MPI
+subroutine PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
 
-        type(Mesh_Structure), intent(in) :: PolyMesh
-        real(kind=8), dimension(:,:), allocatable, intent(out) :: u
-        integer(kind=4), intent(in) :: mpi_id   
-        integer(kind=4), intent(in) :: local_dof, global_dof
-        real(kind=8), pointer, intent(in) :: sol_ptr(:)
-        
-        integer(kind=4), dimension(:), allocatable :: nnod_num
-        real(kind=8), dimension(:), allocatable :: u_loc, u_glo
-        integer(kind=4), dimension(:), allocatable :: gathered_sizes, displacements
-        integer(kind=4) :: i, Np
 
-        Vec :: petsc_sol
-        Np = PolyMesh%Elem_loc(1)%NDof_loc
+    type(Mesh_Structure), intent(in) :: PolyMesh
+    integer(kind=4), intent(in) :: local_dof
+    ! integer(kind=4), intent(in) :: mpi_id
+    integer(kind=4), dimension(:), allocatable, intent(inout) :: nnod_num
+    integer(kind=4), dimension(:), allocatable, intent(inout) :: gathered_sizes, displacements
+    real(kind=8), dimension(:,:), allocatable, intent(inout) :: u
+    integer(kind=4) :: i, Np
 
-        ! STORE LOCAL NUMERATION TO RECONSTRUCT THE SOLUTION
-        allocate(nnod_num(local_dof))
-        call CREATE_LOCAL_NODE_NUM(nnod_num, local_dof)
+    Np = PolyMesh%Elem_loc(1)%NDof_loc
 
-        ! SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
-        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-        allocate(u_loc(local_dof))
-        allocate(u_glo(global_dof))
+    ! Allocate solution for post-processing
+    allocate(u(Np, 3*PolyMesh%num_poly))
 
-        if(mpi_np > 1) then
+    ! STORE LOCAL NUMERATION TO RECONSTRUCT THE SOLUTION
+    allocate(nnod_num(local_dof))
+    call CREATE_LOCAL_NODE_NUM(nnod_num, local_dof)
 
-            allocate(gathered_sizes(mpi_np))
-      
-            call MPI_AllGather(local_dof, 1, MPI_INTEGER, gathered_sizes, 1, & 
-                        MPI_INTEGER, MPI_COMM_WORLD, ierr)
-            
-            allocate(displacements(mpi_np))
-            displacements(1) = 0
-            do i = 2, mpi_np
-                    displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
-            end do
+    if(mpi_np > 1) then
 
-        endif
+        allocate(gathered_sizes(mpi_np))
 
-        ! print *, 'SCATTER SOLUTION'
-        PetscCallA(VecGetArrayF90(petsc_sol, sol_ptr, mpi_ierr))
-        u_loc(1:local_dof) = sol_ptr
-        if(mpi_np == 1) then
-            u_glo = u_loc
-        else
-            call MPI_ALLGATHERV(u_loc, local_dof, MPI_DOUBLE_PRECISION, &
-                        u_glo, gathered_sizes, displacements, MPI_DOUBLE_PRECISION, &
-                        MPI_COMM_WORLD, mpi_ierr)
-        endif
-        deallocate(u_loc)
+        call MPI_AllGather(local_dof, 1, MPI_INTEGER, gathered_sizes, 1, &
+                    MPI_INTEGER, MPI_COMM_WORLD, ierr)
 
-        ! RECONSTRUCT SOLUTION MATRIX FOR POST-PROCESSING
-        allocate(u(Np, 3*PolyMesh%num_poly))    
-        u = RESHAPE(u_glo, (/Np, 3*PolyMesh%num_poly /))
-        deallocate(u_glo)
+        allocate(displacements(mpi_np))
+        displacements(1) = 0
+        do i = 2, mpi_np
+                displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
+        end do
 
-        ! print *,'Done with the solution'
-    
-    end subroutine POST_PROCESS
+    endif
+
+end subroutine PREPROCESS_SOLUTION
+
+subroutine POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, u, nnod_num, gathered_sizes, displacements)
+
+    type(Mesh_Structure), intent(in) :: PolyMesh            !< mesh
+    real(kind=8), dimension(:,:), intent(inout) :: u        !< global solution
+    integer(kind=4), intent(in) :: local_dof                !< number of local dofs for the process
+    integer(kind=4), intent(in) :: global_dof               !< number of global dofs
+    real(kind=8), pointer, intent(inout) :: sol_ptr(:)      !< fortran pointer
+
+    integer(kind=4), dimension(:), intent(in) :: nnod_num
+    real(kind=8), dimension(:), allocatable :: u_loc, u_glo
+    integer(kind=4), dimension(:), intent(in) :: gathered_sizes, displacements
+    integer(kind=4) :: Np
+
+    Vec, intent(in) :: petsc_sol
+    ! assuming same degree everywhere
+    Np = PolyMesh%Elem_loc(1)%NDof_loc ! ndof local per dimension (for 3D we need 3*Np)
+
+    ! SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    allocate(u_loc(local_dof))
+    allocate(u_glo(global_dof))
+
+    ! print *, 'SCATTER SOLUTION'
+    PetscCallA(VecGetArrayReadF90(petsc_sol, sol_ptr, mpi_ierr))
+    u_loc(1:local_dof) = sol_ptr
+    PetscCall(VecRestoreArrayReadF90(petsc_sol,sol_ptr,mpi_ierr))
+
+    if(mpi_np == 1) then
+        u_glo = u_loc
+    else
+        call MPI_ALLGATHERV(u_loc, local_dof, MPI_DOUBLE_PRECISION, &
+                    u_glo, gathered_sizes, displacements, MPI_DOUBLE_PRECISION, &
+                    MPI_COMM_WORLD, mpi_ierr)
+    endif
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    deallocate(u_loc)
+
+
+    ! RECONSTRUCT SOLUTION MATRIX FOR POST-PROCESSING
+    ! allocate(u(Np, 3*PolyMesh%num_poly))
+    u = RESHAPE(u_glo, (/Np, 3*PolyMesh%num_poly /))
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    deallocate(u_glo)
+
+    ! print *,'Done with the solution'
+
+end subroutine POST_PROCESS
+
+
+!> matrix free - gather fortran vector solution from local to global.
+!> Dof are split not in ascending order, but gathered as blocks in order of process
+! subroutine GATHER_SOLUTION(PolyMesh, local_dof, global_dof, u_loc, mpi_id, u_glo)
+
+!     type(Mesh_Structure), intent(in) :: PolyMesh    !< Mesh structure
+!     integer(kind=4), intent(in) :: local_dof        !< Number of local dof for the process
+!     integer(kind=4), intent(in) :: global_dof       !< Number of global dof
+!     integer(kind=4), intent(in) :: mpi_id           !< Process ID
+!     real(kind=8), dimension(:,:), intent(out) :: u_glo  !< Vector of global solution
+!     real(kind=8), dimension(:,:), intent(in) :: u_loc   !< Vector of local solution for each process
+
+!     integer(kind=4), dimension(:), allocatable :: nnod_num
+!     integer(kind=4), dimension(:), allocatable :: gathered_sizes, displacements
+!     integer(kind=4) :: i, Np
+
+!     Np = PolyMesh%Elem_loc(1)%NDof_loc
+
+!     ! STORE LOCAL NUMERATION TO RECONSTRUCT THE SOLUTION
+!     allocate(nnod_num(local_dof))
+!     call CREATE_LOCAL_NODE_NUM(nnod_num, local_dof)
+
+!     ! SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
+!     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+!     allocate(u_glo(PolyMesh%num_elem,3*Np))
+
+!     !! send and receive matrices NOT VECTORS?
+
+!     ! contruct gathered_sized for MPI_ALLGATHERV
+!     if(mpi_np > 1) then
+
+!         allocate(gathered_sizes(mpi_np))
+
+!         call MPI_AllGather(local_dof, 1, MPI_INTEGER, gathered_sizes, 1, &
+!                     MPI_INTEGER, MPI_COMM_WORLD, ierr)
+
+!         allocate(displacements(mpi_np))
+!         displacements(1) = 0
+!         do i = 2, mpi_np
+!                 displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
+!         end do
+
+!     endif
+
+!     ! print *, 'SCATTER SOLUTION'
+
+!     if(mpi_np == 1) then
+!         u_glo = u_loc
+!     else
+!         call MPI_ALLGATHERV(u_loc, local_dof, MPI_DOUBLE_PRECISION, &
+!                     u_glo, gathered_sizes, displacements, MPI_DOUBLE_PRECISION, &
+!                     MPI_COMM_WORLD, mpi_ierr)
+!     endif
+
+!     ! RECONSTRUCT SOLUTION MATRIX FOR POST-PROCESSING
+!     allocate(u(Np, 3*PolyMesh%num_poly))
+!     u = RESHAPE(u_glo, (/Np, 3*PolyMesh%num_poly /))
+!     deallocate(u_glo)
+
+!     ! print *,'Done with the solution'
+
+! end subroutine GATHER_SOLUTION
 
     ! Evaluate nodal values of the solution and store them in output.vtk 
-    subroutine EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
+    subroutine EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
         
         use local_search ! see Poly_global.f90
         use problem_data_and_properties
+        use mpi
+        use Poly_setup_MPI
 
         implicit none
 
-        integer(kind=4), intent(in), optional :: num_dt
+        integer(kind=4), intent(in), optional :: num_dt     !< number of timesteps
 
-        type(Mesh_Structure), intent(inout) :: PolyMesh
-        real(kind=8), dimension(:,:), allocatable, intent(in) :: u
-        integer(kind=4), intent(in) :: mpi_id
-        logical, intent(in) :: IsPoly
+        type(Mesh_Structure), intent(inout) :: PolyMesh     !< mesh
+        real(kind=8), dimension(:,:), intent(in) :: u       !< global solution
+        logical, intent(in) :: IsPoly                       !< boolean for polyhedra
         integer(kind=4) :: p, Np, Npoly
         integer(kind=4), dimension(:,:), allocatable :: blist
         real(kind=8), dimension(:), allocatable :: x_p, y_p, z_p
@@ -99,14 +191,14 @@ module post_processing
         real(kind=8), dimension(2) :: intx, inty, intz
         real(kind=8), dimension(:,:), allocatable :: temp
         real(kind=8), dimension(:,:,:), allocatable :: u_nod_vet
-        real(kind=8), dimension(3) :: points
+        !real(kind=8), dimension(3) :: points
         integer(kind=4) :: ie_loc, ie_glob, ipoly_loc, ipoly_glob, ivert, id_node, i, j, k, index
 
         Np = PolyMesh%Elem_loc(1)%NDof_loc
         Npoly = PolyMesh%num_poly
         p = PolyMesh%Elem_loc(1)%Degree
 
-        print *, 'Saving the solution in a file .vtk ...'
+        if (mpi_id==0) print *, 'Saving the solution in a file .vtk ...'
         
         ! list of the degrees of monomials of the Np basis functions up to order p
         ! (see basis_functions.f90)
@@ -193,119 +285,126 @@ module post_processing
 
         enddo
         
-        call WRITE_SOLUTION_VTK(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly, mpi_id, num_dt) ! see MOD_VTK.f90
-        print *,'Done exporting solution'
+        deallocate(temp)
+        deallocate(blist)
+
+        call WRITE_SOLUTION_VTK(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly, num_dt) ! see MOD_VTK.f90
+
+        deallocate(u_nod_vet)
+        if (mpi_id==0) print *,'Done exporting solution'
 
     end subroutine EXPORT_SOLUTION
 
-    ! Compute L2 norm square of the error (u - u_ex)
-    subroutine COMPUTE_ERROR_L2(mass, petsc_sol, petsc_uex, global_dof, err_L2_mpi, local_dof)
+!> Compute L2 norm square of the error (u - u_ex) per processor
+subroutine COMPUTE_ERROR_L2(mass, petsc_sol, petsc_uex, global_dof, err_L2_mpi, local_dof)
 
-        use Poly_setup_mpi, only : mpi_ierr
+    use Poly_setup_mpi, only : mpi_ierr
 
-        implicit none
+    implicit none
 
-        Mat :: mass
-        Vec :: petsc_sol, petsc_uex, temp, error, e_L2
-        PetscScalar coeff
+    Mat :: mass
+    Vec :: petsc_sol, petsc_uex, temp, error, e_L2
+    PetscScalar coeff
 
-        PetscViewer viewer
+    !PetscViewer viewer
 
-        integer(kind=4) :: global_dof, local_dof
-        real(kind=8), pointer, dimension(:) :: error_L2_pointer
-        real(kind=8), dimension(local_dof) :: error_L2
-        real(kind=8) :: err_L2_mpi
+    integer(kind=4) :: global_dof, local_dof
+    real(kind=8), pointer, dimension(:) :: error_L2_pointer
+    real(kind=8), dimension(local_dof) :: error_L2
+    real(kind=8) :: err_L2_mpi
 
-        coeff = -1
+    coeff = -1
 
-        call SET_PETSC_VECTOR(e_L2, local_dof, global_dof)
-        call SET_PETSC_VECTOR(temp, local_dof, global_dof)
-        call SET_PETSC_VECTOR(error, local_dof, global_dof)
+    call SET_PETSC_VECTOR(e_L2, local_dof, global_dof)
+    call SET_PETSC_VECTOR(temp, local_dof, global_dof)
+    call SET_PETSC_VECTOR(error, local_dof, global_dof)
 
-        PetscCall(VecWAXPY(error, coeff, petsc_sol, petsc_uex, mpi_ierr))
+    PetscCall(VecWAXPY(error, coeff, petsc_sol, petsc_uex, mpi_ierr))
 
-        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'error',viewer,mpi_ierr))
-        ! PetscCallA(VecView(error,viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-        
-        PetscCall(MatMult(mass, error, temp, mpi_ierr))
+    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'error',viewer,mpi_ierr))
+    ! PetscCallA(VecView(error,viewer,mpi_ierr))
+    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
-        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'temp',viewer,mpi_ierr))
-        ! PetscCallA(VecView(temp,viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+    PetscCall(MatMult(mass, error, temp, mpi_ierr))
 
-        PetscCall(VecPointwiseMult(e_L2, error, temp, mpi_ierr))
-        PetscCallA(VecGetArrayF90(e_L2, error_L2_pointer, mpi_ierr))
-        error_L2(1:local_dof) = error_L2_pointer
-        err_L2_mpi = sum(error_L2)
+    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'temp',viewer,mpi_ierr))
+    ! PetscCallA(VecView(temp,viewer,mpi_ierr))
+    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
-        ! print *, "errL2 ^2: ", err_L2_mpi
+    PetscCall(VecPointwiseMult(e_L2, error, temp, mpi_ierr))
+    PetscCallA(VecGetArrayReadF90(e_L2, error_L2_pointer, mpi_ierr))
+    error_L2(1:local_dof) = error_L2_pointer
+    PetscCall(VecRestoreArrayReadF90(e_L2, error_L2_pointer,mpi_ierr))
+    err_L2_mpi = sum(error_L2)
 
-    end subroutine COMPUTE_ERROR_L2
+    ! print *, "errL2 ^2: ", err_L2_mpi
 
-    ! Compute DG norm square of the error (u - u_ex)
-    subroutine COMPUTE_ERROR_DG(mat_dg, petsc_sol, petsc_uex, global_dof, err_DG_mpi, local_dof)
+end subroutine COMPUTE_ERROR_L2
 
-        use Poly_setup_mpi, only : mpi_ierr
+!> Compute DG norm square of the error (u - u_ex) per processor
+subroutine COMPUTE_ERROR_DG(mat_dg, petsc_sol, petsc_uex, global_dof, err_DG_mpi, local_dof)
 
-        implicit none
+    use Poly_setup_mpi, only : mpi_ierr
 
-        Mat :: mat_dg
-        Vec :: petsc_sol, petsc_uex, temp, error, e_DG
-        PetscScalar coeff
+    implicit none
 
-        PetscViewer viewer
+    Mat :: mat_dg
+    Vec :: petsc_sol, petsc_uex, temp, error, e_DG
+    PetscScalar coeff
 
-        integer(kind=4) :: global_dof, local_dof
-        real(kind=8), pointer, dimension(:) :: error_DG_pointer
-        real(kind=8), dimension(local_dof) :: error_DG
-        real(kind=8) :: err_DG_mpi
+    !PetscViewer viewer
 
-        coeff = -1
+    integer(kind=4) :: global_dof, local_dof
+    real(kind=8), pointer, dimension(:) :: error_DG_pointer
+    real(kind=8), dimension(local_dof) :: error_DG
+    real(kind=8) :: err_DG_mpi
 
-        call SET_PETSC_VECTOR(e_DG, local_dof, global_dof)
-        call SET_PETSC_VECTOR(temp, local_dof, global_dof)
-        call SET_PETSC_VECTOR(error, local_dof, global_dof)
+    coeff = -1
 
-        PetscCall(VecWAXPY(error, coeff, petsc_sol, petsc_uex, mpi_ierr))
+    call SET_PETSC_VECTOR(e_DG, local_dof, global_dof)
+    call SET_PETSC_VECTOR(temp, local_dof, global_dof)
+    call SET_PETSC_VECTOR(error, local_dof, global_dof)
 
-        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'Error_poly_10',viewer,mpi_ierr))
-        ! PetscCallA(VecView(error,viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
-        
-        PetscCall(MatMult(mat_dg, error, temp, mpi_ierr))
+    PetscCall(VecWAXPY(error, coeff, petsc_sol, petsc_uex, mpi_ierr))
 
-        ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'Temp_poly_10',viewer,mpi_ierr))
-        ! PetscCallA(VecView(temp,viewer,mpi_ierr))
-        ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'Error_poly_10',viewer,mpi_ierr))
+    ! PetscCallA(VecView(error,viewer,mpi_ierr))
+    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
-        PetscCall(VecPointwiseMult(e_DG, error, temp, mpi_ierr))
-        PetscCallA(VecGetArrayF90(e_DG, error_DG_pointer, mpi_ierr))
-        error_DG(1:local_dof) = error_DG_pointer
-        err_DG_mpi = sum(error_DG)
+    PetscCall(MatMult(mat_dg, error, temp, mpi_ierr))
 
-        ! print *, "errDG ^2: ", err_DG_mpi
+    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'Temp_poly_10',viewer,mpi_ierr))
+    ! PetscCallA(VecView(temp,viewer,mpi_ierr))
+    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
-    end subroutine COMPUTE_ERROR_DG
+    PetscCall(VecPointwiseMult(e_DG, error, temp, mpi_ierr))
+    PetscCallA(VecGetArrayReadF90(e_DG, error_DG_pointer, mpi_ierr))
+    error_DG(1:local_dof) = error_DG_pointer
+    PetscCall(VecRestoreArrayReadF90(e_DG, error_DG_pointer,mpi_ierr))
+    err_DG_mpi = sum(error_DG)
 
-    ! Compute the maximum value of the diameter of the elements of the mesh
-    function compute_hmax(PolyMesh) result(hmax)
+    ! print *, "errDG ^2: ", err_DG_mpi
 
-        type(Mesh_Structure), intent(in) :: PolyMesh
-        real(kind=8) :: hmax
-        integer(kind=4) :: ipoly_loc
-        real(kind=8) :: h
+end subroutine COMPUTE_ERROR_DG
 
-        hmax = PolyMesh%Poly(1)%hk
-        
-        do ipoly_loc=2,PolyMesh%num_poly_loc
+!> Compute the maximum value of the diameter of the elements of the mesh per processor
+function compute_hmax(PolyMesh) result(hmax)
 
-            h = PolyMesh%Poly(ipoly_loc)%hk
+    type(Mesh_Structure), intent(in) :: PolyMesh
+    real(kind=8) :: hmax
+    integer(kind=4) :: ipoly_loc
+    real(kind=8) :: h
 
-            if(h > hmax) hmax = h
+    hmax = PolyMesh%Poly(1)%hk
 
-        enddo
+    do ipoly_loc=2,PolyMesh%num_poly_loc
 
-    end function compute_hmax
+        h = PolyMesh%Poly(ipoly_loc)%hk
+
+        if(h > hmax) hmax = h
+
+    enddo
+
+end function compute_hmax
 
 end module post_processing
