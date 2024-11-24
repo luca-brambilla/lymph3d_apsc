@@ -498,6 +498,183 @@ subroutine VTU_WRITE_SOLUTION(filename, xx, yy, zz, nnode_per_el, n_elem, n_elem
 
 end subroutine VTU_WRITE_SOLUTION
 
+
+subroutine ENSIGHT_WRITE_SOLUTION(base_filename,xx, yy, zz, nnode_per_el, n_elem, u_name, u, start_node, start_elem, num_dt)
+
+    use mpi
+    use Poly_setup_MPI
+
+    implicit none
+
+    ! Input arguments
+    integer*4, intent(in) :: nnode_per_el             !< Number of nodes per element
+    integer*4, intent(in) :: n_elem                   !< Number of elements in this part
+    real(8), intent(in) :: xx(4, n_elem)            !< x coordinates of 4 vertices of tetrahedra
+    real(8), intent(in) :: yy(4, n_elem)            !< y coordinates of 4 vertices of tetrahedra
+    real(8), intent(in) :: zz(4, n_elem)            !< z coordinates of 4 vertices of tetrahedra
+    character(len=*), intent(in), optional :: u_name !< Solution name (e.g., "Velocity")
+    real(8), intent(in), optional :: u(3, 4, n_elem) !< Solution values (3D vectors per node)
+    integer*4, intent(in) :: start_node                  !< starting node for the part
+    integer*4, intent(in) :: start_elem
+    integer*4, intent(in) :: num_dt                            !< number of timestep
+    character(len=*), intent(in) :: base_filename
+
+    ! Internal variables
+    integer*4 :: i, j, k
+    integer*4 :: geo_unit, sol_unit
+    character(len=256) :: geo_filename, sol_filename
+    integer*4 :: node_counter, global_node_number
+
+    ! Generate filenames for this part
+    write(geo_filename, '(A, "geo_part", I0, ".geo")') trim(base_filename), mpi_id
+    write(sol_filename, '(A, "sol_", I0, "_part", I0, ".vec")') trim(base_filename), num_dt, mpi_id
+
+    ! **********************
+    ! Write Geometry File
+    ! **********************
+    write(*,'(A)') trim(geo_filename)
+    open(newunit=geo_unit, file=geo_filename, action='WRITE', status='REPLACE', form='FORMATTED')
+
+    ! EnSight header
+    write(geo_unit, '(A)') 'Ensight Gold'
+    write(geo_unit, '(A)') 'Unstructured mesh part'
+    write(geo_unit, '(A)') 'node id assign'
+    write(geo_unit, '(A)') 'element id assign'
+
+    ! Write part header
+    write(geo_unit, '(A)') 'part'
+    write(geo_unit, '(I10)') mpi_id
+    write(geo_unit, '(A)') 'Mesh from part '//trim(geo_filename)
+
+    ! Write coordinates
+    write(geo_unit, '(A)') 'coordinates'
+    write(geo_unit, '(I10)') n_elem * nnode_per_el
+    ! numbering first
+    node_counter = 0
+    do i = 1, n_elem
+        do j = 1, nnode_per_el
+            global_node_number = start_node + node_counter
+            ! write(geo_unit, '(I10, 3F16.8)') global_node_number, xx(j, i), yy(j, i), zz(j, i)
+            write(geo_unit, '(I10)') global_node_number
+            node_counter = node_counter + 1
+        end do
+    end do
+    ! x coordinates, then y then z
+    do i = 1, n_elem
+      do j = 1, nnode_per_el
+          write(geo_unit, '(F16.8)') xx(j, i)
+      end do
+    end do
+    do i = 1, n_elem
+      do j = 1, nnode_per_el
+          write(geo_unit, '(F16.8)') yy(j, i)
+          node_counter = node_counter + 1
+      end do
+    end do
+    do i = 1, n_elem
+      do j = 1, nnode_per_el
+          write(geo_unit, '(F16.8)') zz(j, i)
+      end do
+    end do
+
+    ! Write elements
+    write(geo_unit, '(A)') 'tetra4' ! Use tetrahedral representation
+    write(geo_unit, '(I10)') n_elem
+    do i = 0, n_elem-1
+      write(geo_unit, '(I10)') (start_elem+i)
+    end do
+    do i = 1, n_elem
+        write(geo_unit, '(4I10)') (start_node + (i - 1) * 4 + j - 1, j = 1, 4)
+    end do
+
+    close(geo_unit)
+
+    ! **********************
+    ! Write Solution File
+    ! **********************
+    write(*,'(A)') trim(sol_filename)
+    if (present(u_name) .and. present(u)) then
+        open(newunit=sol_unit, file=sol_filename, action='WRITE', status='REPLACE', form='FORMATTED')
+
+        ! Write solution header
+        write(sol_unit, '(A)') 'vector per node'
+        write(sol_unit, '(A)') 'part'
+        write(sol_unit, '(I10)') mpi_id
+
+        ! Write solution values
+        node_counter = 0
+        do i = 1, n_elem
+            do j = 1, 4
+                global_node_number = start_node + node_counter
+                write(sol_unit, '(I10, 3F16.8)') global_node_number, u(1, j, i), u(2, j, i), u(3, j, i)
+                node_counter = node_counter + 1
+            end do
+        end do
+
+        close(sol_unit)
+    end if
+end subroutine ENSIGHT_WRITE_SOLUTION
+
+subroutine WRITE_ENSIGHT_CASE(base_filename, num_dt, solution_name)
+
+    use mpi
+    use Poly_setup_MPI
+
+    implicit none
+
+    ! Input arguments
+    character(len=*), intent(in) :: base_filename  !< Base filename (without extension)
+    integer*4, intent(in) :: num_dt
+    character(len=*), intent(in), optional :: solution_name !< Solution variable name
+
+    ! Internal variables
+    integer*4 :: i
+    character(len=256) :: case_filename, tmp_name
+    integer*4 :: case_file_unit, iostat
+
+    write(*,'(A)') 'ensight case'
+    ! Generate case filename
+    write(case_filename, '(A, "_", I0,".case")') trim(base_filename), num_dt
+
+    open(newunit=case_file_unit, file=case_filename, action='WRITE', status='REPLACE', form='FORMATTED', iostat=iostat)
+
+    if (iostat /= 0) then
+        write(*,*) 'Error opening/writing file for process:', mpi_id
+        stop
+    end if
+
+    write(case_file_unit, '(A)') 'FORMAT'
+    write(case_file_unit, '(A)') 'type: ensight gold'
+
+    ! Write geometry section
+    write(case_file_unit, '(A)') 'GEOMETRY'
+    do i = 0, mpi_np-1
+        write(case_file_unit, '(A, "geo_part", I0, ".geo")') 'model: ', i
+    end do
+
+    ! Write solution section if needed
+    if (present(solution_name)) then
+        write(case_file_unit, '(A)') 'VARIABLE'
+        ! write(case_file_unit, '(A, A)', advance='NO') 'vector per node: ', trim(solution_name)
+        ! do i = 0, mpi_np-2
+        !     write(tmp_name, '(" sol_", I0, "_part", I0, ".vec")') num_dt,  i
+        !     write(case_file_unit, '(A)', advance='NO') trim(tmp_name)
+        ! end do
+        ! i=mpi_np-1
+        ! write(tmp_name, '(" sol_", I0, "_part", I0, ".vec")') num_dt,  i
+        ! write(case_file_unit, '(A)') trim(tmp_name)
+        ! write(case_file_unit, '(A, A)') 'vector per node: ', trim(solution_name)
+        write(case_file_unit, '(A)') 'vector per node:'
+        do i = 0, mpi_np-1
+            write(tmp_name, '(A, " sol_", I0, "_part", I0, ".vec")') trim(solution_name), num_dt,  i
+            write(case_file_unit, '(A)') trim(tmp_name)
+        end do
+    end if
+
+    close(case_file_unit)
+end subroutine WRITE_ENSIGHT_CASE
+
+
     subroutine VTK_WRITE_MESH_PARTITION(filename, xx, yy, zz, nnode_per_el, n_elem, PolyMesh)
 
       implicit none
@@ -745,7 +922,8 @@ end subroutine VTU_WRITE_SOLUTION
         logical, intent(in) :: IsPoly
         real(kind=8), dimension(4,n_elem) :: xx, yy, zz
         character(len=80) :: vtk_filename_num!, vtk_filename_exact
-        integer(kind=4) :: ie_loc,ivert,id_node
+        integer(kind=4) :: ie_loc,ivert,id_node,i
+        integer(kind=4) :: start_node(mpi_np), start_elem(mpi_np)
 
         do ie_loc = 1,n_elem
 
@@ -822,6 +1000,32 @@ end subroutine VTU_WRITE_SOLUTION
 
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
         call VTU_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, 4, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh, num_dt)
+
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        start_node(1) = 1
+        start_elem(1) = 1
+        ! only in parallel
+        if(mpi_np > 1) then
+            call MPI_AllGather(PolyMesh%num_elem_loc, 1, MPI_INTEGER, start_elem, 1, &
+            MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            ! mpi process from 0
+            do i = mpi_np,2,-1
+              start_elem(i) = start_elem(i-1)
+            enddo
+            start_elem(1) = 1
+            do i = 2,mpi_np
+                start_node(i) = start_node(i-1) + 4*start_elem(i)
+            enddo
+            do i = 2,mpi_np
+                start_elem(i) = start_elem(i-1) + start_elem(i)
+            enddo
+        endif
+        write(*,'(A)') 'write ensight'
+        write(*,*) 'process ', mpi_id, ' elem loc ', PolyMesh%num_elem_loc, ' start node ', start_node(mpi_id+1)
+        call ENSIGHT_WRITE_SOLUTION('MONITORS/',xx,yy,zz, 4, n_elem, 'DISPLACEMENT', u, start_node(mpi_id+1), start_elem(mpi_id+1), num_dt)
+
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        if (mpi_id == 0) call WRITE_ENSIGHT_CASE('MONITORS/solution', num_dt, 'DISPLACEMENT')
 
     end subroutine WRITE_SOLUTION_VTK
 
