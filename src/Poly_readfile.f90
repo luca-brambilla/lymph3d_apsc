@@ -334,6 +334,8 @@ end subroutine READ_HEADER
      use Poly_exit_codes, only: EXIT_FUNCTION_ERROR
      use Poly_global, only: damping_type
 
+     use global_parameters
+
      implicit none
 
      character(len=50)     :: filemate, fileinput
@@ -693,7 +695,7 @@ end subroutine READ_HEADER
              if(PolyData%QS(im) == 0.d0) then
                 PolyData%prop_mat(im,4) = 0.d0;
              else
-                PolyData%prop_mat(im,4) = pi*(PolyData%fmax)/PolyData%QS(im)
+                PolyData%prop_mat(im,4) = PI*(PolyData%fmax)/PolyData%QS(im)
              endif
          enddo
       else

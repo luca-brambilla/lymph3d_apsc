@@ -4,18 +4,19 @@
 !> (penalization coefficient, IP method, reaction coefficient).
 module problem_data_and_properties
 
+    use global_parameters
+
     implicit none
 
     contains
 
     !> @brief time function to be multiplied to space function to have h(x,t)=f(x)*g(t)
     function time_function(time)result(r)
-        
+
         implicit none
         real(kind=8) :: r
         real(kind=8) :: time
 
-        real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2 = sqrt(2.)
 
         r = sin(SQRT2*PI*time)
 
@@ -30,7 +31,6 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: p
         real(kind=8) :: alpha, theta, c
         real(kind=8) :: lambda, mu
-        real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
 
         call set_properties(alpha, theta, c)
 
@@ -53,45 +53,43 @@ module problem_data_and_properties
 
         real(kind=8), dimension(3) :: r !> result vector
         real(kind=8), dimension(3) :: p !> physical coordinates vector
-        real(kind=8) :: alpha, theta, c !> 
-        real(kind=8) :: lambda, mu      !> elastic parameters 
-        real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
+        real(kind=8) :: alpha, theta, c !>
+        real(kind=8) :: lambda, mu      !> elastic parameters
 
         call set_properties(alpha, theta, c)
 
         ! r(1) = 0
         ! r(2) = 0
         ! r(3) = - 9.8 * 2400
-        
+
         r(1) = (-2.0*rho + 3.0*(lambda+2.0*mu))*PI**2 * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
         r(2) = (-2.0*rho + 3.0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
         r(3) = (-2.0*rho + 3.0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
 
     end function f_time
-       
+
     !> @brief Dirichlet boundary data
     function gd(p,space_fun_tag)result(r)
-    
+
         integer(kind=4) :: space_fun_tag
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
 
         ! r = 0.0
 
         if(space_fun_tag==1) then
-            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
             r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
         if(space_fun_tag==2) then
-            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
             r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
         if(space_fun_tag==3) then
-            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
             r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
@@ -100,28 +98,27 @@ module problem_data_and_properties
 
     !> @brief Dirichlet boundary data depending on time
     function gd_time(p,space_fun_tag,time)result(r)
-    
+
         real(kind=8) :: time
 
         integer(kind=4) :: space_fun_tag
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2 = sqrt(2.)
 
         ! r = 0.0
 
         if(space_fun_tag==1) then
-            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
             r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
         if(space_fun_tag==2) then
-            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
             r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
         if(space_fun_tag==3) then
-            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
             r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
         endif
@@ -130,7 +127,7 @@ module problem_data_and_properties
 
     !> @brief Surface traction data
     function gn(lambda,mu,normal,p,space_fun_tag)result(r)
-    
+
         implicit none
 
         integer(kind=4) :: space_fun_tag
@@ -138,7 +135,6 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: p, normal
         real(kind=8), dimension(3,3) :: stress_tensor
         real(kind=8) :: lambda, mu
-        real(kind=8), parameter :: PI = 4.d0*datan(1.d0) 
         integer(kind=4) :: i, j
 
         ! r(1) = 0
@@ -187,30 +183,28 @@ module problem_data_and_properties
         enddo
 
     end function gn
-    
+
     !> @brief Analytical solution
     function uex(p)result(r)
 
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
-        
-        r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+
+        r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
         r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
         r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
     end function uex
-    
+
     !> @brief Analytical solution depenting on time
     function uex_time(p, time)result(r)
-        
+
         real(kind=8) :: time
 
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2 = sqrt(2.)
 
-        r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3)) 
+        r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
         r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
         r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
@@ -218,7 +212,7 @@ module problem_data_and_properties
 
     !> @brief Initial condition for displacement
     function ic_displacement(p)result(r)
-        
+
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
 
@@ -230,10 +224,9 @@ module problem_data_and_properties
 
     !> @brief Initial condition for velocity
     function ic_velocity(p)result(r)
-        
+
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
-        real(kind=8), parameter :: PI = 4.d0*datan(1.d0), SQRT2 = sqrt(2.)
 
         r(1) = SQRT2*PI * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
         r(2) = SQRT2*PI * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
@@ -247,11 +240,11 @@ module problem_data_and_properties
         implicit none
 
         real(kind=8) :: alpha, theta, c
-        
+
         alpha = 10 ! penalty coefficient (which appears in the definition of the penalization function)
         theta = - 1 ! IP method (theta = -1 ---> SIP, theta = 0 ---> IIP, theta = 1 ---> NIP)
         c = 0 ! coefficient of the reaction term
-        
+
     end subroutine set_properties
-    
+
 end module problem_data_and_properties

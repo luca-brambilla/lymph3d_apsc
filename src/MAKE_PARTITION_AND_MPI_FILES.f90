@@ -1471,7 +1471,7 @@ end subroutine CREATE_NORMAL_FACE
 
       implicit none
 
-      integer(kind=4) :: ipoly,ipoly_loc,ipoly_glob, ivert, id_node
+      integer(kind=4) :: ipoly_loc,ipoly_glob, ivert, id_node
       integer (kind=4) :: t,l,ie,ie_loc,ie_glob
       integer(kind=4) :: num_tet_in_poly,num_vert_poly
       real(kind=8) :: dist
@@ -1873,20 +1873,20 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
    character(len=70), intent(in) :: mpifile
    character(len=70) :: mpi_file_tri
    integer(kind=4), intent(in)  :: mpi_np, mpi_id
-   integer(kind=4) :: status(MPI_STATUS_SIZE)
-   integer(kind=4) :: unit_mpi, num_elem_list, num_tria_loc, i, j,Row,Row2, &
+   !integer(kind=4) :: status(MPI_STATUS_SIZE)
+   integer(kind=4) :: unit_mpi, num_elem_list, num_tria_loc, i, j,Row2, &
                         num_tria_send, ie, iface, mat, ie_ne, iface_ne, mat_ne, &
                         ie_loc, ipoly_glob,ipoly2_glob,ipoly_loc,ipoly2_loc,ie_ne_loc, ip, &
-                        num_tria_send_mpi, kiter,kiter2, num_tria_send_loc,face_glob,&
+                        num_tria_send_mpi, kiter,kiter2, num_tria_send_loc,&
                         iface_poly,num_tet_in_poly
-   integer (kind=4), dimension(:), allocatable :: faces_found_loc,faces_to_find_send
-   integer (kind=4) :: num_faces_send_mpi,iter_face,iter_face_2
+   !integer (kind=4), dimension(:), allocatable :: faces_found_loc,faces_to_find_send
+   !integer (kind=4) :: num_faces_send_mpi,iter_face,iter_face_2
 
    integer(kind=4), dimension(:,:), allocatable :: con_tria_loc, con_tria_recv_mpi
    integer(kind=4), dimension(:),   allocatable :: con_tria_send, &
                                                    con_tria_send_mpi
-   integer(kind=4), dimension(:), allocatable :: faces_to_find_send_mpi
-   integer(kind=4), dimension(1) :: one = 1
+   !integer(kind=4), dimension(:), allocatable :: faces_to_find_send_mpi
+   !integer(kind=4), dimension(1) :: one = 1
 
    real(kind=8), dimension(:,:), allocatable :: xx_loc
    real(kind=8), dimension(:,:), allocatable :: yy_loc
@@ -1898,9 +1898,9 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
    real(kind=8), dimension(:), allocatable :: x1_send_mpi,x2_send_mpi
    real(kind=8), dimension(:), allocatable :: y1_send_mpi,y2_send_mpi
    real(kind=8), dimension(:), allocatable :: z1_send_mpi,z2_send_mpi
-   real(kind=8), dimension(:,:), allocatable :: xx_recv_mpi,yy_recv_mpi,zz_recv_mpi
+   !real(kind=8), dimension(:,:), allocatable :: xx_recv_mpi,yy_recv_mpi,zz_recv_mpi
 
-   integer(kind=4), dimension(:), allocatable :: index_loc,index_send,index_send_mpi
+   integer(kind=4), dimension(:), allocatable :: index_send,index_send_mpi
    integer(kind=4) :: num_poly_send,num_poly_send_loc,num_poly_send_mpi,num_index_send_mpi,num_hk_send_mpi
    integer(kind=4) :: space_fun_tag
 
@@ -2663,8 +2663,8 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
 
    character(len=70), intent(in) :: mpi_file    !< folder_mpi where to store files
    character(len=70) :: mpi_file_mesh = 'mesh_000000.mpi'
-   character(len=70) :: mat_file_mesh = 'matf0000000.m'
-   character(len=70) :: mat_file_mesh_1
+   !character(len=70) :: mat_file_mesh = 'matf0000000.m'
+   !character(len=70) :: mat_file_mesh_1
    character(len=70) :: mpi_file_interface = 'interface_000000.mpi'
 
    integer(kind=4), intent(in)  :: mpi_id

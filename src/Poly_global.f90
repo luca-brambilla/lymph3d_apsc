@@ -96,11 +96,6 @@ module Poly_global
     !>  logical variable to save outputs
     logical :: IsSave_output
 
-    !parameters
-    !> parameter for @f$ \pi @f$
-    real(kind=8), parameter :: PI = 4.d0*datan(1.d0)
-    !> parameter for @f$ \sqrt{2} @f$
-    real(kind=8), parameter :: SQRT2=sqrt(2.0)
 
 end module Poly_global
 

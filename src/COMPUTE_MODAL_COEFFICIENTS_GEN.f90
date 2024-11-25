@@ -1,5 +1,5 @@
 subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff, f_analytic)
-     
+
 #include<petsc/finclude/petscksp.h>
 
     use petscksp
@@ -10,13 +10,15 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
     use Poly_ref_mappings
     use local_search
     use SET_PETSC_SYSTEM
-        
+    use global_parameters
+
     implicit none
-    
+
     !! PASS FUNCTION AS ARGUMENT
     interface
         function f_analytic(point) result(res)
-            real(kind=8), dimension(3) :: point, res
+            use global_parameters, only: DIM
+            real(kind=8), dimension(DIM) :: point, res
         end function f_analytic
     end interface
 
@@ -36,12 +38,12 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
     real(kind=8), dimension(3,3) :: Jinv
     real(kind=8), dimension(:,:), allocatable :: nod2, nod3, nodtet3
     real(kind=8), dimension(:), allocatable :: wei2, wei3, weitet3
-    real(kind=8), dimension(3) :: points
+    real(kind=8), dimension(DIM) :: points
     real(kind=8), dimension(:,:), allocatable :: phi
     real(kind=8), dimension(:,:,:), allocatable :: dphi
     real(kind=8), dimension(:,:), allocatable :: modal_coeff
     integer(kind=4) :: petsc_num(global_dof)
-    real(kind=8), dimension(3) :: eval
+    real(kind=8), dimension(DIM) :: eval
 
     integer(kind=4) :: q, ii, jj
 
@@ -59,7 +61,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
 
     allocate(nodtet3(4,nq3))
     allocate(weitet3(nq3))
-    
+
     ! Maps to the reference tetrahedron (see Poly_ref_mappings.f90)
     call mapping_quadrature_3D(nod3, wei3, nq3, nodtet3, weitet3)
 
@@ -78,20 +80,20 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
 
         ! computation of the coordinates of the tetrahedron
         do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
-            
+
             ! see MAKE_PARTITION_AND_MPI_FILES.f90
             call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                    PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)      
-                
+                                    PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)
+
             x(ivert)=PolyMesh%coord_x(id_node)
             y(ivert)=PolyMesh%coord_y(id_node)
             z(ivert)=PolyMesh%coord_z(id_node)
 
         enddo
-        
+
         ! computation of the reference map Fk, the inverse Jinv and the determinant Jdet of its jacobian (see Poly_ref_mappings.f90)
-        call jacobians(x, y, z, Fk, Jinv, Jdet) 
-            
+        call jacobians(x, y, z, Fk, Jinv, Jdet)
+
         ! find the polyhedron ipoly_glob that contains the tetrahedron ie_loc
         ie_glob = PolyMesh%elem_loc2glo(ie_loc)
         ipoly_glob = PolyMesh%elem_in_poly(ie_glob)
@@ -109,26 +111,26 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
         do q = 1,nq3
             do m=1,Np
 
-                do ii=1,3
+                do ii=1,DIM
                     points(ii)=0.0
                     do jj=1,4
                         points(ii)=points(ii)+Fk(ii,jj)*nodtet3(jj,q)
                     enddo
                 enddo
-                
+
                 eval = f_analytic(points)
 
-                do i=1,3
+                do i=1,DIM
                     modal_coeff(i,m) = modal_coeff(i,m) + abs(Jdet)*weitet3(q)*eval(i)*phi(m,q)
                 enddo
-                
+
             end do
         end do
 
         ! this allows to assemble the local matrix correctly into the global vector
         beg = (ipoly_glob-1)*Np + 1
 
-        do i=1,3
+        do i=1,DIM
             do m=1,Np
 
             val(1) = modal_coeff(i,m)
@@ -140,7 +142,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
 
             enddo
         enddo
-        
+
     enddo
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -152,7 +154,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
 
     deallocate(phi)
     deallocate(dphi)
-    
+
     deallocate(nodtet3)
     deallocate(weitet3)
 
