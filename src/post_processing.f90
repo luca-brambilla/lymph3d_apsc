@@ -12,6 +12,8 @@ module post_processing
     use MOD_VTK
     use SET_PETSC_SYSTEM
 
+    use global_parameters
+
     implicit none
 
     contains
@@ -31,7 +33,7 @@ subroutine PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, di
     Np = PolyMesh%Elem_loc(1)%NDof_loc
 
     ! Allocate solution for post-processing
-    allocate(u(Np, 3*PolyMesh%num_poly))
+    allocate(u(Np, DIM * PolyMesh%num_poly))
 
     ! STORE LOCAL NUMERATION TO RECONSTRUCT THE SOLUTION
     allocate(nnod_num(local_dof))
@@ -49,7 +51,7 @@ subroutine PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, di
         do i = 2, mpi_np
                 displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
         end do
-
+        print *, 'displacements', displacements
     endif
 
 end subroutine PREPROCESS_SOLUTION
@@ -95,7 +97,7 @@ subroutine POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, u, 
 
     ! RECONSTRUCT SOLUTION MATRIX FOR POST-PROCESSING
     ! allocate(u(Np, 3*PolyMesh%num_poly))
-    u = RESHAPE(u_glo, (/Np, 3*PolyMesh%num_poly /))
+    u = RESHAPE(u_glo, (/Np, DIM * PolyMesh%num_poly /))
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
     deallocate(u_glo)
@@ -129,7 +131,7 @@ end subroutine POST_PROCESS
 !     ! SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
 !     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-!     allocate(u_glo(PolyMesh%num_elem,3*Np))
+!     allocate(u_glo(PolyMesh%num_elem,DIM*Np))
 
 !     !! send and receive matrices NOT VECTORS?
 
@@ -160,8 +162,8 @@ end subroutine POST_PROCESS
 !     endif
 
 !     ! RECONSTRUCT SOLUTION MATRIX FOR POST-PROCESSING
-!     allocate(u(Np, 3*PolyMesh%num_poly))
-!     u = RESHAPE(u_glo, (/Np, 3*PolyMesh%num_poly /))
+!     allocate(u(Np, DIM*PolyMesh%num_poly))
+!     u = RESHAPE(u_glo, (/Np, DIM*PolyMesh%num_poly /))
 !     deallocate(u_glo)
 
 !     ! print *,'Done with the solution'
@@ -210,7 +212,7 @@ end subroutine POST_PROCESS
 
         u_nod_vet = 0.0
 
-        do k=1,3
+        do k=1,DIM
 
             ! Computing nodal values of the solution (on each element)
             do ie_loc = 1,PolyMesh%num_elem_loc
