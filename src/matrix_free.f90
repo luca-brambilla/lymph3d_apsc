@@ -15,6 +15,8 @@ module matrix_free
     use Poly_mesh
     use vet_mat_operations
 
+    use global_parameters
+
     implicit none
 
     ! for stiffness matrix that has different sizes depending on neighbors
@@ -39,10 +41,12 @@ module matrix_free
         Vec :: values_z
     end type PetscRowVec
 
+    !> typedef for PETSc Matrix - to construct arrays of matrices
     type :: PetscMatStruct
         Mat :: data
     end type
 
+    !> typedef for PETSc Vector - to construct arrays of vectors
     type :: PetscVecStruct
         Vec :: data
     end type
@@ -50,16 +54,18 @@ module matrix_free
     contains
 
 
+!> set up 2D array of PETSc matrices
 subroutine SET_PETSC_MASS_MATRIX_FREE(ne_loc, Np, M)
 
     integer(kind=4), intent(in) :: ne_loc   !< number of rows
     integer(kind=4), intent(in) :: Np       !< PETSc square matrix size
-    type(PetscMatStruct), dimension(ne_loc,3), intent(out) :: M
+    !> 2D array, store each block of the diagonal in a 1D array for each element
+    type(PetscMatStruct), dimension(ne_loc,DIM), intent(out) :: M
 
     integer(kind=4) :: ie_loc, i
 
     do ie_loc=1,ne_loc
-        do i=1,3
+        do i=1,DIM
             PetscCall(MatCreate(PETSC_COMM_SELF, M(ie_loc,i)%data, mpi_ierr))
             PetscCall(MatSetSizes(M(ie_loc,i)%data, Np, Np, Np, Np, mpi_ierr))
             PetscCall(MatSetFromOptions(M(ie_loc,i)%data, mpi_ierr))
@@ -68,6 +74,7 @@ subroutine SET_PETSC_MASS_MATRIX_FREE(ne_loc, Np, M)
 
 end subroutine SET_PETSC_MASS_MATRIX_FREE
 
+!> set up array of PETSc vector
 subroutine SET_PETSC_VECTOR_MATRIX_FREE(ne_loc, Np, V)
 
     integer(kind=4), intent(in) :: ne_loc   !< number of rows
@@ -97,12 +104,13 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
 
     implicit none
 
-    type(Mesh_Structure), intent(inout) :: PolyMesh
-    type(Data_Structure), intent(in) :: PolyData
-    integer(kind=4), intent(in) :: Np, global_dof
+    type(Mesh_Structure), intent(inout) :: PolyMesh !< Mesh
+    type(Data_Structure), intent(in) :: PolyData    !< Data
+    integer(kind=4), intent(in) :: Np               !< number of degrees of freedom of each element
+    integer(kind=4), intent(in) :: global_dof       !< Number of global dofs
 
-    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc,3), intent(out) :: massa
-    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc,3), intent(out) :: massa_modale
+    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(out) :: massa
+    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(out) :: massa_modale
     PetscScalar :: val(1)
     PetscInt :: irow(1), jcol(1)
 
@@ -144,7 +152,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
 
     integer(kind=4) :: e, E1, E2, sides
     integer(kind=4), dimension(4) :: face_flag
-    real(kind=8), dimension(3) :: nn
+    real(kind=8), dimension(DIM) :: nn
     integer(kind=4) :: space_fun_tag
     !integer(kind=4) :: n_neigh      !< number of neighbor internal faces
     integer(kind=4) :: neigh_count  !< counter for inserting contributions in K_loc
@@ -152,24 +160,24 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     ! integer(kind=4), intent(out) :: internal_neigh(PolyMesh%num_elem_loc,:) !< internal neighbors connectivity - similar to el_neigh from PolyMesh
     integer(kind=4), intent(out) :: max_faces !< maximum number of polygon faces
 
-    real(kind=8), dimension(3,Np) :: rhs_tet_loc
-    real(kind=8), dimension(3,Np) :: rhs_face_bd_loc
-    real(kind=8), dimension(3,3,Np,Np) :: V_loc
-    real(kind=8), dimension(3,3,Np,Np) :: S_loc, I_loc, IN_loc, SN_loc
+    real(kind=8), dimension(DIM, Np) :: rhs_tet_loc
+    real(kind=8), dimension(DIM, Np) :: rhs_face_bd_loc
+    real(kind=8), dimension(DIM, DIM, Np, Np) :: V_loc
+    real(kind=8), dimension(DIM, DIM, Np, Np) :: S_loc, I_loc, IN_loc, SN_loc
 
     ! each local has a matrix
     ! local square
-    real(kind=8), dimension(PolyMesh%num_elem_loc,3,3,Np,Np), intent(out) :: M_loc
-    real(kind=8), dimension(3,3,Np,Np) :: mass_loc
-    real(kind=8), dimension(PolyMesh%num_elem_loc,3,3,Np,Np), intent(out) :: M_modal_loc
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM, DIM, Np, Np), intent(out) :: M_loc
+    real(kind=8), dimension(DIM, DIM, Np, Np) :: mass_loc
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM, DIM, Np, Np), intent(out) :: M_modal_loc
     ! real(kind=8), dimension(:,PolyMesh%num_elem_loc,3,3,Np,Np), allocatable, intent(out) :: K_loc
 
     ! local rectangular
     real(kind=8), dimension(:,:,:,:), allocatable, intent(out) :: K_loc
     real(kind=8), dimension(:,:,:,:), allocatable, intent(out) :: A_dg_loc
     ! local vector
-    real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np) :: rhs_loc_tmp
-    real(kind=8), dimension(PolyMesh%num_elem_loc,3*Np), intent(out) :: rhs_loc
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM, Np) :: rhs_loc_tmp
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(out) :: rhs_loc
 
     integer(kind=4) :: row, col
 
@@ -237,8 +245,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     ! internal_neigh = 0
 
     !! WASTE OF MEMORY...
-    allocate(K_loc(PolyMesh%num_elem_loc,max_faces,3*Np,3*Np))
-    allocate(A_dg_loc(PolyMesh%num_elem_loc,max_faces,3*Np,3*Np))
+    allocate(K_loc(PolyMesh%num_elem_loc, max_faces, DIM*Np, DIM*Np))
+    allocate(A_dg_loc(PolyMesh%num_elem_loc, max_faces, DIM*Np, DIM*Np))
     K_loc = 0.0
     A_dg_loc = 0.0
 
@@ -322,7 +330,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
 
         ! PETSc populate matrix
         ! insert the values of M_loc in the 3 blocks of the mass matrix
-        do i=1,3
+        do i=1,DIM
             do m=1,Np
                 do n=1,Np
 
@@ -345,7 +353,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
         ! call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
         call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_loc_tmp(ie_loc,:,:), rho*present)
         ! copy to output in correct format
-        do i=1,3
+        do i=1,DIM
             row = (i-1)*Np+1
             rhs_loc(ie_loc, row:row+Np) = rhs_loc_tmp(ie_loc,i,:)
         enddo
@@ -459,7 +467,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
                 ! if e is a boundary edge, then insert the values of rhs_face_bd_loc
                 ! in the entries of the rhs vector
                 if (E2 == -1 .or. E2 == -2) then
-                    do i=1,3
+                    do i=1,DIM
                         do m=1,Np
                             row = (i-1)*Np+1 + m
                             tmp = rhs_face_bd_loc(i,m)
@@ -478,8 +486,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
             if(E2 /= -2) then
 
                 ! Add E+ contribution (S_loc and I_loc) to stiffness and DG
-                do i=1,3
-                    do j=1,3
+                do i=1,DIM
+                    do j=1,DIM
                         do m=1,Np
                             row = (i-1)*Np+1 + m
                             do n=1,Np
@@ -494,8 +502,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
                 ! Add neighbor face contribution E- (SN_loc to stiffness and DG - IN_loc to stiffness)
                 ! leave matrix K_loc portion 0.0 if not Dirichlet
                 if (E2 /= -1) then
-                    do i=1,3
-                        do j=1,3
+                    do i=1,DIM
+                        do j=1,DIM
                             do m=1,Np
                                 row = (i-1)*Np+1 + m
                                 do n=1,Np
@@ -548,7 +556,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     ! PASS FUNCTION AS ARGUMENT
     interface
         function f_analytic(point) result(res)
-            real(kind=8), dimension(3) :: point, res
+            real(kind=8), dimension(DIM) :: point, res
         end function f_analytic
     end interface
 
@@ -578,12 +586,12 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     real(kind=8), dimension(3,3) :: Jinv
     real(kind=8), dimension(:,:), allocatable :: nod2, nod3, nodtet3
     real(kind=8), dimension(:), allocatable :: wei2, wei3, weitet3
-    real(kind=8), dimension(3) :: points
+    real(kind=8), dimension(DIM) :: points
     real(kind=8), dimension(:,:), allocatable :: phi
     real(kind=8), dimension(:,:,:), allocatable :: dphi
     real(kind=8), dimension(:,:), allocatable, intent(out) :: modal_coeff
     real(kind=8), dimension(:,:,:), allocatable :: uex_integral
-    real(kind=8), dimension(3) :: eval
+    real(kind=8), dimension(DIM) :: eval
 
     integer(kind=4) :: q, ii, jj
     integer(kind=4) :: j,n,k
@@ -634,8 +642,8 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     call SOLVER_SETTINGS(petsc_m_tmp,ksp,pc)
 
     ! solution initializations
-    allocate(uex_integral(PolyMesh%num_elem_loc,3,Np))
-    allocate(modal_coeff(PolyMesh%num_elem_loc,3*Np))
+    allocate(uex_integral(PolyMesh%num_poly_loc, DIM, Np))
+    allocate(modal_coeff(PolyMesh%num_poly_loc, DIM*Np))
     uex_integral = 0.0
     modal_coeff = 0.0
 
@@ -675,7 +683,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
         do q = 1,nq3
             do m=1,Np
 
-                do ii=1,3
+                do ii=1,DIM
                     points(ii)=0.0
                     do jj=1,4
                         points(ii)=points(ii)+Fk(ii,jj)*nodtet3(jj,q)
@@ -684,7 +692,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
                 eval = f_analytic(points)
 
-                do i=1,3
+                do i=1,DIM
                     uex_integral(ie_loc,i,m) = uex_integral(ie_loc,i,m) + abs(Jdet)*weitet3(q)*eval(i)*phi(m,q)
                 enddo
 
@@ -695,7 +703,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
         ! insert new values for each loop on element
         PetscCall(MatZeroEntries(petsc_m_tmp, mpi_ierr))
         ! PetscCall(VecZeroEntries(petsc_mass_modal(), mpi_ierr))
-        do i=1,3
+        do i=1,DIM
 
             ! copy matrix
             PetscCall(MatCopy(massa_modale(ie_loc,i)%data, petsc_m_tmp,SAME_NONZERO_PATTERN, mpi_ierr))
@@ -771,8 +779,8 @@ subroutine TIME_STEP_MATRIX_FREE(neighbors, n_neigh, Np, time_step, t, K_loc_el,
     !> degrees of freedom for local polynomial basis
     integer(kind=4), intent(in) :: Np
     !> mass matrix for E+
-    real(kind=8), dimension(3,3,Np,Np) :: M_loc_el
-    type(PetscMatStruct), dimension(3), intent(in) :: massa_el
+    real(kind=8), dimension(DIM, DIM, Np, Np) :: M_loc_el
+    type(PetscMatStruct), dimension(DIM), intent(in) :: massa_el
 
     Mat :: petsc_m_tmp !! PASS AS ARGUMENT? AVOID MULTIPLE SETUP?
     ! PETSc Solver context
@@ -782,13 +790,13 @@ subroutine TIME_STEP_MATRIX_FREE(neighbors, n_neigh, Np, time_step, t, K_loc_el,
     !> stiffness matrix with contributions only from element E+ and neighbors E-
     real(kind=8), dimension(:,:,:), intent(in) :: K_loc_el
     !> forcing term vector on E+
-    real(kind=8), dimension(3*Np), intent(in) :: rhs_el
+    real(kind=8), dimension(DIM*Np), intent(in) :: rhs_el
     !> solution from two previous timesteps u^{(n-1)} for element E+
-    real(kind=8), dimension(3*Np), intent(in) :: u0_el
+    real(kind=8), dimension(DIM*Np), intent(in) :: u0_el
     !> solution from previous timestep for u^{(n)} with contributions from E+ and neighbors E-
     real(kind=8), dimension(:,:), intent(in) :: un_loc
     !> output solution for the element E+
-    real(kind=8), dimension(3*Np), intent(out) :: usol_el
+    real(kind=8), dimension(DIM*Np), intent(out) :: usol_el
     Vec :: petsc_sol
     Vec :: petsc_v_tmp
 
@@ -873,7 +881,7 @@ subroutine TIME_STEP_MATRIX_FREE(neighbors, n_neigh, Np, time_step, t, K_loc_el,
     ! one dimension at a time - 3 separate blocks of Np
     PetscCall(MatZeroEntries(petsc_m_tmp, mpi_ierr))
     irow(1) = 1
-    do i=1,3
+    do i=1,DIM
         row = (i-1)*Np+1
         ! tmp_v = dt^2*(f-K*u)
         ! tmp_v(row:row+Np) = - tmp_v(row:row+Np) + rhs_el(row:row+Np)*time_function(t)
