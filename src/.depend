@@ -1,0 +1,26 @@
+COMPUTE_MODAL_COEFFICIENTS.o : COMPUTE_MODAL_COEFFICIENTS.f90 SET_PETSC_SYSTEM.o Poly_global.o Poly_ref_mappings.o basis_function.o problem_data_and_properties.o Poly_global.o Poly_setup_MPI.o 
+COMPUTE_MODAL_COEFFICIENTS_GEN.o : COMPUTE_MODAL_COEFFICIENTS_GEN.f90 global_parameters.o SET_PETSC_SYSTEM.o Poly_global.o Poly_ref_mappings.o basis_function.o problem_data_and_properties.o Poly_global.o Poly_setup_MPI.o 
+CREATE_LOCAL_NODE_NUM.o : CREATE_LOCAL_NODE_NUM.f90 Poly_mesh.o Poly_setup_MPI.o 
+Lymph3D.o : Lymph3D.f90 global_parameters.o matrix_free.o SET_PETSC_SYSTEM.o post_processing.o Poly_mesh.o Poly_data.o Poly_global.o problem_data_and_properties.o Poly_setup_MPI.o 
+MAKE_MATRICES.o : MAKE_MATRICES.f90 Poly_data.o Poly_ref_mappings.o Poly_global.o assemble_local.o basis_function.o problem_data_and_properties.o Poly_setup_MPI.o Poly_mesh.o 
+MAKE_PARTITION_AND_MPI_FILES.o : MAKE_PARTITION_AND_MPI_FILES.f90 Poly_global.o Poly_global.o Poly_global.o MOD_VTK.o Poly_mesh.o Poly_data.o Poly_global.o Poly_global.o Poly_setup_MPI.o 
+MAKE_RHS.o : MAKE_RHS.f90 Poly_data.o Poly_ref_mappings.o Poly_global.o assemble_local.o basis_function.o problem_data_and_properties.o Poly_setup_MPI.o Poly_mesh.o 
+MESH_CORRECTION.o : MESH_CORRECTION.f90 Poly_global.o Poly_global.o Poly_mesh.o 
+MOD_MPI.o : MOD_MPI.f90 
+MOD_VTK.o : MOD_VTK.f90 problem_data_and_properties.o Poly_setup_MPI.o global_parameters.o Poly_mesh.o 
+Poly_data.o : Poly_data.f90 Poly_global.o Poly_global.o 
+Poly_global.o : Poly_global.f90 
+Poly_mesh.o : Poly_mesh.f90 Poly_global.o Poly_global.o 
+Poly_readfile.o : Poly_readfile.f90 Poly_mesh.o global_parameters.o Poly_data.o Poly_setup_MPI.o Poly_global.o Poly_global.o Poly_global.o Poly_global.o 
+Poly_ref_mappings.o : Poly_ref_mappings.f90 vet_mat_operations.o 
+Poly_setup_MPI.o : Poly_setup_MPI.f90 
+READ_INPUT_FILES.o : READ_INPUT_FILES.f90 Poly_mesh.o Poly_data.o Poly_global.o Poly_global.o Poly_global.o Poly_setup_MPI.o 
+SET_PETSC_SYSTEM.o : SET_PETSC_SYSTEM.f90 Poly_global.o Poly_setup_MPI.o 
+SOLVER_SETTINGS.o : SOLVER_SETTINGS.f90 problem_data_and_properties.o Poly_global.o Poly_setup_MPI.o 
+assemble_local.o : assemble_local.f90 basis_function.o Poly_ref_mappings.o Poly_mesh.o problem_data_and_properties.o 
+basis_function.o : basis_function.f90 global_parameters.o vet_mat_operations.o Poly_mesh.o 
+global_parameters.o : global_parameters.f90 
+matrix_free.o : matrix_free.f90 global_parameters.o vet_mat_operations.o Poly_mesh.o Poly_data.o Poly_ref_mappings.o Poly_global.o assemble_local.o basis_function.o problem_data_and_properties.o Poly_setup_MPI.o 
+post_processing.o : post_processing.f90 Poly_global.o global_parameters.o SET_PETSC_SYSTEM.o MOD_VTK.o basis_function.o Poly_ref_mappings.o Poly_mesh.o problem_data_and_properties.o Poly_global.o Poly_setup_MPI.o 
+problem_data_and_properties.o : problem_data_and_properties.f90 global_parameters.o 
+vet_mat_operations.o : vet_mat_operations.f90 

@@ -3,14 +3,20 @@ OBJS=$(SRCS:.f90=.o)
 
 COMP=mpif90
 
-COMP_FC_FLAGS=-O5 -g -c -cpp -ffree-form -ffree-line-length-none -fopenmp -fbounds-check 
+DIR_FMETIS=/home/luca/fmetis/build
+DIR_METIS=/home/luca/metis-5.1.0/build/Linux-x86_64
+DIR_PETSC=/home/luca/petsc
+
+COMP_FC_FLAGS=-O5 -g -c -cpp -ffree-form -ffree-line-length-none -fopenmp -fbounds-check
 COMP_LD_FLAGS=-O5  -fopenmp
 
-METIS_FC_FLAGS=-I/home/luca/fmetis/build/include -I/home/luca/metis-5.1.0/build/Linux-x86_64/include
-METIS_LD_FLAGS=-L/home/luca/fmetis/build/lib -lfmetis -L/home/luca/metis-5.1.0/build/Linux-x86_64/libmetis -lmetis
+DEBUG_FC_FLAGS = -Wunused -Wconversion -fcheck=all -fbacktrace #-Wall -fcheck=all -fbacktrace
 
-PETSC_LD_FLAGS=-L/home/luca/petsc/arch-linux-c-debug/lib -Wl,-rpath=/home/luca/petsc/arch-linux-c-debug/lib -lpetsc
-PETSC_FC_FLAGS=-I/home/luca/petsc/arch-linux-c-debug/include -I/home/luca/petsc/include
+METIS_FC_FLAGS=-I$(DIR_FMETIS)/include -I$(DIR_METIS)/include
+METIS_LD_FLAGS=-L$(DIR_FMETIS)/lib -lfmetis -L$(DIR_METIS)/libmetis -lmetis
+
+PETSC_LD_FLAGS=-L$(DIR_PETSC)/arch-linux-c-debug/lib -Wl,-rpath=$(DIR_PETSC)/arch-linux-c-debug/lib -lpetsc
+PETSC_FC_FLAGS=-I$(DIR_PETSC)/arch-linux-c-debug/include -I$(DIR_PETSC)/include
 # PETSC_LD_FLAGS=-L/usr/lib/petsc/lib -lpetsc
 # PETSC_FC_FLAGS=-I/usr/lib/petsc/include
 
@@ -23,12 +29,25 @@ EXEC=Lymph3D
 all: $(OBJS) $(EXEC)
 
 $(EXEC): $(OBJS)
-	$(COMP) -o $@  $(OBJS) $(PETSC_LD_FLAGS) $(COMP_LD_FLAGS) $(METIS_LD_FLAGS) 
+	$(COMP) -o $@  $(OBJS) $(PETSC_LD_FLAGS) $(COMP_LD_FLAGS) $(METIS_LD_FLAGS)
 #rm -f *.o *.mod
 
-$(OBJS):%.o: %.f90 assemble_local.o post_processing.o SET_PETSC_SYSTEM.o MOD_VTK.o Poly_ref_mappings.o basis_function.o Poly_setup_MPI.o Poly_mesh.o Poly_data.o Poly_global.o vet_mat_operations.o problem_data_and_properties.o MOD_MPI.o
-	$(COMP) $(PETSC_FC_FLAGS) $(COMP_FC_FLAGS) $(METIS_FC_FLAGS) $< -o $@
+$(OBJS):%.o: %.f90
+	$(COMP) $(PETSC_FC_FLAGS) $(COMP_FC_FLAGS) $(METIS_FC_FLAGS) $(DEBUG_FC_FLAGS) $< -o $@
+
+# ubuntu package dependencies created with makedepf90
+include .depend
+
+# Poly_setup_MPI:%.o: %.f90
+# matrix_free.o: matrix_free.f90 Poly_setup_MPI.o problem_data_and_properties.o
+# Lymph3D:%.o: %.f90 Poly_data.o Poly_setup_MPI.o problem_data_and_properties.o Poly_mesh.o post_processing.o SET_PETSC_SYSTEM.o matrix_free.o global_parameters.o
+
+# $(OBJS):%.o: %.f90 assemble_local.o post_processing.o SET_PETSC_SYSTEM.o MOD_VTK.o Poly_ref_mappings.o basis_function.o Poly_setup_MPI.o Poly_mesh.o Poly_data.o Poly_global.o vet_mat_operations.o problem_data_and_properties.o MOD_MPI.o matrix_free.o global_parameters.o
+# 	$(COMP) $(PETSC_FC_FLAGS) $(COMP_FC_FLAGS) $(METIS_FC_FLAGS) $(DEBUG_FC_FLAGS) $< -o $@
 
 .PHONY: clean
 clean:
 	-rm -f *.o *.mod Lymph3D
+
+depend: $(SRCS)
+	makedepf90 *.f90 > .depend
