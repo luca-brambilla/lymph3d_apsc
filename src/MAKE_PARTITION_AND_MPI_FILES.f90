@@ -2,6 +2,8 @@
 !    Author: Ilario Mazzieri
 !
 
+!TODO do not pass mpi_id and mpi_np use Poly_setup_mpi for all
+
 !> @brief Makes Partitioning and writes files *.mpi
 !! @author Ilario Mazzieri
 !> @date September, 2013
@@ -9,6 +11,13 @@
 
 !> @note A new partition is made if elementdomain.mpi is absent in the
 !! workig directory or in the folder given in SPEED.input (MPIFILE).
+
+module mesh_partition_and_mpi_files
+
+   implicit none
+
+contains
+
 
 !> partition of the mesh into the different processors and stores the local properties of the mesh into the correspondent fields of the struct Mesh_Structure. Furthermore, this subroutine generates output files in the folders FILES_MPI;
 subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
@@ -19,7 +28,7 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
    use Poly_exit_codes
    use Poly_data
    use Poly_mesh
-   use MOD_VTK
+   !use MOD_VTK
 
    implicit none
 
@@ -36,7 +45,6 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
 
    allocate(PolyMesh%part_elem(PolyMesh%num_elem));
    PolyMesh%part_elem = mpi_id;
-
 
    if (mpi_id == 0)  &
       write(*,'(A)') '---------------------Partitioning----------------------'
@@ -132,7 +140,6 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
    print *,'PRINT LOCAL MESH STRUCTURE'
 
    ! call print_Local_Mesh_Structure_VTK(PolyMesh)
-   call WRITE_MESH_VISUALIZATION_VTK(PolyMesh%num_elem_loc, PolyMesh, mpi_id)
 
    if(PolyMesh%num_prysm > 0) deallocate(PolyMesh%con_prysm)
    if(PolyMesh%num_tet > 0)   deallocate(PolyMesh%con_tet)
@@ -163,7 +170,8 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
    PRINT *,'WRITE MESH INFO'
 
    !optional: write infos about mesh (for debug purposes)
-   call WRITE_MESH_INFO(folder_mpi, PolyMesh, mpi_id)
+   call WRITE_MESH_INFO(folder_mpi, PolyMesh)
+   call WRITE_INTERFACE_INFO(folder_mpi, PolyMesh)
 
 end subroutine MAKE_PARTITION_AND_MPI_FILES
 
@@ -201,13 +209,17 @@ subroutine MESH_PARTITIONING(mpi_file, n_elem, nnode, nparts, &
    character(len=70) :: mpi_file, u_name
 
    integer(kind=4) :: num_hex, num_tet, num_prysm
-   integer(kind=4), dimension(num_hex,9), intent(in) :: con_hex
-   integer(kind=4), dimension(num_tet,5), intent(in) :: con_tet
-   integer(kind=4), dimension(num_prysm,6), intent(in) :: con_prysm
+   ! integer(kind=4), dimension(num_hex,9), intent(in) :: con_hex
+   ! integer(kind=4), dimension(num_tet,5), intent(in) :: con_tet
+   ! integer(kind=4), dimension(num_prysm,6), intent(in) :: con_prysm
+   integer(kind=4), dimension(:,:), allocatable, intent(in) :: con_hex
+   integer(kind=4), dimension(:,:), allocatable, intent(in) :: con_tet
+   integer(kind=4), dimension(:,:), allocatable, intent(in) :: con_prysm
 
    integer(kind=4) :: ic, ie, i
    integer(kind=4) :: u_mpi = 400
 
+   print *, 'subroutine mesh partioning'
    if(len_trim(mpi_file) /= 70) then
       u_name = mpi_file(1:len_trim(mpi_file)) // '/elem4proc.mpi'
    else
@@ -2432,7 +2444,7 @@ end subroutine CREATE_NEIGH_EL_TRIA
 
 
       call MPI_ALLREDUCE(el_per_mat_loc, el_per_mat, PolyData%nmat, MPI_INTEGER,  &
-                         MPI_SUM, MPI_COMM_WORLD, mpi_ierr);
+                         MPI_SUM, MPI_COMM_WORLD, mpi_ierr)
 
 
       do ie = 1, PolyMesh%num_elem_loc
@@ -2654,32 +2666,27 @@ end subroutine FIND_POS_LOC_NODE
 
 !> writes the mesh properties for the elements contained in each processor in the mpi files mesh.mpi;
 !>
-subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
+subroutine WRITE_MESH_INFO(mpi_file, PolyMesh)
 
+   use Poly_setup_MPI
    use Poly_mesh
    use local_search
 
    implicit none
 
+   type(Mesh_Structure), intent(inout) :: PolyMesh !< mesh
    character(len=70), intent(in) :: mpi_file    !< folder_mpi where to store files
    character(len=70) :: mpi_file_mesh = 'mesh_000000.mpi'
    !character(len=70) :: mat_file_mesh = 'matf0000000.m'
    !character(len=70) :: mat_file_mesh_1
-   character(len=70) :: mpi_file_interface = 'interface_000000.mpi'
 
-   integer(kind=4), intent(in)  :: mpi_id
-   integer(kind=4)  :: i, ie, unit_mpi, ivert,ipoly_loc,ipoly_glob, id_node, unit_mat, unit_int
-
-   integer(kind=4) :: num_interface
-   type(Mesh_Structure), intent(inout) :: PolyMesh
+   integer(kind=4)  :: ie, iface, unit_mpi, ivert,ipoly_loc,ipoly_glob, id_node, unit_mat
 
    unit_mpi = 40 + mpi_id
    unit_mat = 4000 + mpi_id
-   unit_int = 40000 + mpi_id
 
    if (mpi_id < 10) then
       write(mpi_file_mesh(11:11),'(i1)') mpi_id
-      write(mpi_file_interface(16:16),'(i1)') mpi_id
    elseif (mpi_id < 100) then
       write(mpi_file_mesh(10:11),'(i2)') mpi_id
    elseif (mpi_id < 1000) then
@@ -2695,21 +2702,6 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
    mpi_file_mesh = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_mesh
    open(unit_mpi,file=mpi_file_mesh)
 
-   mpi_file_interface = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_interface
-   open(unit_int,file=mpi_file_interface)
-
-   !! loop over elements and faces twice to count the number of interfaces
-   num_interface = 0
-   do ie = 1, PolyMesh%num_elem_loc
-      do i = 1, PolyMesh%Elem_loc(ie)%num_faces
-         ! check process and store IDs if in a different one and count
-         if (mpi_id /= PolyMesh%Elem_loc(ie)%neigh_el(i,0)) then
-            num_interface = num_interface + 1
-         endif
-      enddo
-   enddo
-   write(unit_int,*) num_interface
-
    do ie = 1, PolyMesh%num_elem_loc
       write(unit_mpi,*) &
             'Loc. Element #: ', ie, ' Glo. Element #: ', PolyMesh%elem_loc2glo(ie)
@@ -2721,7 +2713,7 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
       write(unit_mpi,*) 'Num Vert: ',     PolyMesh%Elem_loc(ie)%num_vert
       write(unit_mpi,*) 'Vertices #: ',   PolyMesh%Elem_loc(ie)%vert
 
-      ipoly_glob=PolyMesh%elem_in_poly(PolyMesh%elem_loc2glo(ie));
+      ipoly_glob=PolyMesh%elem_in_poly(PolyMesh%elem_loc2glo(ie))
       call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
                                                 PolyMesh%num_poly_loc, &
                                                 ipoly_glob,ipoly_loc)
@@ -2745,29 +2737,13 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
       write(unit_mpi,*) 'Diameter hk : ', PolyMesh%Poly(ipoly_loc)%hk
       write(unit_mpi,*) 'Num Faces: ',    PolyMesh%Elem_loc(ie)%num_faces
 
-      do i = 1, PolyMesh%Elem_loc(ie)%num_faces
-         write(unit_mpi,*) 'Face #',i ,': ',  PolyMesh%Elem_loc(ie)%faces(i,:)
-         write(unit_mpi,*) 'Normal : ',    PolyMesh%Elem_loc(ie)%normal(i,:)
-         write(unit_mpi,*) 'Area : ',      PolyMesh%Elem_loc(ie)%area(i)
+      ! loop on face for each element
+      do iface = 1, PolyMesh%Elem_loc(ie)%num_faces
+         write(unit_mpi,*) 'Face #', iface, ': ',  PolyMesh%Elem_loc(ie)%faces(iface,:)
+         write(unit_mpi,*) 'Normal : ',    PolyMesh%Elem_loc(ie)%normal(iface,:)
+         write(unit_mpi,*) 'Area : ',      PolyMesh%Elem_loc(ie)%area(iface)
 
-         ! check process and store IDs if in a different one and count
-         ! if (mpi_id /= PolyMesh%Elem_loc(ie)%neigh_el(i,0)) then
-         !    num_interface = num_interface + 1
-         ! endif
-
-         if (mpi_id /= PolyMesh%Elem_loc(ie)%neigh_el(i,0)) then
-            write(unit_int,*) PolyMesh%Elem_loc(ie)%neigh_el(i,0), PolyMesh%Elem_loc(ie)%neigh_el(i,2)
-         endif
       enddo
-
-      ! if (num_interface /= 0) then
-      !    do i = 1, PolyMesh%Elem_loc(ie)%num_faces
-      !       ! check process and store IDs if in a different one and store process and element ID
-      !       if (mpi_id /= PolyMesh%Elem_loc(ie)%neigh_el(i,0)) then
-      !          write(unit_int,*) PolyMesh%Elem_loc(ie)%neigh_el(i,0), PolyMesh%Elem_loc(ie)%neigh_el(i,2)
-      !       endif
-      !    enddo
-      ! endif
 
       write(unit_mpi,*) 'Neighbouring Elements: shared by (mpi-proc/mat_id/el_id/face_id/poly id/space_fun_tag)'
       write(unit_mpi,*) 'Neigh Face #1: ', PolyMesh%Elem_loc(ie)%neigh_el(1,:)
@@ -2776,7 +2752,7 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
       write(unit_mpi,*) 'Neigh Face #4: ', PolyMesh%Elem_loc(ie)%neigh_el(4,:)
 
       !write(unit_mpi,*) 'Flag to see if the faces needs  to be integrated'
-      !write(unit_mpi,*) 'Face #1 :', PolyMesh%Elem_loc(ie)%flag(1)
+      !write(unit_mpi,*) 'Face #1: ', PolyMesh%Elem_loc(ie)%flag(1)
       !write(unit_mpi,*) 'Face #2: ', PolyMesh%Elem_loc(ie)%flag(2)
       !write(unit_mpi,*) 'Face #3: ', PolyMesh%Elem_loc(ie)%flag(3)
       !write(unit_mpi,*) 'Face #4: ', PolyMesh%Elem_loc(ie)%flag(4)
@@ -2793,7 +2769,6 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
    enddo
 
    close(unit_mpi)
-   close(unit_int)
 
    ! matfile output for debugging
    !-----------------------------------------------------------------------------
@@ -2855,7 +2830,133 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh, mpi_id)
    ! enddo
 
 
-
 end subroutine WRITE_MESH_INFO
 
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
+
+   use Poly_setup_MPI
+   use Poly_mesh
+
+   implicit none
+
+   type(Mesh_Structure), intent(inout) :: PolyMesh !< mesh
+   character(len=70), intent(in) :: mpi_file    !< folder_mpi where to store files
+   character(len=70) :: mpi_file_interface = 'interface_000000.mpi'
+
+   integer(kind=4)  :: i, ie, iface, inter_count, unit_int, elem_proc_id
+
+   integer(kind=4) :: num_inter_loc
+   integer(kind=4), dimension(mpi_np) :: num_elem_interface_loc
+   integer(kind=4), dimension(mpi_np, PolyMesh%Elem_loc(1)%num_faces) :: elem_interface_tmp !< temp matrix for worst case scenario, interface on all faces
+   integer(kind=4), dimension(mpi_np) :: recvcounts, displs
+   integer(kind=4), dimension(mpi_np) :: inter_displs_loc    !< vector containing displacement index for each process (progressive)
+
+   integer(kind=4), dimension(:), allocatable :: elem_inter_loc
+
+   unit_int = 40000 + mpi_id
+
+   if (mpi_id < 10) then
+      write(mpi_file_interface(16:16),'(i1)') mpi_id
+   elseif (mpi_id < 100) then
+      write(mpi_file_interface(15:16),'(i1)') mpi_id
+   elseif (mpi_id < 1000) then
+      write(mpi_file_interface(14:16),'(i1)') mpi_id
+   elseif (mpi_id < 10000) then
+      write(mpi_file_interface(13:16),'(i1)') mpi_id
+   elseif (mpi_id < 100000) then
+      write(mpi_file_interface(12:16),'(i1)') mpi_id
+   elseif (mpi_id < 1000000) then
+      write(mpi_file_interface(11:16),'(i1)') mpi_id
+   endif
+
+   mpi_file_interface = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_interface
+   open(unit_int,file=mpi_file_interface)
+
+   ! count local number of interfaces and allocate memory for local data
+   num_inter_loc = 0
+   num_elem_interface_loc = 0
+   elem_interface_tmp = -1
+   do ie = 1, PolyMesh%num_elem_loc
+      do iface = 1, PolyMesh%Elem_loc(ie)%num_faces
+         elem_proc_id = PolyMesh%Elem_loc(ie)%neigh_el(iface,0)
+         ! check process and store IDs if in a different one and count
+         if (mpi_id /= elem_proc_id) then
+            ! count total number of interfaces
+            num_inter_loc = num_inter_loc + 1
+            ! count number of interfaces per process
+            num_elem_interface_loc(elem_proc_id+1) = num_elem_interface_loc(elem_proc_id+1) + 1
+            ! insert global element ID into temporary matrix following progressive indexing
+            inter_count = num_elem_interface_loc(elem_proc_id+1)
+            elem_interface_tmp(elem_proc_id+1, inter_count) = PolyMesh%Elem_loc(ie)%neigh_el(iface,2)
+         endif
+      enddo
+   enddo
+   write(unit_int,*) num_inter_loc
+   allocate(elem_inter_loc(num_inter_loc))
+
+   ! total number of interfaces and allocate memory for global data
+   call MPI_ALLREDUCE(num_inter_loc, 1, PolyMesh%num_elem_inter, MPI_INTEGER,  &
+                         MPI_SUM, MPI_COMM_WORLD, mpi_ierr)
+   allocate(PolyMesh%elem_inter(PolyMesh%num_elem_inter))
+
+   ! progressive counter
+   inter_count = 1
+   inter_displs_loc = 0
+   do i=1,mpi_np
+      inter_displs_loc(i) = inter_count
+      num_inter_loc = num_elem_interface_loc(i)
+      if (num_inter_loc /= 0) then
+         elem_inter_loc(inter_count:inter_count+num_inter_loc-1) = elem_interface_tmp(i, 1:num_inter_loc)
+         inter_count = inter_count + num_inter_loc
+      endif
+   end do
+   print *, mpi_id, inter_displs_loc
+
+   do ie = 1, PolyMesh%num_elem_loc
+      ! loop on face for each element
+      do iface = 1, PolyMesh%Elem_loc(ie)%num_faces
+         ! write to file interface element IDs and process
+         elem_proc_id = PolyMesh%Elem_loc(ie)%neigh_el(iface,0)
+         if (mpi_id /= elem_proc_id) then
+            write(unit_int,*) elem_proc_id, PolyMesh%Elem_loc(ie)%neigh_el(iface,2)
+         endif
+      enddo
+   enddo
+
+   close(unit_int)
+
+   ! save the number of interface elements to send and receive for all processes
+   !! avoid using temporary buffer by setting as receive the address of first element of 2d array -> treated as 1D? confident in array memory layout?
+   !! PolyMesh%num_elem_interface_comm(1,1)
+   allocate(PolyMesh%num_elem_inter_comm(mpi_np,mpi_np))
+   PolyMesh%num_elem_inter_comm = 0
+   recvcounts = mpi_np  ! Each process sends mpi_np elements
+   displs = (/ (i*mpi_np, i=0, mpi_np-1) /)  ! Offsets for each process
+
+   call MPI_ALLGATHERV(num_elem_interface_loc, mpi_np, MPI_INTEGER, PolyMesh%num_elem_inter_comm(1,1), recvcounts, displs, MPI_INTEGER, MPI_COMM_WORLD, mpi_ierr)
+
+   ! do i=1,mpi_np
+   !    recvcounts = sum()
+   ! enddo
+   ! call MPI_ALLGATHERV()
+
+
+   allocate(PolyMesh%inter_disp(mpi_np,mpi_np))
+   PolyMesh%inter_disp = PolyMesh%num_elem_inter_comm + 1
+   inter_count=1
+   do i=1,mpi_np
+
+   enddo
+
+   ! allocate(PolyMesh%elem_inter(PolyMesh%num_elem_inter))
+   ! call MPI_ALLGATHERV(elem_inter_loc, mpi_np, MPI_INTEGER, PolyMesh%num_elem_inter_comm(1,1), recvcounts, displs, MPI_INTEGER, MPI_COMM_WORLD, mpi_ierr)
+   ! deallocate(elem_inter_loc)
+
+   !call MPI_ALLGATHERV(num_elem_interface_loc, mpi_np, MPI_INTEGER, num_elem_interface_tmp, recvcounts, displs, MPI_INTEGER, MPI_COMM_WORLD, mpi_ierr)
+   !PolyMesh%num_elem_interface = reshape(num_elem_interface_tmp, (/mpi_np, mpi_np/))
+
+end subroutine WRITE_INTERFACE_INFO
+
+end module mesh_partition_and_mpi_files

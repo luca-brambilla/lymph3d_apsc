@@ -85,6 +85,11 @@ module Poly_mesh
         integer(kind=4), dimension(:), allocatable :: node_loc2glo  !< Local-to-global maps to transition from the local enumeration to the global one for the nodes
         integer(kind=4), dimension(:), allocatable :: poly_loc2glo  !< Local-to-global maps to transition from the local enumeration to the global one for the polyhedra
 
+        integer(kind=4), dimension(:,:), allocatable :: num_elem_inter_comm !< Matrix containing the number of interface elements per process for send and receive communication
+        integer(kind=4) :: num_elem_inter !< Total number of interface elements
+        integer(kind=4), dimension(:,:), allocatable :: inter_disp !< indices for elem_inter setting the initial position for data of each process
+        integer(kind=4), dimension(:), allocatable :: elem_inter !< interface element ID per process
+
         type(Element), dimension(:), pointer :: Elem_loc !< For each element it stores all the properties
 
         type(Polyhedron),dimension(:),pointer :: Poly  !< For each polyhedron it stores all the properties

@@ -11,6 +11,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
     use local_search
     use SET_PETSC_SYSTEM
     use global_parameters
+    use mesh_partition_and_mpi_files
 
     implicit none
 

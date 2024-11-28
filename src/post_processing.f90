@@ -11,7 +11,8 @@ module post_processing
     use basis_function
     use MOD_VTK
     use SET_PETSC_SYSTEM
-
+    use mesh_partition_and_mpi_files
+    
     use global_parameters
 
     implicit none
@@ -51,7 +52,7 @@ subroutine PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, di
         do i = 2, mpi_np
                 displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
         end do
-        print *, 'displacements', displacements
+        ! print *, 'displacements', displacements
     endif
 
 end subroutine PREPROCESS_SOLUTION

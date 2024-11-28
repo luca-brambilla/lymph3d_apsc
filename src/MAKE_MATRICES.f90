@@ -13,6 +13,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     use local_search
     use Poly_ref_mappings
     use Poly_data
+    use mesh_partition_and_mpi_files
 
     implicit none
 

@@ -10,6 +10,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
     use Poly_ref_mappings
     use local_search
     use SET_PETSC_SYSTEM
+    use mesh_partition_and_mpi_files
         
     implicit none
         
