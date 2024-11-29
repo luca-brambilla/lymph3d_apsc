@@ -60,3 +60,10 @@ src/TEST_*
 *.mpi
 petsc_uex
 *.vtk
+docs
+petsc
+mesh
+src/test
+
+setup_host.sh
+run_sims.sh
