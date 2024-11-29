@@ -14,6 +14,7 @@ module matrix_free
     use Poly_data
     use Poly_mesh
     use vet_mat_operations
+    use mesh_partition_and_mpi_files
 
     use global_parameters
 
@@ -74,14 +75,15 @@ subroutine SET_PETSC_MASS_MATRIX_FREE(ne_loc, Np, M)
 
 end subroutine SET_PETSC_MASS_MATRIX_FREE
 
-!> set up array of PETSc vector
+!> set up array of PETSc vectors
 subroutine SET_PETSC_VECTOR_MATRIX_FREE(ne_loc, Np, V)
 
     integer(kind=4), intent(in) :: ne_loc   !< number of rows
     integer(kind=4), intent(in) :: Np       !< PETSc vector size
+    !> array of PETSc vectors
     type(PetscVecStruct), dimension(ne_loc), intent(out) :: V
 
-    integer(kind=4) :: ie_loc, i
+    integer(kind=4) :: ie_loc
 
     do ie_loc=1,ne_loc
         PetscCall(VecCreate(PETSC_COMM_SELF, V(ie_loc)%data, mpi_ierr))
@@ -150,12 +152,12 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     integer(kind=4) :: Npoly
     integer(kind=4) :: i, j, m, n
 
-    integer(kind=4) :: e, E1, E2, sides
+    integer(kind=4) :: e, E1, E2!, sides
     integer(kind=4), dimension(4) :: face_flag
     real(kind=8), dimension(DIM) :: nn
     integer(kind=4) :: space_fun_tag
     !integer(kind=4) :: n_neigh      !< number of neighbor internal faces
-    integer(kind=4) :: neigh_count  !< counter for inserting contributions in K_loc
+    !integer(kind=4) :: neigh_count  !< counter for inserting contributions in K_loc
 
     ! integer(kind=4), intent(out) :: internal_neigh(PolyMesh%num_elem_loc,:) !< internal neighbors connectivity - similar to el_neigh from PolyMesh
     integer(kind=4), intent(out) :: max_faces !< maximum number of polygon faces
@@ -236,10 +238,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     ! loop over elements to find the maximum number of polygonal faces
     !! IS ALL SPLIT IN POLYGONS OR TETRAHEDRA???
     max_faces = PolyMesh%Elem_loc(1)%num_faces
-    do ie_loc = 2, PolyMesh%num_elem_loc
-        sides = PolyMesh%Elem_loc(ie_loc)%num_faces
-        if (sides > max_faces) max_faces = sides
-    end do
+    ! do ie_loc = 2, PolyMesh%num_elem_loc
+    !     sides = PolyMesh%Elem_loc(ie_loc)%num_faces
+    !     if (sides > max_faces) max_faces = sides
+    ! end do
 
     ! allocate(internal_neigh(PolyMesh%num_elem_loc, max_faces))
     ! internal_neigh = 0
@@ -556,6 +558,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     ! PASS FUNCTION AS ARGUMENT
     interface
         function f_analytic(point) result(res)
+            use global_parameters, only: DIM
             real(kind=8), dimension(DIM) :: point, res
         end function f_analytic
     end interface
@@ -566,9 +569,9 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     Mat :: petsc_m_tmp     ! temporary matrix for linear systems
     Vec :: petsc_exact
     Vec :: petsc_modal_coeff
-    PetscScalar :: val(1)
-    PetscInt :: irow(1)
-    PetscInt :: jcol(1)
+    !PetscScalar :: val(1)
+    !PetscInt :: irow(1)
+    !PetscInt :: jcol(1)
 
     ! PETSc Solver context
     KSP :: ksp  ! Krylov solver context
@@ -577,7 +580,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     type(Mesh_Structure) :: PolyMesh
     integer(kind=4) :: p, Np
     integer(kind=4) :: nq3, nq2, Npoly
-    integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, i, m, beg
+    integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, i, m!, beg
     integer(kind=4) :: ipoly_loc, ipoly_glob
     integer(kind=4), dimension(:,:), allocatable :: blist
     real(kind=8) :: Jdet
@@ -594,14 +597,17 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     real(kind=8), dimension(DIM) :: eval
 
     integer(kind=4) :: q, ii, jj
-    integer(kind=4) :: j,n,k
+    !integer(kind=4) :: j,n,k
     integer(kind=4) :: row
+
+    real(kind=8), dimension(:), pointer :: v_ptr
+
 
     ! logical, intent(in) :: IsTime_dependent
     ! real(kind=8), intent(in), optional :: time
 
-    p = PolyMesh%Elem_loc(1)%Degree
-    Npoly = PolyMesh%num_poly
+    p = PolyMesh%Elem_loc(1)%Degree !< degree of the polynomial
+    Npoly = PolyMesh%num_poly       !< number of polyhedra
 
     ! Computation of Gauss-Legendre quadrature nodes and weights over the reference square and cube
     ! (see basis_functions.f90)
@@ -623,13 +629,13 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     ! use PETSc to compute linear system
     ! only local to process
 
-    ! 1 block of element local mass matrix out of 3
+    ! 1 block of element local mass matrix out of 3 (1 dimension)
     PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
     PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
     PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
     PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
 
-    ! 1 block of element local vectors out of 3
+    ! 1 block of element local vectors out of 3 (1 dimension)
     PetscCall(VecCreate(PETSC_COMM_SELF, petsc_exact, mpi_ierr))
     PetscCall(VecSetSizes(petsc_exact, Np, Np, mpi_ierr))
     PetscCall(VecSetFromOptions(petsc_exact, mpi_ierr))
@@ -699,7 +705,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
             end do
         end do
 
-        ! copy mass matrix and exact solution into PETSc
+        ! copy mass matrix and exact solution into PETSc structures
         ! insert new values for each loop on element
         PetscCall(MatZeroEntries(petsc_m_tmp, mpi_ierr))
         ! PetscCall(VecZeroEntries(petsc_mass_modal(), mpi_ierr))
@@ -710,13 +716,17 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
             ! vector assignment
             !! copy whole vector at once
-            do m=1,Np
-                irow(1) = m
-                val(1) = uex_integral(ie_loc,i,m)
-                if (val(1) .ne. 0.0) then
-                    PetscCall(VecSetValues(petsc_exact, 1, irow, val, INSERT_VALUES, mpi_ierr))
-                endif
-            enddo
+            ! do m=1,Np
+            !     irow(1) = m
+            !     val(1) = uex_integral(ie_loc,i,m)
+            !     if (val(1) .ne. 0.0) then
+            !         PetscCall(VecSetValues(petsc_exact, 1, irow, val, INSERT_VALUES, mpi_ierr))
+            !     endif
+            ! enddo
+            PetscCall(VecGetArrayF90(petsc_exact,v_ptr,mpi_ierr))
+            v_ptr = uex_integral(ie_loc,i,:)
+            PetscCall(VecRestoreArrayF90(petsc_exact,v_ptr,mpi_ierr))
+
             ! finalize copy process
             PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
             PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
@@ -726,14 +736,18 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
             ! solve linear system matrix-free on block (i,i) and save solution
             PetscCall(KSPSolve(ksp, petsc_exact, petsc_modal_coeff, mpi_ierr))
 
-            ! copy solution
+            ! copy block of the solution solution
             !! copy whole matrix at once ???
-            do m=1,Np
-                irow(1) = m
-                row = (Np-1)*i+1 + m
-                PetscCall(VecGetValues(petsc_modal_coeff, 1, irow, val, mpi_ierr))
-                modal_coeff(ie_loc,row) = val(1)
-            enddo
+            ! do m=1,Np
+            !     irow(1) = m
+            !     row = (Np-1)*i+1 + m ! not right?
+            !     PetscCall(VecGetValues(petsc_modal_coeff, 1, irow, val, mpi_ierr))
+            !     modal_coeff(ie_loc,row) = val(1)
+            ! enddo
+            row = (i-1)*Np+1
+            PetscCall(VecGetArrayReadF90(petsc_modal_coeff,v_ptr,mpi_ierr))
+            modal_coeff(ie_loc,row:row+Np) =  v_ptr
+            PetscCall(VecRestoreArrayF90(petsc_modal_coeff,v_ptr,mpi_ierr))
 
         enddo
 
@@ -763,7 +777,7 @@ end subroutine COMPUTE_MODAL_COEFFICIENTS_FREE
 subroutine TIME_STEP_MATRIX_FREE(neighbors, n_neigh, Np, time_step, t, K_loc_el, massa_el, rhs_el, u0_el, un_loc, usol_el)
 
     !TODO consider different Np
-    !TODO compute inverse of mass matrix only once
+    !TODO compute inverse of mass matrix only once ?
     !DONE sides different for each row of K
     !TODO create a list of neighbors or pass ie_loc
     !TODO check format for solutions, pass whole or pass sections - update in place or outside subroutine? un gets lost?
@@ -779,7 +793,7 @@ subroutine TIME_STEP_MATRIX_FREE(neighbors, n_neigh, Np, time_step, t, K_loc_el,
     !> degrees of freedom for local polynomial basis
     integer(kind=4), intent(in) :: Np
     !> mass matrix for E+
-    real(kind=8), dimension(DIM, DIM, Np, Np) :: M_loc_el
+    !real(kind=8), dimension(DIM, DIM, Np, Np) :: M_loc_el
     type(PetscMatStruct), dimension(DIM), intent(in) :: massa_el
 
     Mat :: petsc_m_tmp !! PASS AS ARGUMENT? AVOID MULTIPLE SETUP?
@@ -809,11 +823,11 @@ subroutine TIME_STEP_MATRIX_FREE(neighbors, n_neigh, Np, time_step, t, K_loc_el,
     real(kind=8), dimension(:), pointer :: v_ptr
 
     real(kind=8) :: dt2half, dt2
-    integer(kind=4) :: i,j,m,n,k
-    integer(kind=4) :: row, col
+    integer(kind=4) :: i,k!,j,m,n
+    integer(kind=4) :: row!, col
     PetscScalar :: val(Np)
     PetscInt :: irow(1)
-    PetscInt :: jcol(1)
+    !PetscInt :: jcol(1)
 
     !! HOW TO EXTRACT UN_LOC and U0_LOC ???
 

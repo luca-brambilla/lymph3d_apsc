@@ -494,7 +494,8 @@ module basis_function
 
         integer(kind=4), intent(in) :: nq2, Np
         integer(kind=4), intent(in) :: e_E1, E2
-        real(kind=8), dimension(3,2), intent(in) :: b_box1, b_box2
+        real(kind=8), dimension(3,2), intent(in) :: b_box1
+        real(kind=8), dimension(:,:), intent(in) :: b_box2      ! input dynamically allocated
         integer(kind=4), dimension(Np,3), intent(in) :: blist
         real(kind=8), dimension(3,4), intent(in) :: Fk
         real(kind=8), dimension(4,nq2), intent(in) :: nodtria2
