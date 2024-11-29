@@ -31,7 +31,7 @@ subroutine PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, di
     real(kind=8), dimension(:,:), allocatable, intent(inout) :: u
     integer(kind=4) :: i, Np
 
-    Np = PolyMesh%Elem_loc(1)%NDof_loc
+    Np = PolyMesh%Elem_loc(1)%NDof_elem
 
     ! Allocate solution for post-processing
     allocate(u(Np, DIM * PolyMesh%num_poly))
@@ -72,7 +72,7 @@ subroutine POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, u, 
 
     Vec, intent(in) :: petsc_sol
     ! assuming same degree everywhere
-    Np = PolyMesh%Elem_loc(1)%NDof_loc ! ndof local per dimension (for 3D we need 3*Np)
+    Np = PolyMesh%Elem_loc(1)%NDof_elem ! ndof local per dimension (for 3D we need 3*Np)
 
     ! SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -123,7 +123,7 @@ end subroutine POST_PROCESS
 !     integer(kind=4), dimension(:), allocatable :: gathered_sizes, displacements
 !     integer(kind=4) :: i, Np
 
-!     Np = PolyMesh%Elem_loc(1)%NDof_loc
+!     Np = PolyMesh%Elem_loc(1)%NDof_elem
 
 !     ! STORE LOCAL NUMERATION TO RECONSTRUCT THE SOLUTION
 !     allocate(nnod_num(local_dof))
@@ -197,7 +197,7 @@ end subroutine POST_PROCESS
         !real(kind=8), dimension(3) :: points
         integer(kind=4) :: ie_loc, ie_glob, ipoly_loc, ipoly_glob, ivert, id_node, i, j, k, index
 
-        Np = PolyMesh%Elem_loc(1)%NDof_loc
+        Np = PolyMesh%Elem_loc(1)%NDof_elem
         Npoly = PolyMesh%num_poly
         p = PolyMesh%Elem_loc(1)%Degree
 

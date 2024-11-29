@@ -16,8 +16,8 @@ module Poly_mesh
         integer(kind=4)  :: mat_prop    !< ID for heterogeneous materials
         integer(kind=4)  :: num_vert    !< Number of vertices of the element
         integer(kind=4)  :: num_faces   !< Number of faces of the element
-        integer(kind=4)  :: Degree      !< Local degree of the basis function for the element
-        integer(kind=4)  :: NDof_loc    !< Local number of degrees of freedom per dimension
+        integer(kind=4)  :: Degree      !< Degree of the basis function for the element
+        integer(kind=4)  :: NDof_elem    !< Number of degrees of freedom per dimension
         integer(kind=4), dimension(:),   pointer :: vert    !< Indexes of the vertices of the element
         integer(kind=4), dimension(:,:), pointer :: faces   !< Indexes of the vertices for every face of the element
 
@@ -82,9 +82,11 @@ module Poly_mesh
         integer(kind=4) :: num_node_loc     !< Local number of vertices
         integer (kind=4) :: num_poly_loc        !< Local number of polyhedra
         integer(kind=4), dimension(:), allocatable :: elem_loc2glo  !< Local-to-global maps to transition from the local enumeration to the global one for the elements
+        integer(kind=4), dimension(:), allocatable :: elem_glo2loc  !< Global-to-local maps to transition from the global enumeration to the local one for the elements
         integer(kind=4), dimension(:), allocatable :: node_loc2glo  !< Local-to-global maps to transition from the local enumeration to the global one for the nodes
         integer(kind=4), dimension(:), allocatable :: poly_loc2glo  !< Local-to-global maps to transition from the local enumeration to the global one for the polyhedra
 
+        !! change names num_elem_inter_comm and num_elem_inter
         integer(kind=4), dimension(:,:), allocatable :: num_elem_inter_comm !< Matrix containing the number of interface elements per process for send and receive communication
         integer(kind=4) :: num_elem_inter !< Total number of interface elements
         integer(kind=4), dimension(:,:), allocatable :: inter_disp !< indices for elem_inter setting the initial position for data of each process
@@ -158,6 +160,7 @@ subroutine allocate_Mesh_Structure(Struct)
     !         Struct%vert_z(Struct%num_node))
     !allocate(Struct%part_elem(Struct%num_elem))
     allocate(Struct%elem_in_poly(Struct%num_elem))
+    allocate(Struct%elem_glo2loc(Struct%num_elem))
 
 end subroutine allocate_Mesh_Structure
 

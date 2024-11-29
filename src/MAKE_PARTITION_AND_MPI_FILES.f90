@@ -69,7 +69,7 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
       open(part_unit,file=part_file)
       read(part_unit,*) dummy
       do i = 1, PolyMesh%num_elem
-         read(part_unit,*) dummy, PolyMesh%part_elem(i)
+         read(part_unit,*) dummy, PolyMesh%part_elem(i), PolyMesh%elem_glo2loc(i)
       enddo
       close(part_unit)
 
@@ -206,6 +206,8 @@ subroutine MESH_PARTITIONING(mpi_file, n_elem, nnode, nparts, &
    integer(idx_t), pointer :: vwgt(:)   => NULL()
    integer(idx_t), pointer :: tpwgts(:) => NULL()
 
+   integer(kind=4), dimension(nparts) :: proc_count
+   integer(kind=4), dimension(n_elem) :: glo2loc
    character(len=70) :: mpi_file, u_name
 
    integer(kind=4) :: num_hex, num_tet, num_prysm
@@ -298,8 +300,11 @@ subroutine MESH_PARTITIONING(mpi_file, n_elem, nnode, nparts, &
 
       open(u_mpi,file = u_name)
       write(u_mpi,*) n_elem
+      proc_count = 0
       do i = 1, n_elem
-         write(u_mpi,*) i, epart(i)-1
+         proc_count(epart(i)) = proc_count(epart(i)) +1
+         glo2loc(i) = proc_count(epart(i))
+         write(u_mpi,*) i, epart(i)-1, glo2loc(i)
       enddo
       close(u_mpi)
 
@@ -1005,7 +1010,7 @@ end subroutine WRITE_PARTITION
 
           !Define material properties and polynomial degree element wise
           PolyMesh%Elem_loc(ie)%Degree   = PolyData%sdeg_mat(vect_read(1))
-          PolyMesh%Elem_loc(ie)%NDof_loc = (PolyMesh%Elem_loc(ie)%Degree + 1) * &
+          PolyMesh%Elem_loc(ie)%NDof_elem = (PolyMesh%Elem_loc(ie)%Degree + 1) * &
                                            (PolyMesh%Elem_loc(ie)%Degree + 2) * &
                                            (PolyMesh%Elem_loc(ie)%Degree + 3) / 6;
 !          PolyMesh%Elem_loc(ie)%Rho    = PolyData%prop_mat(vect_read(1),1)
@@ -1060,7 +1065,7 @@ end subroutine WRITE_PARTITION
           PolyMesh%Elem_loc(ie_shift)%mat_prop = vect_read(1)
 
           PolyMesh%Elem_loc(ie)%Degree   = PolyData%sdeg_mat(vect_read(1))
-          PolyMesh%Elem_loc(ie)%NDof_loc = (PolyMesh%Elem_loc(ie)%Degree + 1) * &
+          PolyMesh%Elem_loc(ie)%NDof_elem = (PolyMesh%Elem_loc(ie)%Degree + 1) * &
                                            (PolyMesh%Elem_loc(ie)%Degree + 2) * &
                                            (PolyMesh%Elem_loc(ie)%Degree + 3) / 6;
 
@@ -1110,7 +1115,7 @@ end subroutine WRITE_PARTITION
           PolyMesh%Elem_loc(ie_shift)%mat_prop = vect_read(1)
 
           PolyMesh%Elem_loc(ie)%Degree   = PolyData%sdeg_mat(vect_read(1))
-          PolyMesh%Elem_loc(ie)%NDof_loc = (PolyMesh%Elem_loc(ie)%Degree + 1) * &
+          PolyMesh%Elem_loc(ie)%NDof_elem = (PolyMesh%Elem_loc(ie)%Degree + 1) * &
                                            (PolyMesh%Elem_loc(ie)%Degree + 2) * &
                                            (PolyMesh%Elem_loc(ie)%Degree + 3) / 6;
 
@@ -2451,7 +2456,7 @@ end subroutine CREATE_NEIGH_EL_TRIA
 
       do ie = 1, PolyMesh%num_elem_loc
 
-         allocate(PolyMesh%Elem_loc(ie)%Dof_glo(PolyMesh%Elem_loc(ie)%NDof_loc))
+         allocate(PolyMesh%Elem_loc(ie)%Dof_glo(PolyMesh%Elem_loc(ie)%NDof_elem))
 
          iglo_el  = PolyMesh%elem_loc2glo(ie);
          mat_type = PolyMesh%Elem_loc(ie)%mat_prop
@@ -2467,9 +2472,9 @@ end subroutine CREATE_NEIGH_EL_TRIA
          enddo
 
          el_before_ie = iglo_el - sum(el_per_mat(1:mat_type-1)) - 1
-         ndof_shift = ndof_shift + el_before_ie * PolyMesh%Elem_loc(ie)%NDof_loc
+         ndof_shift = ndof_shift + el_before_ie * PolyMesh%Elem_loc(ie)%NDof_elem
 
-         do i = 1, PolyMesh%Elem_loc(ie)%NDof_loc
+         do i = 1, PolyMesh%Elem_loc(ie)%NDof_elem
 
             PolyMesh%Elem_loc(ie)%Dof_glo(i) = ndof_shift + i
 
