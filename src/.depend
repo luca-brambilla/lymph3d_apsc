@@ -21,7 +21,7 @@ assemble_local.o : assemble_local.f90 basis_function.o Poly_ref_mappings.o Poly_
 basis_function.o : basis_function.f90 global_parameters.o vet_mat_operations.o Poly_mesh.o 
 global_parameters.o : global_parameters.f90 
 matrix_free.o : matrix_free.f90 global_parameters.o MAKE_PARTITION_AND_MPI_FILES.o vet_mat_operations.o Poly_mesh.o Poly_data.o Poly_ref_mappings.o Poly_global.o assemble_local.o basis_function.o problem_data_and_properties.o Poly_setup_MPI.o 
-mpi_communication.o : mpi_communication.f90 Poly_setup_MPI.o 
+mpi_communication.o : mpi_communication.f90 global_parameters.o Poly_mesh.o Poly_setup_MPI.o 
 post_processing.o : post_processing.f90 Poly_global.o global_parameters.o MAKE_PARTITION_AND_MPI_FILES.o SET_PETSC_SYSTEM.o MOD_VTK.o basis_function.o Poly_ref_mappings.o Poly_mesh.o problem_data_and_properties.o Poly_global.o Poly_setup_MPI.o 
 problem_data_and_properties.o : problem_data_and_properties.f90 global_parameters.o 
 vet_mat_operations.o : vet_mat_operations.f90 

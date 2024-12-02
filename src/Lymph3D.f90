@@ -21,7 +21,7 @@ program Lymph3D
     use post_processing
     use SET_PETSC_SYSTEM
     use matrix_free
-
+    use exchange_data
     !use MOD_MPI_CUSTOM
     use global_parameters
 
@@ -106,6 +106,9 @@ program Lymph3D
     !integer(kind=4) :: j,k,m,n,row,col
     integer(kind=4) :: k, row
     integer(kind=4) :: neighbor
+
+    real(kind=8), dimension(:), allocatable :: prova_in, prova_out
+    integer(kind=4) :: tmp_size
     ! read parameter
     ! iarg = getarg(1,arg)
     ! open(unit=10, file=arg, status="new")
@@ -177,14 +180,35 @@ program Lymph3D
 
     call MAKE_PARTITION_AND_MPI_FILES(PolyData, PolyMesh, Npoly)
 
-    if (mpi_id==0) then
-        print *, PolyMesh%elem_glo2loc
-    endif
+    ! if (mpi_id==0) then
+    !     print *, PolyMesh%elem_glo2loc
+    ! endif
 
-    ! call PetscFinalize(mpi_ierr)
-    ! call MPI_FINALIZE(mpi_ierr)
+    call FLUSH
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    call FLUSH
 
-    ! stop
+    Np = PolyMesh%Elem_loc(1)%NDof_elem
+
+    tmp_size = sum(PolyMesh%num_elem_inter_comm(mpi_id+1,:))
+    allocate(prova_in(PolyMesh%num_elem_loc*DIM*Np))
+    allocate(prova_out(tmp_size*DIM*Np))
+
+    prova_in=0
+    do i=1,PolyMesh%num_elem_loc*DIM*Np
+        prova_in(i) = 100*mpi_id + i
+    enddo
+
+    !print *, 'proc:', mpi_id, 'num el loc', PolyMesh%num_elem_loc, 'dim', PolyMesh%num_elem_loc*DIM*Np
+    !print *, 'proc:', mpi_id, 'data out: ', prova_in
+    call MPI_EXCHANGE_DOF(PolyMesh, prova_in, prova_out, tmp_size*DIM*Np)
+    print *, 'end exchange'
+    print *, 'proc:', mpi_id, 'data out: ', prova_out
+
+    call PetscFinalize(mpi_ierr)
+    call MPI_FINALIZE(mpi_ierr)
+
+    stop
 
     call WRITE_MESH_VISUALIZATION_VTK(PolyMesh%num_elem_loc, PolyMesh, mpi_id)
 
