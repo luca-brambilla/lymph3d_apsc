@@ -81,6 +81,8 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
       call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
       call MPI_BCAST(PolyMesh%part_elem,PolyMesh%num_elem, &
                      MPI_INTEGER,0,MPI_COMM_WORLD,mpi_ierr)
+      call MPI_BCAST(PolyMesh%elem_glo2loc,PolyMesh%num_elem, &
+                     MPI_INTEGER,0,MPI_COMM_WORLD,mpi_ierr)
    endif
 
    !ATTENTION PROBABLY THIS HAS TO BE DONE ONLY IF ELEM4POC.MPI IS ABSENT
@@ -2841,6 +2843,7 @@ end subroutine WRITE_MESH_INFO
 
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+!> write interface info to file and store it
 subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
 
    use Poly_setup_MPI
@@ -2913,7 +2916,8 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
    if (mpi_id==0) print *, 'total number of interfaces for comm:', PolyMesh%num_elem_inter
 
    ! allocate after knowing the total number of interfaces
-   allocate(PolyMesh%elem_inter(PolyMesh%num_elem_inter))
+   allocate(PolyMesh%elem_inter_glo(PolyMesh%num_elem_inter))
+   allocate(PolyMesh%elem_inter_loc(PolyMesh%num_elem_inter))
 
    ! loop over processes - progressive counter increasing with each new number of elements to send per processor
    inter_count = 1
@@ -2973,8 +2977,14 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
    displs = PolyMesh%inter_disp(:,1)
 
    ! gather ordered (by process) lists (each of different legth) into a single array
-   call MPI_ALLGATHERV(elem_inter_loc, recvcounts(mpi_id+1), MPI_INTEGER, PolyMesh%elem_inter, recvcounts, displs, MPI_INTEGER, MPI_COMM_WORLD, mpi_ierr)
+   call MPI_ALLGATHERV(elem_inter_loc, recvcounts(mpi_id+1), MPI_INTEGER, PolyMesh%elem_inter_glo, recvcounts, displs, MPI_INTEGER, MPI_COMM_WORLD, mpi_ierr)
 
+   do i=1,PolyMesh%num_elem_inter
+      PolyMesh%elem_inter_loc(i) = PolyMesh%elem_glo2loc(PolyMesh%elem_inter_glo(i))
+   enddo
+
+   call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+   call FLUSH
 
    if (mpi_id == 0) then
       print *, "num_elem_inter_comm row-by-row:"
@@ -2987,8 +2997,11 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
          print *, PolyMesh%inter_disp(i, :)
       end do
 
-      print *, 'elem_inter'
-      print *, PolyMesh%elem_inter
+      print *, 'elem_inter_glo'
+      print *, PolyMesh%elem_inter_glo
+
+      print *, 'elem_inter_loc'
+      print *, PolyMesh%elem_inter_loc
    endif
 
 end subroutine WRITE_INTERFACE_INFO
