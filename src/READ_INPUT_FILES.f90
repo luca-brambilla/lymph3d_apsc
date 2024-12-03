@@ -119,8 +119,8 @@ subroutine READ_INPUT_FILES(PolyData,PolyMesh)
 
 
     grid_file = grid_file(1:len_trim(grid_file)) // '.mesh'
-    if (mpi_id.eq.0)  write(*,'(A)') '-------------------Reading Grid File-------------------'
-    if (mpi_id.eq.0)  write(*,'(A,A35)') 'Grid File : ',grid_file
+    if (mpi_id==0)  write(*,'(A)') '-------------------Reading Grid File-------------------'
+    if (mpi_id==0)  write(*,'(A,A35)') 'Grid File : ',grid_file
 
     inquire(file=grid_file,exist=IS_filefound);
     if(IS_filefound .eqv. .false.) call EXIT(EXIT_MISSING_FILE)
@@ -140,7 +140,7 @@ subroutine READ_INPUT_FILES(PolyData,PolyMesh)
 !    if (mpi_id == 0) call print_Mesh_Structure(PolyData)
 
 
-    if(mpi_id .eq. 0) write(*,'(A)') 'Read.'
-    if(mpi_id .eq. 0) write(*,'(A)')
+    if(mpi_id==0) write(*,'(A)') 'Read.'
+    if(mpi_id==0) write(*,'(A)')
 
 end subroutine READ_INPUT_FILES

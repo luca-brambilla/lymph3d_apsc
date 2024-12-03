@@ -243,7 +243,7 @@ end subroutine READ_HEADER
 
             ! Not-honoring Fault Plane
             read(inline(5:),*) src_name
-            if (src_name.eq.'LOAD-SRCMOD2') PolyData%srcmodflag = 1;
+            if (src_name == 'LOAD-SRCMOD2') PolyData%srcmodflag = 1;
 
            case('FUNC')
             PolyData%nfunc = PolyData%nfunc + 1
@@ -757,11 +757,11 @@ subroutine READ_DIME_MESHFILE(filemesh, PolyData, PolyMesh)
       ileft = 0
       iright = 0
       do i = 1, str_len
-         if (inline(i:i).ge.'A') exit
+         if (inline(i:i) >= 'A') exit
       enddo
       ileft = i
       do i = ileft, str_len
-         if (inline(i:i).lt.'A') exit
+         if (inline(i:i) < 'A') exit
       enddo
       iright = i
 

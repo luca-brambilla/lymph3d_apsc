@@ -323,14 +323,14 @@ module find_poly
 
         do i=1,N
 
-            if (array(i)  .eq. val) then
+            if (array(i)  == val) then
                 temp1(i)=1
             else
                 temp1(i)=0
             end if
         end do
         do i=1,N
-            if (temp1(i) .eq. 1) then
+            if (temp1(i) == 1) then
                 temp2(ii)=i
                 ii=ii+1
             end if

@@ -16,9 +16,9 @@ contains
       integer*4 :: len, type, i
 
       do i=0,len-1
-      if (ABS(invec(i)) .lt. 1E-16) then
+      if (ABS(invec(i)) < 1E-16) then
             !inoutvec(i)=inoutvec(i)
-      elseif (ABS(inoutvec(i)) .lt. 1E-16) then
+      elseif (ABS(inoutvec(i)) < 1E-16) then
             inoutvec(i)=invec(i)
       else
             inoutvec(i)=1.d0/2.d0*(invec(i)+inoutvec(i))
@@ -33,7 +33,7 @@ contains
 
       do i=0,len-1
 
-      if (ABS(invec(i)) .lt. 1E-16) then
+      if (ABS(invec(i)) < 1E-16) then
             ! Local vector has no entry --> Leave collective vector as it is (probably has some other value)
       else
             ! If the local vector has some entry, accept that over the existing value

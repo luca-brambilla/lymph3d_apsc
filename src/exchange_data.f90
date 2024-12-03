@@ -20,10 +20,6 @@ subroutine MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
     type(ScatteredArray), dimension(:,:), allocatable, intent(out) :: send_data !< variable size send buffers
     type(ScatteredArray), dimension(:,:), allocatable, intent(out) :: recv_data !< variable size receive buffers
 
-    ! interface
-    !     real(type=8), dimension(:), allocatable, intent(inout) :: send_data, recv_data
-    ! end interface
-
     integer(kind=4) :: id_send
     integer(kind=4) :: id_recv
     integer(kind=4) :: n_elem

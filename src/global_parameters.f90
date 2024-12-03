@@ -10,5 +10,6 @@ module global_parameters
     integer(kind=4), parameter :: DIM = 3               !< dimension of the problem
     real(kind=8), parameter :: SQRT2 = sqrt(2.0d0)      !< parameter for @f$ \sqrt{2} @f$
     real(kind=8), parameter :: PI = 4.d0*datan(1.0d0)   !< parameter for @f$ \pi @f$
+    real(kind=8), parameter :: TOL = 1.0d-40            !< tolerance for small numbers
 
 end module global_parameters

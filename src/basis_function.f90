@@ -396,7 +396,7 @@ module basis_function
             ! Computation of the derivative of Legendre Polynomials for degree greater than 7
             ii = p-1
 
-            do while (ii .ge. 0)
+            do while (ii >= 0)
                 call LegendreP_nonnorm(LP_old, x, ii, int, nq)
                 LPder_temp = LPder_temp + (2*ii + 1) * LP_old
                 ii = ii - 2

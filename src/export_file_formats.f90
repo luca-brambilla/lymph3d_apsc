@@ -1,5 +1,5 @@
 !> Module containing type definitions and routines for real-time VTK output during computations for individual material blocks
-module MOD_VTK
+module export_file_formats
 
     use Poly_mesh
     use global_parameters
@@ -8,10 +8,11 @@ module MOD_VTK
 
     contains
 
-    !>
     !! change types?
     !! hardcoded 3 for 3D and 4 for tetrahedra vertices
     !! hardcoded VTK type for tetrahedra 10
+
+    !> Export solution in .vtk format
 subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nnode_per_el, n_elem, n_elem_tot, u_name, u, PolyMesh)
 
     use mpi
@@ -47,7 +48,7 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nnode_per_el, n_elem, n_elem
     !integer(kind=4), intent(in) :: mpi_id
 
     ! Capping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
-    real*8, parameter :: cap = 1E-40
+    real*8, parameter :: cap = 1d-40
 
         ! call MPI_REDUCE(err_L2_mpi, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
         ! 0, MPI_COMM_WORLD, mpi_ierr)
@@ -210,7 +211,7 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nnode_per_el, n_elem, n_elem
 
 end subroutine VTK_WRITE_SOLUTION
 
-!< Initial lines for PVD file
+!> Export solution in .pdv format (joint with VTU_WRITE_SOLUTION)
 subroutine PVD_SETUP(num_dt_mon, dt_start, num_dt)
 
     implicit none
@@ -252,6 +253,7 @@ end subroutine PVD_SETUP
 
 
 !> Write mesh and solution into 2 separate VTU files
+!> Export solution in .vtu format (joint with PVD_SETUP)
 subroutine VTU_WRITE_SOLUTION(filename, xx, yy, zz, nnode_per_el, n_elem, n_elem_tot, u_name, u, PolyMesh, num_dt)
 
     use mpi
@@ -291,7 +293,7 @@ subroutine VTU_WRITE_SOLUTION(filename, xx, yy, zz, nnode_per_el, n_elem, n_elem
     integer*4 :: elem_offset, conn_offset
 
     ! Capping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
-    real*8, parameter :: cap = 1E-40
+    real*8, parameter :: cap = 1d-40
 
         ! call MPI_REDUCE(err_L2_mpi, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
         ! 0, MPI_COMM_WORLD, mpi_ierr)
@@ -706,7 +708,7 @@ subroutine WRITE_ENSIGHT_CASE(base_filename, num_dt, solution_name)
     close(case_file_unit)
 end subroutine WRITE_ENSIGHT_CASE
 
-
+!> write mesh partition files, only geometric data
     subroutine VTK_WRITE_MESH_PARTITION(filename, xx, yy, zz, nnode_per_el, n_elem, PolyMesh)
 
       implicit none
@@ -723,7 +725,7 @@ end subroutine WRITE_ENSIGHT_CASE
       integer*4 :: i,j
 
       ! Capping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
-      real*8, parameter :: cap = 1E-40
+      real*8, parameter :: cap = 1d-40
 
       do i=1,n_elem
         do j=1,nnode_per_el
@@ -793,7 +795,7 @@ end subroutine WRITE_ENSIGHT_CASE
       integer*4 :: i,j
 
       ! Capping parameter (VTK format problems with e.g. 1E-300 --> set to zero)
-      real*8, parameter :: cap = 1E-40
+      real*8, parameter :: cap = 1d-40
 
       do i=1,n_elem
         do j=1,nnode_per_el
@@ -939,7 +941,7 @@ end subroutine WRITE_ENSIGHT_CASE
     !> Store the numerical solution in an appropriate file
     !! HARDCODED 4 FOR 4 VERTICES OF TET
     !! MERGE SUBROUTINES...
-    subroutine WRITE_SOLUTION_VTK(n_elem, PolyMesh, u, IsPoly, num_dt)
+    subroutine WRITE_SOLUTION(n_elem, PolyMesh, u, IsPoly, num_dt)
 
         use problem_data_and_properties
         use mpi
@@ -1029,9 +1031,12 @@ end subroutine WRITE_ENSIGHT_CASE
 
         endif
 
+        if (mpi_id==0) print *, 'Writing .vtk file...'
         call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, 4, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
 
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        if (mpi_id==0) print *, 'Writing .vtu file...'
+
         call VTU_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, 4, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh, num_dt)
 
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -1060,13 +1065,15 @@ end subroutine WRITE_ENSIGHT_CASE
             enddo
         endif
 
-        write(*,'(A)') ' write ensight'
+        if (mpi_id==0) print *, 'Writing Ensight .geo and .vec file...'
         call ENSIGHT_WRITE_SOLUTION('MONITORS/',xx,yy,zz, 4, n_elem, PolyMesh%num_elem, 'DISPLACEMENT', u, start_node, gathered_sizes, num_dt)
 
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        if (mpi_id==0) print *, 'Writing Ensight .case file...'
+
         if (mpi_id == 0) call WRITE_ENSIGHT_CASE('MONITORS/solution', num_dt, 'DISPLACEMENT')
 
-    end subroutine WRITE_SOLUTION_VTK
+    end subroutine WRITE_SOLUTION
 
     !> Write .vtk files for the visualization of the partition and agglomeration of the mesh
     subroutine WRITE_MESH_VISUALIZATION_VTK(n_elem, PolyMesh, mpi_id)
@@ -1191,4 +1198,4 @@ end subroutine WRITE_ENSIGHT_CASE
 
     end subroutine WRITE_ERRORS
 
-end module MOD_VTK
+end module export_file_formats

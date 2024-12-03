@@ -1,4 +1,5 @@
-subroutine SOLVER_SETTINGS(stiff,ksp,pc)
+!> Set PETSc solver settings: type of solver (direct, iterative), algorithm and preconditioner
+subroutine SOLVER_SETTINGS(stiff, ksp, pc)
 
 #include<petsc/finclude/petscksp.h>
 
@@ -10,7 +11,7 @@ subroutine SOLVER_SETTINGS(stiff,ksp,pc)
     implicit none
 
 !-------------------------------------------------------------------------------
-    
+
     ! PETSC
 
     !> FEM Matrices for acoustic materials
@@ -45,16 +46,19 @@ subroutine SOLVER_SETTINGS(stiff,ksp,pc)
     solver_type = 1;
 
     !> Create solver object ksp
-    PetscCall(KSPCreate(PETSC_COMM_WORLD, ksp, mpi_ierr))
-    !PetscCall(KSPCreate(PETSC_COMM_SELF, ksp, mpi_ierr))
+    if (IS_MatrixFree .eqv. .true.) then
+        PetscCall(KSPCreate(PETSC_COMM_SELF, ksp, mpi_ierr))
+    else
+        PetscCall(KSPCreate(PETSC_COMM_WORLD, ksp, mpi_ierr))
+    endif
 
     !> Set the linear operators for the KSP object
     !> Choose A itself as preconditioner as default
     PetscCall(KSPSetOperators(ksp, stiff, stiff, mpi_ierr))
 
     !> Choose the concrete solver
-    if (solver_type .eq. 0) then !> Direct solver
-        
+    if (solver_type == 0) then !> Direct solver
+
         ! Set the type of the KSP solver
         ! KSPPREONLY: apply a preconditioner to the linear system but not to perform any iterative solving
         PetscCall(KSPSetType(ksp, KSPPREONLY, mpi_ierr))
@@ -63,7 +67,7 @@ subroutine SOLVER_SETTINGS(stiff,ksp,pc)
         !> 1 :: Cholesky
         preconditioner_type = 0
 
-    elseif (solver_type .eq. 1) then !> Iterative solver
+    elseif (solver_type == 1) then !> Iterative solver
 
         call set_properties(alpha, theta, c)
 
@@ -78,7 +82,7 @@ subroutine SOLVER_SETTINGS(stiff,ksp,pc)
     endif
 
     !> Specify the iterative solver settings
-    if (solver_type .gt. 0) then
+    if (solver_type > 0) then
         !> Use a specific preconditioner, that is NOT a direct solver
         !> 2 :: ILU
         !> 3 :: Incomplete Cholesky
@@ -100,22 +104,22 @@ subroutine SOLVER_SETTINGS(stiff,ksp,pc)
         !> In particular, use the previous solution as initial guess for the next solve step
         PetscCall(KSPSetInitialGuessNonzero(ksp, PETSC_TRUE, mpi_ierr))
     endif
-    
+
     !>------------------------------------------------------------------------------
-    
+
     !> Set up preconditioner -------------------------------------------------------
     !> Gets chosen by the linear solver
-    
+
     !> Get the preconditioner associated with the KSP solver
     !> pc is a pointer to a variable (of type PC) that will store the preconditioner associated with the KSP object after the function call
     PetscCall(KSPGetPC(ksp, pc, mpi_ierr))
-    
+
     !> Choose the concrete preconditioner
-    if (preconditioner_type .eq. 0) then
+    if (preconditioner_type == 0) then
         !> Use LU decomposition as a preconditioner
         PetscCall(PCSetType(pc, PCLU, mpi_ierr))
         ! PetscCall(PCSetType(pc, PCCHOLESKY, mpi_ierr))
-        
+
         !> Use MUMPS to perform the LU-decomposition
         ! PetscCall(PCFactorSetMatSolverType(pc,MATSOLVERMUMPS,mpi_ierr))
         ! PetscCall(PCFactorSetUpMatSolverType(pc,mpi_ierr))
@@ -131,26 +135,26 @@ subroutine SOLVER_SETTINGS(stiff,ksp,pc)
         ! icntl = 14
         ! ival  = 70
         ! PetscCall(MatMumpsSetIcntl(RR, icntl, ival, mpi_ierr))
-    
-    elseif (preconditioner_type .eq. 1) then
+
+    elseif (preconditioner_type == 1) then
         !> Use Cholesky factorization as a preconditioner
         PetscCall(PCSetType(pc, PCCHOLESKY, mpi_ierr))
-    
-    elseif (preconditioner_type .eq. 2) then
+
+    elseif (preconditioner_type == 2) then
         !> Use ILU as a preconditioner
         PetscCall(PCSetType(pc, PCILU, mpi_ierr))
-    
-    elseif (preconditioner_type .eq. 3) then
+
+    elseif (preconditioner_type == 3) then
         !> Use Incomplete Cholesky factorization as a preconditioner
         PetscCall(PCSetType(pc, PCICC, mpi_ierr))
-    
-    elseif (preconditioner_type .eq. 4) then
+
+    elseif (preconditioner_type == 4) then
         !> Use Jacobi preconditioner
         PetscCall(PCSetType(pc, PCJACOBI, mpi_ierr))
-    
-    elseif (preconditioner_type .eq. 5) then
+
+    elseif (preconditioner_type == 5) then
         !> Use SOR method as a preconditioner
         PetscCall(PCSetType(pc, PCSOR, mpi_ierr))
     endif
 
-end subroutine 
+end subroutine SOLVER_SETTINGS
