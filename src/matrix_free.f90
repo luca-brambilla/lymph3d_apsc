@@ -93,12 +93,11 @@ subroutine SET_PETSC_VECTOR_MATRIX_FREE(ne_loc, Np, V)
 
 end subroutine SET_PETSC_VECTOR_MATRIX_FREE
 
-!> @brief Allocate and compute the mass, stiffness, dg, modal matrices and
-!> rhs vector for each element.
+!> @brief Compute the mass, stiffness, dg, modal matrices for each element.
 !> The stiffness and dg matrices for the element E+ are rectangular and contain
 !> the contributions also from neighboring elements E-.
 !> mass matrix is directly in PETSc for later to solve linear systems.
-subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_loc, rhs_loc, massa, massa_modale, max_faces)
+subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_loc, massa, massa_modale, max_faces)
 
     !TODO variable number of sides, do not count boundaries
     !TODO polytopal elements, face contribution to same matrices
@@ -117,10 +116,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     PetscInt :: irow(1), jcol(1)
 
     real(kind=8) :: present = 0.0
-    real(kind=8) :: tmp = 0.0
 
     real(kind=8) :: dt2
-
 
     integer(kind=4) :: nq3, nq2, p
     real(kind=8) :: theta, alpha, c
@@ -162,8 +159,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     ! integer(kind=4), intent(out) :: internal_neigh(PolyMesh%num_elem_loc,:) !< internal neighbors connectivity - similar to el_neigh from PolyMesh
     integer(kind=4), intent(out) :: max_faces !< maximum number of polygon faces
 
-    real(kind=8), dimension(DIM, Np) :: rhs_tet_loc
-    real(kind=8), dimension(DIM, Np) :: rhs_face_bd_loc
     real(kind=8), dimension(DIM, DIM, Np, Np) :: V_loc
     real(kind=8), dimension(DIM, DIM, Np, Np) :: S_loc, I_loc, IN_loc, SN_loc
 
@@ -177,9 +172,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     ! local rectangular
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: K_loc
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: A_dg_loc
-    ! local vector
-    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM, Np) :: rhs_loc_tmp
-    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(inout) :: rhs_loc
 
     integer(kind=4) :: row, col
 
@@ -238,7 +230,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     ! internal_neigh = 0
 
     ! initialize output once
-    rhs_loc = 0.0
     K_loc = 0.0
     A_dg_loc = 0.0
 
@@ -269,13 +260,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
         ! initialization of V_loc
         V_loc = 0.0
-        ! initialization of the rhs term on the volume rhs_tet_loc
-        rhs_tet_loc = 0.0
-
         mass_loc = 0.0
 
         mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
-
         ! take correct density only for dynamic case
         rho = PolyData%prop_mat(mat_id,1) ! DENSITY USED FOR DYNAMICS
         lambda = PolyData%prop_mat(mat_id,2)
@@ -331,7 +318,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                     jcol(1) = n-1
                     val(1)  = mass_loc(i,i,m,n)
 
-                    if (val(1) .ne. 0.0) then
+                    if (val(1) >= TOL) then
                         PetscCall(MatSetValues(massa_modale(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
                         val(1) = val(1)*rho
                         PetscCall(MatSetValues(massa(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
@@ -339,16 +326,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
                 enddo
             enddo
-        enddo
-
-        ! computation of the local forcing vector, consider rhs with density only if dynamic case.
-
-        ! call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
-        call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_loc_tmp(ie_loc,:,:), rho*present)
-        ! copy to output in correct format
-        do i=1,DIM
-            row = (i-1)*Np
-            rhs_loc(ie_loc, row+1:row+Np) = rhs_loc_tmp(ie_loc,i,:)
         enddo
 
         ! current element E+
@@ -360,8 +337,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
             face_flag(e) = 0
 
-            ! initialization of the face rhs term rhs_face_bd_loc
-            rhs_face_bd_loc = 0.0
             ! initialization of the face matrices I_loc, S_loc, IN_loc and SN_loc
             I_loc = 0.0
             S_loc = 0.0
@@ -424,9 +399,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                     call MAKE_STIFF_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly), nn, &
                                         PolyMesh%Elem_loc(E1)%area(e),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
 
-                    call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly),&
-                                    nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
-
                 else
 
                     ! check if e is not a boundary face
@@ -439,9 +411,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                         call MAKE_STIFF_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly2_loc)%hk,nn, &
                                                 PolyMesh%Elem_loc(E1)%area(e),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
 
-                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,nn, &
-                                        PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
-
                     else
 
                         call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
@@ -450,25 +419,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                         call MAKE_STIFF_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(1)%hk, nn, &
                                                 PolyMesh%Elem_loc(E1)%area(e),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
 
-                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,nn, &
-                                        PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
-
                     endif
 
-                endif
-
-                ! if e is a boundary edge, then insert the values of rhs_face_bd_loc
-                ! in the entries of the rhs vector
-                if (E2 == -1 .or. E2 == -2) then
-                    do i=1,DIM
-                        do m=1,Np
-                            row = (i-1)*Np + m
-                            tmp = rhs_face_bd_loc(i,m)
-                            if (tmp .ne. 0.0) then
-                                rhs_loc(ie_loc,row) = rhs_loc(ie_loc,row) + tmp
-                            endif
-                        enddo
-                    enddo
                 endif
 
             endif
@@ -539,6 +491,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
 end subroutine MAKE_MATRICES_FREE
 
+!> @brief Compute the RHS vector for each element.
 subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
     implicit none
 
@@ -643,7 +596,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
     ! loop on the tetrahedra
     elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
 
-        ! initialization of the rhs term on the volume rhs_tet_loc       
+        ! initialization of the rhs term on the volume rhs_tet_loc
         rhs_tet_loc = 0.0
 
         ! count neighbor element contribution only to allocate K_loc
