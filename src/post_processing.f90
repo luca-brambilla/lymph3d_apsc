@@ -9,7 +9,7 @@ module post_processing
     use Poly_mesh
     use Poly_ref_mappings
     use basis_function
-    use MOD_VTK
+    use export_file_formats
     use SET_PETSC_SYSTEM
     use mesh_partition_and_mpi_files
     
@@ -23,12 +23,13 @@ module post_processing
 subroutine PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
 
 
-    type(Mesh_Structure), intent(in) :: PolyMesh
-    integer(kind=4), intent(in) :: local_dof
+    type(Mesh_Structure), intent(in) :: PolyMesh    !< mesh
+    integer(kind=4), intent(in) :: local_dof        !< number of local dof
     ! integer(kind=4), intent(in) :: mpi_id
-    integer(kind=4), dimension(:), allocatable, intent(inout) :: nnod_num
-    integer(kind=4), dimension(:), allocatable, intent(inout) :: gathered_sizes, displacements
-    real(kind=8), dimension(:,:), allocatable, intent(inout) :: u
+    integer(kind=4), dimension(:), allocatable, intent(out) :: nnod_num
+    integer(kind=4), dimension(:), allocatable, intent(out) :: gathered_sizes !< MPI gather size
+    integer(kind=4), dimension(:), allocatable, intent(out) :: displacements !< MPI gather displacements
+    real(kind=8), dimension(:,:), allocatable, intent(out) :: u !< solution (Np, 3*num_poly)
     integer(kind=4) :: i, Np
 
     Np = PolyMesh%Elem_loc(1)%NDof_elem
@@ -171,7 +172,7 @@ end subroutine POST_PROCESS
 
 ! end subroutine GATHER_SOLUTION
 
-    ! Evaluate nodal values of the solution and store them in output.vtk 
+    ! Evaluate nodal values of the solution and store them in various formats
     subroutine EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
         
         use local_search ! see Poly_global.f90
@@ -201,7 +202,7 @@ end subroutine POST_PROCESS
         Npoly = PolyMesh%num_poly
         p = PolyMesh%Elem_loc(1)%Degree
 
-        if (mpi_id==0) print *, 'Saving the solution in a file .vtk ...'
+        if (mpi_id==0) print *, 'Saving the solution in a file ...'
         
         ! list of the degrees of monomials of the Np basis functions up to order p
         ! (see basis_functions.f90)
@@ -291,7 +292,7 @@ end subroutine POST_PROCESS
         deallocate(temp)
         deallocate(blist)
 
-        call WRITE_SOLUTION_VTK(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly, num_dt) ! see MOD_VTK.f90
+        call WRITE_SOLUTION(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly, num_dt) ! see export_file_formats.f90
 
         deallocate(u_nod_vet)
         if (mpi_id==0) print *,'Done exporting solution'
@@ -351,13 +352,16 @@ subroutine COMPUTE_ERROR_DG(mat_dg, petsc_sol, petsc_uex, global_dof, err_DG_mpi
 
     implicit none
 
-    Mat :: mat_dg
-    Vec :: petsc_sol, petsc_uex, temp, error, e_DG
-    PetscScalar coeff
+    type(tMat), intent(in) :: mat_dg       !< PETSc DG matrix
+    type(tVec), intent(in) :: petsc_sol    !< PETSc computed solution vector
+    type(tVec), intent(in) :: petsc_uex    !< PETSc exact solution vector
+    Vec :: temp, error, e_DG
+    PetscScalar :: coeff
 
     !PetscViewer viewer
 
-    integer(kind=4) :: global_dof, local_dof
+    integer(kind=4), intent(in) :: global_dof   !< global number of dof
+    integer(kind=4), intent(in) :: local_dof    !< local number of dof
     real(kind=8), pointer, dimension(:) :: error_DG_pointer
     real(kind=8), dimension(local_dof) :: error_DG
     real(kind=8) :: err_DG_mpi
@@ -393,8 +397,8 @@ end subroutine COMPUTE_ERROR_DG
 !> Compute the maximum value of the diameter of the elements of the mesh per processor
 function compute_hmax(PolyMesh) result(hmax)
 
-    type(Mesh_Structure), intent(in) :: PolyMesh
-    real(kind=8) :: hmax
+    type(Mesh_Structure), intent(in) :: PolyMesh    !< mesh
+    real(kind=8) :: hmax                            !< maximun size
     integer(kind=4) :: ipoly_loc
     real(kind=8) :: h
 
