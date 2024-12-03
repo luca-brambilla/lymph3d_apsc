@@ -109,6 +109,7 @@ program Lymph3D
 
     real(kind=8), dimension(:), allocatable :: prova_in, prova_out
     integer(kind=4) :: tmp_size
+    type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
     ! read parameter
     ! iarg = getarg(1,arg)
     ! open(unit=10, file=arg, status="new")
@@ -199,11 +200,17 @@ program Lymph3D
         prova_in(i) = 100*mpi_id + i
     enddo
 
-    !print *, 'proc:', mpi_id, 'num el loc', PolyMesh%num_elem_loc, 'dim', PolyMesh%num_elem_loc*DIM*Np
     !print *, 'proc:', mpi_id, 'data out: ', prova_in
-    call MPI_EXCHANGE_DOF(PolyMesh, prova_in, prova_out, tmp_size*DIM*Np)
+
+    call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    call MPI_EXCHANGE_DOF(PolyMesh, prova_in, prova_out, send_data, recv_data)
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    call MPI_EXCHANGE_DEALLOCATE(PolyMesh, send_data, recv_data)
     print *, 'end exchange'
-    print *, 'proc:', mpi_id, 'data out: ', prova_out
+    !print *, 'proc:', mpi_id, 'data out: ', prova_out
 
     call PetscFinalize(mpi_ierr)
     call MPI_FINALIZE(mpi_ierr)
