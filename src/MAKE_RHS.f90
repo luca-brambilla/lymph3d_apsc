@@ -13,6 +13,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
     use Poly_ref_mappings
     use Poly_data
     use mesh_partition_and_mpi_files
+    use global_parameters
 
     implicit none
     
@@ -212,7 +213,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
 
                 nn = PolyMesh%Elem_loc(E1)%normal(e,:)
 
-                ! If it is true, then the two polyhedra do not belong to the same processor 
+                ! If it is true, then the two polyhedra do not belong to the same processo
                 ! so we have to retrieve b_box of neighbouring element from neigh_bbox
                 ! and hk of neighbouring element from neigh_hk
                 ! Otherwise, the two polyhedra belong to the same processor 

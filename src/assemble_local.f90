@@ -120,7 +120,7 @@ subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rh
     real(kind=8), dimension(nq3), intent(in) :: weitet3
     real(kind=8), dimension(Np,nq3), intent(in) :: phi
     real(kind=8), dimension(3,4), intent(in) :: Fk
-    real(kind=8), dimension(DIM,Np), intent(out) :: rhs_tet_loc
+    real(kind=8), dimension(:,:), intent(out) :: rhs_tet_loc ! dim (3,Np)
 
     integer(kind=4) :: q, i, j, k, m
     real(kind=8), dimension(DIM) :: points, forc_term

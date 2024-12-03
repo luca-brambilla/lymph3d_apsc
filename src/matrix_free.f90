@@ -98,7 +98,7 @@ end subroutine SET_PETSC_VECTOR_MATRIX_FREE
 !> The stiffness and dg matrices for the element E+ are rectangular and contain
 !> the contributions also from neighboring elements E-.
 !> mass matrix is directly in PETSc for later to solve linear systems.
-subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, A_dg_loc, M_modal_loc, rhs_loc, massa, massa_modale, max_faces)
+subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_loc, rhs_loc, massa, massa_modale, max_faces)
 
     !TODO variable number of sides, do not count boundaries
     !TODO polytopal elements, face contribution to same matrices
@@ -111,8 +111,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     integer(kind=4), intent(in) :: Np               !< number of degrees of freedom of each element
     integer(kind=4), intent(in) :: global_dof       !< Number of global dofs
 
-    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(out) :: massa
-    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(out) :: massa_modale
+    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa
+    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa_modale
     PetscScalar :: val(1)
     PetscInt :: irow(1), jcol(1)
 
@@ -169,24 +169,19 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
 
     ! each local has a matrix
     ! local square
-    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM, DIM, Np, Np), intent(out) :: M_loc
+    !real(kind=8), dimension(:, :, :, :, :), allocatable, intent(out) :: M_loc
     real(kind=8), dimension(DIM, DIM, Np, Np) :: mass_loc
-    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM, DIM, Np, Np), intent(out) :: M_modal_loc
+    !real(kind=8), dimension(:, :, :, :, :), allocatable, intent(out) :: M_modal_loc
     ! real(kind=8), dimension(:,PolyMesh%num_elem_loc,3,3,Np,Np), allocatable, intent(out) :: K_loc
 
     ! local rectangular
-    real(kind=8), dimension(:,:,:,:), allocatable, intent(out) :: K_loc
-    real(kind=8), dimension(:,:,:,:), allocatable, intent(out) :: A_dg_loc
+    real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: K_loc
+    real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: A_dg_loc
     ! local vector
     real(kind=8), dimension(PolyMesh%num_elem_loc, DIM, Np) :: rhs_loc_tmp
-    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(out) :: rhs_loc
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(inout) :: rhs_loc
 
     integer(kind=4) :: row, col
-
-    PRINT *, '***** MATRIX FREE SETUP *****'
-
-    call SET_PETSC_MASS_MATRIX_FREE(PolyMesh%num_elem_loc, Np, massa)
-    call SET_PETSC_MASS_MATRIX_FREE(PolyMesh%num_elem_loc, Np, massa_modale)
 
     dt2 = time_step * time_step
     ! set the properties of the method (see problem_data_and_properties.f90)
@@ -231,10 +226,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
         print *,'RHS with only static component'
     endif
 
-    ! initialize output once
-    M_loc = 0.0
-    rhs_loc = 0.0
-
     ! loop over elements to find the maximum number of polygonal faces
     !! IS ALL SPLIT IN POLYGONS OR TETRAHEDRA???
     max_faces = PolyMesh%Elem_loc(1)%num_faces
@@ -246,9 +237,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
     ! allocate(internal_neigh(PolyMesh%num_elem_loc, max_faces))
     ! internal_neigh = 0
 
-    !! WASTE OF MEMORY...
-    allocate(K_loc(PolyMesh%num_elem_loc, max_faces, DIM*Np, DIM*Np))
-    allocate(A_dg_loc(PolyMesh%num_elem_loc, max_faces, DIM*Np, DIM*Np))
+    ! initialize output once
+    rhs_loc = 0.0
     K_loc = 0.0
     A_dg_loc = 0.0
 
@@ -325,7 +315,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
 
         ! computation of the local mass matrix M_loc (see assemble_local.f90)
         !!! i only need true mass matrix
-        call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, rho, M_loc(ie_loc,:,:,:,:))
+        !call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, rho, M_loc(ie_loc,:,:,:,:))
 
         ! for petsc
         call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, 1.0d0, mass_loc)
@@ -336,8 +326,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
             do m=1,Np
                 do n=1,Np
 
-                    irow(1) = m
-                    jcol(1) = n
+                    ! PETSc numbering starts from 0
+                    irow(1) = m-1
+                    jcol(1) = n-1
                     val(1)  = mass_loc(i,i,m,n)
 
                     if (val(1) .ne. 0.0) then
@@ -356,8 +347,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
         call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_loc_tmp(ie_loc,:,:), rho*present)
         ! copy to output in correct format
         do i=1,DIM
-            row = (i-1)*Np+1
-            rhs_loc(ie_loc, row:row+Np) = rhs_loc_tmp(ie_loc,i,:)
+            row = (i-1)*Np
+            rhs_loc(ie_loc, row+1:row+Np) = rhs_loc_tmp(ie_loc,i,:)
         enddo
 
         ! current element E+
@@ -471,7 +462,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
                 if (E2 == -1 .or. E2 == -2) then
                     do i=1,DIM
                         do m=1,Np
-                            row = (i-1)*Np+1 + m
+                            row = (i-1)*Np + m
                             tmp = rhs_face_bd_loc(i,m)
                             if (tmp .ne. 0.0) then
                                 rhs_loc(ie_loc,row) = rhs_loc(ie_loc,row) + tmp
@@ -491,9 +482,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
                 do i=1,DIM
                     do j=1,DIM
                         do m=1,Np
-                            row = (i-1)*Np+1 + m
+                            row = (i-1)*Np + m
                             do n=1,Np
-                                col = (j-1)*Np+1 + n
+                                col = (j-1)*Np + n
                                 K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_loc(i,j,m,n) - I_loc(j,i,n,m) + S_loc(i,j,m,n)
                             enddo
                         enddo
@@ -507,9 +498,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
                     do i=1,DIM
                         do j=1,DIM
                             do m=1,Np
-                                row = (i-1)*Np+1 + m
+                                row = (i-1)*Np + m
                                 do n=1,Np
-                                    col = (j-1)*Np+1 + n
+                                    col = (j-1)*Np + n
                                     K_loc(ie_loc,e,row,col) = K_loc(ie_loc,e,row,col) + theta*IN_loc(i,j,m,n) - IN_loc(j,i,n,m) + SN_loc(i,j,m,n)
                                 enddo
                             enddo
@@ -525,7 +516,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
         enddo face_loop
     enddo elem_loop
 
-    !call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
     ! print *, 'Reaction coefficient c: ', c
 
@@ -548,6 +539,280 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, 
 
 end subroutine MAKE_MATRICES_FREE
 
+subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
+    implicit none
+
+    type(Mesh_Structure), intent(inout) :: PolyMesh !< Mesh
+    type(Data_Structure), intent(in) :: PolyData    !< Data
+    integer(kind=4), intent(in) :: Np               !< number of degrees of freedom of each element
+    integer(kind=4), intent(in) :: global_dof       !< Number of global dofs
+
+    real(kind=8) :: present = 0.0
+    real(kind=8) :: tmp = 0.0
+
+    integer(kind=4) :: nq3, nq2, p
+    real(kind=8) :: theta, alpha, c
+
+    real(kind=8), dimension(4,4,4) :: node_maps
+    real(kind=8), dimension(2,3,4) :: node_maps_inv
+
+    real(kind=8), dimension(:,:), ALLOCATABLE :: nod3, nodtet3
+    real(kind=8), dimension(:), ALLOCATABLE :: wei3, weitet3
+    real(kind=8), dimension(:,:), ALLOCATABLE :: nod2, nodtria2
+    real(kind=8), dimension (:), ALLOCATABLE :: wei2, weitria2
+    integer(kind=4), dimension(:,:), ALLOCATABLE :: blist
+
+    real(kind=8), dimension(:,:), ALLOCATABLE :: phi
+    real(kind=8), dimension(:,:,:), ALLOCATABLE :: dphi
+    real(kind=8), dimension(:,:,:), ALLOCATABLE :: phi_b
+    real(kind=8), dimension(:,:,:,:), ALLOCATABLE :: grad_b
+
+    real(kind=8), dimension(3,4) :: Fk
+    real(kind=8) :: Jdet
+    real(kind=8), dimension(3,3) :: Jinv
+    real(kind=8), dimension(4) :: x, y, z
+
+    real(kind=8) :: lambda, mu, rho ! density used for dynamics
+    integer(kind=4) :: mat_id
+
+    integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, ipoly_loc, ipoly_glob, ipoly2_loc, ipoly2_glob
+    integer(kind=4) :: n_tet_in_poly, iface_poly
+    integer(kind=4) :: Npoly
+    integer(kind=4) :: i, j, m
+
+    integer(kind=4) :: e, E1, E2!, sides
+    integer(kind=4), dimension(4) :: face_flag
+    real(kind=8), dimension(DIM) :: nn
+    integer(kind=4) :: space_fun_tag
+    !integer(kind=4) :: n_neigh      !< number of neighbor internal faces
+    !integer(kind=4) :: neigh_count  !< counter for inserting contributions in K_loc
+
+    real(kind=8), dimension(DIM, Np) :: rhs_tet_loc
+    real(kind=8), dimension(DIM, Np) :: rhs_face_bd_loc
+
+    ! local vector
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM, Np) :: rhs_loc_tmp
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(inout) :: rhs_loc
+
+    integer(kind=4) :: row
+
+    call set_properties(alpha, theta, c)
+
+    ! total degree of the basis functions
+    p = PolyMesh%Elem_loc(1)%Degree;
+    Npoly = PolyMesh%num_poly
+
+    ! Computation of Gauss-Legendre quadrature nodes and weights over the reference square and cube
+    ! (see basis_functions.f90)
+    call quadrature(nod2, wei2, nod3, wei3, p, nq3, nq2)
+
+    ! see Poly_ref_mappings.f90
+    call tria2tetfaces_maps(node_maps, node_maps_inv)
+
+    allocate(nodtet3(4,nq3))
+    allocate(nodtria2(4,nq2))
+    allocate(weitet3(nq3))
+    allocate(weitria2(nq2))
+
+    ! Maps to the reference tetrahedron and reference triangle (see Poly_ref_mappings.f90)
+    call mapping_quadrature_3D(nod3, wei3, nq3, nodtet3, weitet3)
+    call mapping_quadrature_2D(nod2, wei2, nq2, nodtria2, weitria2)
+
+    ! list of the degrees of monomials of the Np basis functions up to order p (see basis_functions.f90)
+    allocate(blist(Np,3))
+    call basis_list(blist, p, Np)
+
+    print *,'Assembling linear system...'
+
+    allocate(phi(Np,nq3))
+    allocate(dphi(3,Np,nq3))
+    allocate(phi_b(Np,nq2,2))
+    allocate(grad_b(3,Np,nq2,2))
+
+    ! assign 0 to density for static case
+    if (IsTime_dependent .eqv. .true.) then
+        print *,'RHS with additional dynamic component'
+        present = 1.0
+    else
+        print *,'RHS with only static component'
+    endif
+
+    ! initialize output once
+    rhs_loc = 0.0
+
+    ! loop on the tetrahedra
+    elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
+
+        ! initialization of the rhs term on the volume rhs_tet_loc       
+        rhs_tet_loc = 0.0
+
+        ! count neighbor element contribution only to allocate K_loc
+        ! current element E+
+        E1 = ie_loc
+
+        mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
+        rho = PolyData%prop_mat(mat_id,1) ! DENSITY USED FOR DYNAMICS
+        lambda = PolyData%prop_mat(mat_id,2)
+        mu = PolyData%prop_mat(mat_id,3)
+
+        ! computation of the coordinates of the tetrahedron
+        do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
+
+            ! see MAKE_PARTITION_AND_MPI_FILES.f90
+            call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+                                PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)
+
+            x(ivert)=PolyMesh%coord_x(id_node)
+            y(ivert)=PolyMesh%coord_y(id_node)
+            z(ivert)=PolyMesh%coord_z(id_node)
+
+        enddo
+
+        ! computation of the reference map Fk, the inverse Jinv and the determinant Jdet of its jacobian (see Poly_ref_mappings.f90)
+        call jacobians(x, y, z, Fk, Jinv, Jdet)
+
+        ! find the polyhedron ipoly_glob that contains the tetrahedron ie_loc
+        ie_glob = PolyMesh%elem_loc2glo(ie_loc)
+        ipoly_glob = PolyMesh%elem_in_poly(ie_glob)
+
+        ! see subroutine local_search in Poly_global.f90
+        call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
+                                    PolyMesh%num_poly_loc, &
+                                    ipoly_glob,ipoly_loc)
+
+        ! evaluation of the basis functions and their partial derivatives at the 3D quadrature nodes for a given polyhedral element contained in b_box
+        ! (see basis_functions.f90)
+        call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
+
+        call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_loc_tmp(ie_loc,:,:), rho*present)
+
+        ! copy to output in correct format
+        do i=1,DIM
+            row = (i-1)*Np
+            rhs_loc(ie_loc, row+1:row+Np) = rhs_loc_tmp(ie_loc,i,:)
+        enddo
+
+        ! current element E+
+        E1 = ie_loc
+        face_loop: do e=1,PolyMesh%Elem_loc(E1)%num_faces
+            face_flag(e) = 0
+
+            ! initialization of the face rhs term rhs_face_bd_loc
+            rhs_face_bd_loc = 0.0
+
+            ! find the neighbouring tetrahedron E2 sharing the face e with E1
+            ! E2 is element E-
+            E2 = PolyMesh%Elem_loc(E1)%neigh_el(e,2)
+            space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(e,5)
+
+            ! if e is not a boundary face
+            if (E2 /= -1 .and. E2 /= -2) then
+
+                ! find the polyhedron in which E2 is contained
+                ipoly2_glob = PolyMesh%elem_in_poly(E2)
+
+                ! see subroutine local_search in Poly_global.f90
+                call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
+                            PolyMesh%num_poly_loc, &
+                            ipoly2_glob,ipoly2_loc)
+
+                ! check if E1 and E2 belong to the same polyhedron
+                if (ipoly_glob == ipoly2_glob) then
+                    face_flag(e) = 1
+                endif
+
+            endif
+
+            ! if it is true, then E2 does not belong to the same polyhedron E1 belongs to
+            ! or e is a boundary face
+            if (face_flag(e) == 0) then
+
+                nn = PolyMesh%Elem_loc(E1)%normal(e,:)
+
+                ! If it is true, then the two polyhedra do not belong to the same process
+                ! so we have to retrieve b_box of neighbouring element from neigh_bbox
+                ! and hk of neighbouring element from neigh_hk
+                ! Otherwise, the two polyhedra belong to the same processor
+                ! so that b_box and hk can be easily retrieved
+                ! In both cases, compute the basis functions on the faces
+                ! and the local matrices on the faces
+                if (ipoly2_loc==0) then
+
+                    n_tet_in_poly=PolyMesh%Poly(ipoly_loc)%num_tet_in_poly
+
+                    do j=1,n_tet_in_poly
+
+                        if (PolyMesh%Poly(ipoly_loc)%tet_in_poly(j)==ie_glob) then
+                            iface_poly=PolyMesh%Elem_loc(E1)%num_faces*(j-1)+e
+                        endif
+
+                    enddo
+
+                    ! evaluation of the basis functions for every face of two neighbouring tetrahedra E1 and E2 at the 2D quadrature nodes
+                    ! contained respectively in b_box1 and b_box2 (see basis_function.f90)
+                    call basis_boundary(phi_b,grad_b,e, E2, PolyMesh%Poly(ipoly_loc)%b_box,&
+                                        PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist, Np, Fk, node_maps, nodtria2, nq2)
+
+                    call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly),&
+                                    nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
+
+                else
+
+                    ! check if e is not a boundary face
+                    ! otherwise take a default "neighbouring" element (its information won't be read)
+                    if (E2 /= -1 .and. E2 /= -2) then
+
+                        call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
+                                                PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
+
+                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,nn, &
+                                        PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
+
+                    else
+
+                        call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
+                                                PolyMesh%Poly(1)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
+
+                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,nn, &
+                                        PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
+
+                    endif
+
+                endif
+
+                ! if e is a boundary edge, then insert the values of rhs_face_bd_loc
+                ! in the entries of the rhs vector
+                if (E2 == -1 .or. E2 == -2) then
+                    do i=1,DIM
+                        do m=1,Np
+                            row = (i-1)*Np + m
+                            tmp = rhs_face_bd_loc(i,m)
+                            if (tmp .ne. 0.0) then
+                                rhs_loc(ie_loc,row) = rhs_loc(ie_loc,row) + tmp
+                            endif
+                        enddo
+                    enddo
+                endif
+
+            endif
+
+        enddo face_loop
+
+    enddo elem_loop
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    deallocate(phi)
+    deallocate(dphi,phi_b)
+    deallocate(grad_b)
+    deallocate(nodtet3)
+    deallocate(nodtria2)
+    deallocate(weitet3)
+    deallocate(weitria2)
+
+    PRINT *, 'Done with assembling local RHS for matrix free'
+
+end subroutine MAKE_RHS_FREE
 
 !> Matrix-free context, start from nodal solution and get modal solution coefficients.
 !> Data is scattered already, performed in series by each processor, local PETSc definition of vectors and matrix to use solver.

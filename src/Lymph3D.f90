@@ -212,11 +212,6 @@ program Lymph3D
     print *, 'end exchange'
     !print *, 'proc:', mpi_id, 'data out: ', prova_out
 
-    call PetscFinalize(mpi_ierr)
-    call MPI_FINALIZE(mpi_ierr)
-
-    stop
-
     call WRITE_MESH_VISUALIZATION_VTK(PolyMesh%num_elem_loc, PolyMesh, mpi_id)
 
     !! MAY VARY FROM ELEMENT TO ELEMENT !!!
@@ -274,18 +269,24 @@ program Lymph3D
     call FLUSH
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
+    IS_MatrixFree = .true.
     if (IS_MatrixFree .eqv. .true.) then
-        print *, 'matrix-free - set and assemble al matrices and vectors'
+        print *, 'matrix-free - set matrices and vectors'
         ! allocate(internal_neigh(PolyMesh%num_elem_loc))
         ! allocate(A_dg_loc(PolyMesh%num_elem_loc))
         ! allocate(K_loc(PolyMesh%num_elem_loc))
 
+        n_neigh = PolyMesh%Elem_loc(1)%num_faces
+        !! WASTE OF MEMORY... MAKE SCATTERED SIZE VECTOR?
+        allocate( K_loc(PolyMesh%num_elem_loc, n_neigh, DIM*Np, DIM*Np) )
+        allocate( A_dg_loc(PolyMesh%num_elem_loc, n_neigh, DIM*Np, DIM*Np) )
+        allocate( rhs_loc(PolyMesh%num_elem_loc, DIM*Np) )
+
         ! allocate the struct containing PETSc Mat for the mass data matrix-free form
         allocate(massa(PolyMesh%num_elem_loc,DIM))
         allocate(massa_modale(PolyMesh%num_elem_loc,DIM))
-
-        ! make all matrices
-        call MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, M_loc, A_dg_loc, M_modal_loc, rhs_loc, massa, massa_modale, n_neigh)
+        call SET_PETSC_MASS_MATRIX_FREE(PolyMesh%num_elem_loc, Np, massa)
+        call SET_PETSC_MASS_MATRIX_FREE(PolyMesh%num_elem_loc, Np, massa_modale)
 
         ! create local vector to each proces for matrix vector multiplicaton
         ! mass matrix-free temporary vector
@@ -324,7 +325,14 @@ program Lymph3D
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     if (IS_MatrixFree .eqv. .true.) then
-        print *, 'assemble matrix-free matrices - do nothing'
+        print *, 'assemble matrix-free matrices'
+
+        ! make all matrices
+        call MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_loc, rhs_loc, massa, massa_modale, n_neigh)
+
+        print *, mpi_id, rhs_loc(1,:)
+
+
     else
         print *, 'ASSEMBLE PETSC MATRICES'
 
@@ -356,7 +364,11 @@ program Lymph3D
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     if (IS_MatrixFree .eqv. .true.) then
-        print *, 'assemble matrix-free rsh - do nothing'
+
+        print *, 'assemble matrix-free RHS'
+        call MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
+        print *, mpi_id, rhs_loc(1,:)
+
     else
         print *, 'ASSEMBLE RHS'
 
@@ -366,6 +378,11 @@ program Lymph3D
         ! PetscCallA(VecView(petsc_rhs,viewer,mpi_ierr))
         ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
     end if
+
+    call PetscFinalize(mpi_ierr)
+    call MPI_FINALIZE(mpi_ierr)
+
+    stop
 
 !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     SETTING SOLVERS
