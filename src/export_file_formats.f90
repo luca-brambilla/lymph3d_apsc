@@ -961,6 +961,8 @@ end subroutine WRITE_ENSIGHT_CASE
         integer(kind=4) :: start_node(mpi_np), start_elem(mpi_np), gathered_sizes(mpi_np), start_solution(mpi_np)
         integer(kind=4) :: nvert_per_el
 
+        print *, 'WRITE_SOLUTION'
+
         nvert_per_el = PolyMesh%Elem_loc(1)%num_vert
 
         do ie_loc = 1,n_elem
@@ -979,102 +981,111 @@ end subroutine WRITE_ENSIGHT_CASE
         enddo
 
         ! WRITE VTK-FILE ----------------------------------------------------
-        if(IsPoly) then
+        if (present(num_dt)) then
+            if(IsPoly) then
 
-            ! write(vtk_filename, '(A,I0,A)') 'MONITORS/sol_poly_', PolyMesh%num_poly, '.vtk'
-            vtk_filename_num = 'MONITORS/sol_poly_000000.vtk'
-            if (mpi_id < 10) then
-                write(vtk_filename_num(24:24),'(i1)') mpi_id
-            elseif (mpi_id < 100) then
-                write(vtk_filename_num(23:24),'(i2)') mpi_id
-            elseif (mpi_id < 1000) then
-                write(vtk_filename_num(22:24),'(i3)') mpi_id
-            elseif (mpi_id < 10000) then
-                write(vtk_filename_num(21:24),'(i4)') mpi_id
-            elseif (mpi_id < 100000) then
-                write(vtk_filename_num(20:24),'(i5)') mpi_id
-            elseif (mpi_id < 1000000) then
-                write(vtk_filename_num(19:24),'(i6)') mpi_id
+                ! write(vtk_filename, '(A,I0,A)') 'MONITORS/sol_poly_', PolyMesh%num_poly, '.vtk'
+                vtk_filename_num = 'MONITORS/sol_poly_000000.vtk'
+                if (mpi_id < 10) then
+                    write(vtk_filename_num(24:24),'(i1)') mpi_id
+                elseif (mpi_id < 100) then
+                    write(vtk_filename_num(23:24),'(i2)') mpi_id
+                elseif (mpi_id < 1000) then
+                    write(vtk_filename_num(22:24),'(i3)') mpi_id
+                elseif (mpi_id < 10000) then
+                    write(vtk_filename_num(21:24),'(i4)') mpi_id
+                elseif (mpi_id < 100000) then
+                    write(vtk_filename_num(20:24),'(i5)') mpi_id
+                elseif (mpi_id < 1000000) then
+                    write(vtk_filename_num(19:24),'(i6)') mpi_id
+                endif
+
+            else
+
+                ! write(vtk_filename, '(A,I0,A)') 'MONITORS/sol_tet_', PolyMesh%num_tet, '.vtk'
+                vtk_filename_num = 'MONITORS/sol_tet_000000.vtk'
+
+                ! num_dt
+                if (num_dt < 10) then
+                    write(vtk_filename_num(23:23),'(i1)') num_dt
+                elseif (num_dt < 100) then
+                    write(vtk_filename_num(22:23),'(i2)') num_dt
+                elseif (num_dt < 1000) then
+                    write(vtk_filename_num(21:23),'(i3)') num_dt
+                elseif (num_dt < 10000) then
+                    write(vtk_filename_num(20:23),'(i4)') num_dt
+                elseif (num_dt < 100000) then
+                    write(vtk_filename_num(19:23),'(i5)') num_dt
+                elseif (num_dt < 1000000) then
+                    write(vtk_filename_num(18:23),'(i6)') num_dt
+                endif
+
+                ! mpi id
+                ! if (mpi_id < 10) then
+                !   write(vtk_filename_num(30:30),'(i1)') mpi_id
+                ! elseif (mpi_id < 100) then
+                !   write(vtk_filename_num(29:30),'(i2)') mpi_id
+                ! elseif (mpi_id < 1000) then
+                !   write(vtk_filename_num(28:30),'(i3)') mpi_id
+                ! elseif (mpi_id < 10000) then
+                !   write(vtk_filename_num(27:30),'(i4)') mpi_id
+                ! elseif (mpi_id < 100000) then
+                !   write(vtk_filename_num(26:30),'(i5)') mpi_id
+                ! elseif (mpi_id < 1000000) then
+                !   write(vtk_filename_num(25:30),'(i6)') mpi_id
+                ! endif
+
             endif
 
         else
+            if(.not. IsPoly) vtk_filename_num = 'MONITORS/sol_tet_000000.vtk'
 
-            ! write(vtk_filename, '(A,I0,A)') 'MONITORS/sol_tet_', PolyMesh%num_tet, '.vtk'
-            vtk_filename_num = 'MONITORS/sol_tet_000000.vtk'
-
-            ! num_dt
-            if (num_dt < 10) then
-                write(vtk_filename_num(23:23),'(i1)') num_dt
-            elseif (num_dt < 100) then
-                write(vtk_filename_num(22:23),'(i2)') num_dt
-            elseif (num_dt < 1000) then
-                write(vtk_filename_num(21:23),'(i3)') num_dt
-            elseif (num_dt < 10000) then
-                write(vtk_filename_num(20:23),'(i4)') num_dt
-            elseif (num_dt < 100000) then
-                write(vtk_filename_num(19:23),'(i5)') num_dt
-            elseif (num_dt < 1000000) then
-                write(vtk_filename_num(18:23),'(i6)') num_dt
-            endif
-
-            ! mpi id
-            ! if (mpi_id < 10) then
-            !   write(vtk_filename_num(30:30),'(i1)') mpi_id
-            ! elseif (mpi_id < 100) then
-            !   write(vtk_filename_num(29:30),'(i2)') mpi_id
-            ! elseif (mpi_id < 1000) then
-            !   write(vtk_filename_num(28:30),'(i3)') mpi_id
-            ! elseif (mpi_id < 10000) then
-            !   write(vtk_filename_num(27:30),'(i4)') mpi_id
-            ! elseif (mpi_id < 100000) then
-            !   write(vtk_filename_num(26:30),'(i5)') mpi_id
-            ! elseif (mpi_id < 1000000) then
-            !   write(vtk_filename_num(25:30),'(i6)') mpi_id
-            ! endif
-
+            write(vtk_filename_num(23:23),'(A)') 'V'
         endif
 
         if (mpi_id==0) print *, 'Writing .vtk file...'
         call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
 
-        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-        if (mpi_id==0) print *, 'Writing .vtu file...'
+        if (present(num_dt)) then
+            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+            if (mpi_id==0) print *, 'Writing .vtu file...'
 
-        call VTU_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh, num_dt)
+            call VTU_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh, num_dt)
 
-        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-        start_node(1) = 0
-        start_elem(1) = 0
-        start_solution(1) = 0
-        ! only in parallel
-        if(mpi_np > 1) then
-            call MPI_AllGather(PolyMesh%num_elem_loc, 1, MPI_INTEGER, gathered_sizes, 1, &
-            MPI_INTEGER, MPI_COMM_WORLD, ierr)
-            start_elem = gathered_sizes
-            ! mpi process from 0
-            do i = mpi_np,2,-1
-              start_elem(i) = start_elem(i-1)
-            enddo
+            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+            start_node(1) = 0
             start_elem(1) = 0
-            do i = 2,mpi_np
-                start_node(i) = start_node(i-1) + nvert_per_el*start_elem(i)
-            enddo
             start_solution(1) = 0
-            do i = 2,mpi_np
-                start_solution(i) = start_solution(i-1) + DIM*nvert_per_el*start_elem(i)
-            enddo
-            do i = 2,mpi_np
-                start_elem(i) = start_elem(i-1) + start_elem(i)
-            enddo
+            ! only in parallel
+            if(mpi_np > 1) then
+                call MPI_AllGather(PolyMesh%num_elem_loc, 1, MPI_INTEGER, gathered_sizes, 1, &
+                MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                start_elem = gathered_sizes
+                ! mpi process from 0
+                do i = mpi_np,2,-1
+                start_elem(i) = start_elem(i-1)
+                enddo
+                start_elem(1) = 0
+                do i = 2,mpi_np
+                    start_node(i) = start_node(i-1) + nvert_per_el*start_elem(i)
+                enddo
+                start_solution(1) = 0
+                do i = 2,mpi_np
+                    start_solution(i) = start_solution(i-1) + DIM*nvert_per_el*start_elem(i)
+                enddo
+                do i = 2,mpi_np
+                    start_elem(i) = start_elem(i-1) + start_elem(i)
+                enddo
+            endif
+
+            if (mpi_id==0) print *, 'Writing Ensight .geo and .vec file...'
+            call ENSIGHT_WRITE_SOLUTION('MONITORS/',xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'DISPLACEMENT', u, start_node, gathered_sizes, num_dt)
+
+            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+            if (mpi_id==0) print *, 'Writing Ensight .case file...'
+
+            if (mpi_id == 0) call WRITE_ENSIGHT_CASE('MONITORS/solution', num_dt, 'DISPLACEMENT')
         endif
-
-        if (mpi_id==0) print *, 'Writing Ensight .geo and .vec file...'
-        call ENSIGHT_WRITE_SOLUTION('MONITORS/',xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'DISPLACEMENT', u, start_node, gathered_sizes, num_dt)
-
-        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-        if (mpi_id==0) print *, 'Writing Ensight .case file...'
-
-        if (mpi_id == 0) call WRITE_ENSIGHT_CASE('MONITORS/solution', num_dt, 'DISPLACEMENT')
 
     end subroutine WRITE_SOLUTION
 

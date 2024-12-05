@@ -172,7 +172,7 @@ end subroutine POST_PROCESS
 
 ! end subroutine GATHER_SOLUTION
 
-    ! Evaluate nodal values of the solution and store them in various formats
+    !> Evaluate nodal values of the solution and store them in various formats
     subroutine EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
         
         use local_search ! see Poly_global.f90
@@ -292,7 +292,12 @@ end subroutine POST_PROCESS
         deallocate(temp)
         deallocate(blist)
 
-        call WRITE_SOLUTION(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly, num_dt) ! see export_file_formats.f90
+        print *, present(num_dt)
+        if (present(num_dt)) then
+            call WRITE_SOLUTION(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly, num_dt) ! see export_file_formats.f90
+        else
+            call WRITE_SOLUTION(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly)
+        endif
 
         deallocate(u_nod_vet)
         if (mpi_id==0) print *,'Done exporting solution'

@@ -108,7 +108,7 @@ program Lymph3D
     integer(kind=4) :: neighbor
 
     real(kind=8), dimension(:), allocatable :: prova_in, prova_out
-    integer(kind=4) :: tmp_size, unit_tmp
+    integer(kind=4) :: tmp_size
     type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
     ! read parameter
     ! iarg = getarg(1,arg)
@@ -212,11 +212,7 @@ program Lymph3D
     print *, 'end exchange'
     !if (mpi_id == 0) print *, 'proc:', mpi_id, 'data out: ', prova_out
 
-    ! open(unit_tmp,file=mpi_file_interface)
-
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-    call STOP_LYMPH3D
+    !call STOP_LYMPH3D
 
     call WRITE_MESH_VISUALIZATION_VTK(PolyMesh%num_elem_loc, PolyMesh, mpi_id)
 
@@ -531,6 +527,7 @@ program Lymph3D
 
             ! SAVE SOLUTION
             if (IsSave_output .eqv. .true.) then
+                if (mpi_id==0) print *, 'displacement'
                 call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
                 call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_u0, sol_ptr, u, nnod_num, gathered_sizes, displacements)
                 call EXPORT_SOLUTION(PolyMesh, u, IsPoly, 0)
@@ -539,9 +536,10 @@ program Lymph3D
             call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_v0, ic_velocity)
             ! SAVE SOLUTION
             if (IsSave_output .eqv. .true.) then
+                if (mpi_id==0) print *, 'velocity'
                 call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
                 call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_v0, sol_ptr, u, nnod_num, gathered_sizes, displacements)
-                call EXPORT_SOLUTION(PolyMesh, u, IsPoly, -1)
+                call EXPORT_SOLUTION(PolyMesh, u, IsPoly)
             endif
             PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
             PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
