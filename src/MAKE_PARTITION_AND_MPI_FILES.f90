@@ -2843,6 +2843,7 @@ end subroutine WRITE_MESH_INFO
 
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+!! CHECK... FEELS REDUNDANT AND WASTE OF MEMORY...
 !> write interface info to file and store it
 subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
 
@@ -2857,9 +2858,11 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
 
    integer(kind=4)  :: i, ie, iface, inter_count, unit_int, elem_proc_id, j, count
 
-   integer(kind=4) :: num_inter_loc
-   integer(kind=4), dimension(mpi_np) :: num_elem_interface_loc
-   integer(kind=4), dimension(mpi_np, PolyMesh%Elem_loc(1)%num_faces) :: elem_interface_tmp !< temp matrix for worst case scenario, interface on all faces
+   integer(kind=4) :: num_inter_loc !< local number of interface of the process
+   integer(kind=4), dimension(mpi_np) :: num_elem_interface_loc !< local number of interfaces per process for communication
+   !! NEED TO COUNT FIRST BEFORE ALLOCATING...
+   !! NUM FACES IS WRONG... IT SHOULD BE NUMBER OF FACES NEEDED BY PROCESSOR
+   integer(kind=4), dimension(:,:), allocatable :: elem_interface_tmp !< list of needed faces on processor
    integer(kind=4), dimension(mpi_np) :: recvcounts, displs
    integer(kind=4), dimension(mpi_np) :: inter_displs_loc    !< vector containing displacement index for each process (progressive)
 
@@ -2886,10 +2889,8 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
    open(unit_int,file=mpi_file_interface)
 
    ! loop over faces of each element
-   ! count local number of interfaces
+   ! count local number of interfaces first, then save later
    num_inter_loc = 0
-   num_elem_interface_loc = 0
-   elem_interface_tmp = -1
    do ie = 1, PolyMesh%num_elem_loc
       do iface = 1, PolyMesh%Elem_loc(ie)%num_faces
          elem_proc_id = PolyMesh%Elem_loc(ie)%neigh_el(iface,0)
@@ -2897,18 +2898,14 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
          if (mpi_id /= elem_proc_id) then
             ! count total number of interfaces
             num_inter_loc = num_inter_loc + 1
-            ! count number of interfaces per process
-            num_elem_interface_loc(elem_proc_id+1) = num_elem_interface_loc(elem_proc_id+1) + 1
-            ! insert global element ID into temporary matrix following progressive indexing
-            inter_count = num_elem_interface_loc(elem_proc_id+1)
-            elem_interface_tmp(elem_proc_id+1, inter_count) = PolyMesh%Elem_loc(ie)%neigh_el(iface,2)
          endif
       enddo
    enddo
    write(unit_int,*) num_inter_loc
 
-   ! allocate after knowing the number of interfaces per processor
+   ! allocate after knowing the number of interfaces per process
    allocate(elem_inter_loc(num_inter_loc))
+   allocate(elem_interface_tmp(mpi_np, num_inter_loc))
 
    ! find total number of interfaces and allocate memory for global data
    call MPI_ALLREDUCE(num_inter_loc, PolyMesh%num_elem_inter, 1, MPI_INTEGER,  &
@@ -2919,6 +2916,33 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
    allocate(PolyMesh%elem_inter_glo(PolyMesh%num_elem_inter))
    allocate(PolyMesh%elem_inter_loc(PolyMesh%num_elem_inter))
 
+   elem_interface_tmp = -1
+   num_elem_interface_loc = 0
+   ! loop over faces of each element
+   do ie = 1, PolyMesh%num_elem_loc
+      do iface = 1, PolyMesh%Elem_loc(ie)%num_faces
+
+         ! write to file interface element IDs and process
+         elem_proc_id = PolyMesh%Elem_loc(ie)%neigh_el(iface,0)
+         if (mpi_id /= elem_proc_id) then
+            
+            ! write to file
+            write(unit_int,*) elem_proc_id, PolyMesh%Elem_loc(ie)%neigh_el(iface,2)
+
+            ! count number of interfaces per process
+            num_elem_interface_loc(elem_proc_id+1) = num_elem_interface_loc(elem_proc_id+1) + 1
+            ! insert global element ID into temporary matrix following progressive indexing
+            inter_count = num_elem_interface_loc(elem_proc_id+1)
+            !print *, mpi_id, 'inter_count', inter_count
+            elem_interface_tmp(elem_proc_id+1, inter_count) = PolyMesh%Elem_loc(ie)%neigh_el(iface,2)
+            !print *, mpi_id, 'elem_interface_tmp', elem_interface_tmp
+
+         endif
+      enddo
+   enddo
+
+   close(unit_int)
+
    ! loop over processes - progressive counter increasing with each new number of elements to send per processor
    inter_count = 1
    do i=1,mpi_np
@@ -2928,20 +2952,6 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
          inter_count = inter_count + num_inter_loc
       endif
    end do
-
-   ! write to file
-   do ie = 1, PolyMesh%num_elem_loc
-      ! loop on face for each element
-      do iface = 1, PolyMesh%Elem_loc(ie)%num_faces
-         ! write to file interface element IDs and process
-         elem_proc_id = PolyMesh%Elem_loc(ie)%neigh_el(iface,0)
-         if (mpi_id /= elem_proc_id) then
-            write(unit_int,*) elem_proc_id, PolyMesh%Elem_loc(ie)%neigh_el(iface,2)
-         endif
-      enddo
-   enddo
-
-   close(unit_int)
 
    ! save the number of interface elements to send and receive for all processes
    allocate(PolyMesh%num_elem_inter_comm(mpi_np,mpi_np))

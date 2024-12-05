@@ -12,4 +12,18 @@ module global_parameters
     real(kind=8), parameter :: PI = 4.d0*datan(1.0d0)   !< parameter for @f$ \pi @f$
     real(kind=8), parameter :: TOL = 1.0d-40            !< tolerance for small numbers
 
+contains
+
+    subroutine STOP_LYMPH3D
+        use mpi
+        use Poly_setup_MPI
+
+        implicit none
+
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        call PetscFinalize(mpi_ierr)
+        call MPI_FINALIZE(mpi_ierr)
+        stop
+    end subroutine STOP_LYMPH3D
+
 end module global_parameters

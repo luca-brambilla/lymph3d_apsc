@@ -108,7 +108,7 @@ program Lymph3D
     integer(kind=4) :: neighbor
 
     real(kind=8), dimension(:), allocatable :: prova_in, prova_out
-    integer(kind=4) :: tmp_size
+    integer(kind=4) :: tmp_size, unit_tmp
     type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
     ! read parameter
     ! iarg = getarg(1,arg)
@@ -197,7 +197,7 @@ program Lymph3D
 
     prova_in=0
     do i=1,PolyMesh%num_elem_loc*DIM*Np
-        prova_in(i) = 100*mpi_id + i
+        prova_in(i) = 1000000*mpi_id + i
     enddo
 
     !print *, 'proc:', mpi_id, 'data out: ', prova_in
@@ -210,7 +210,13 @@ program Lymph3D
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
     call MPI_EXCHANGE_DEALLOCATE(PolyMesh, send_data, recv_data)
     print *, 'end exchange'
-    !print *, 'proc:', mpi_id, 'data out: ', prova_out
+    !if (mpi_id == 0) print *, 'proc:', mpi_id, 'data out: ', prova_out
+
+    ! open(unit_tmp,file=mpi_file_interface)
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    call STOP_LYMPH3D
 
     call WRITE_MESH_VISUALIZATION_VTK(PolyMesh%num_elem_loc, PolyMesh, mpi_id)
 
