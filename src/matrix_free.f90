@@ -70,6 +70,7 @@ subroutine SET_PETSC_MASS_MATRIX_FREE(ne_loc, Np, M)
             PetscCall(MatCreate(PETSC_COMM_SELF, M(ie_loc,i)%data, mpi_ierr))
             PetscCall(MatSetSizes(M(ie_loc,i)%data, Np, Np, Np, Np, mpi_ierr))
             PetscCall(MatSetFromOptions(M(ie_loc,i)%data, mpi_ierr))
+            PetscCall(MatSetUp(M(ie_loc,i)%data, mpi_ierr))
         enddo
     enddo
 
@@ -326,6 +327,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
                 enddo
             enddo
+
+            ! Finalize each PETSc matrix assembly
+            PetscCall(MatAssemblyBegin(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
+            PetscCall(MatAssemblyEnd(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
         enddo
 
         ! current element E+
@@ -485,7 +490,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     deallocate(nodtria2)
     deallocate(weitet3)
     deallocate(weitria2)
-    !! deallocate(blist)
+    deallocate(blist)
 
     PRINT *, 'Done with assembling local matrices for matrix free'
 
@@ -762,6 +767,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
     deallocate(nodtria2)
     deallocate(weitet3)
     deallocate(weitria2)
+    deallocate(blist)
 
     PRINT *, 'Done with assembling local RHS for matrix free'
 
@@ -851,7 +857,10 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
     PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
     PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
-    PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
+    PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr))
+
+    PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+    PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
 
     ! 1 block of element local vectors out of 3 (1 dimension)
     PetscCall(VecCreate(PETSC_COMM_SELF, petsc_exact, mpi_ierr))
@@ -925,12 +934,14 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
         ! copy mass matrix and exact solution into PETSc structures
         ! insert new values for each loop on element
-        PetscCall(MatZeroEntries(petsc_m_tmp, mpi_ierr))
+        !PetscCall(MatZeroEntries(petsc_m_tmp, mpi_ierr))
+
         ! PetscCall(VecZeroEntries(petsc_mass_modal(), mpi_ierr))
         do i=1,DIM
 
+            !! COPY MATRIX OR SET KSP EACH TIME? OR PASS KSP VECTOR/MATRIX DIRECTLY?
             ! copy matrix
-            PetscCall(MatCopy(massa_modale(ie_loc,i)%data, petsc_m_tmp,SAME_NONZERO_PATTERN, mpi_ierr))
+            PetscCall(MatCopy(massa_modale(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
 
             ! vector assignment
             !! copy whole vector at once
@@ -962,9 +973,9 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
             !     PetscCall(VecGetValues(petsc_modal_coeff, 1, irow, val, mpi_ierr))
             !     modal_coeff(ie_loc,row) = val(1)
             ! enddo
-            row = (i-1)*Np+1
+            row = (i-1)*Np
             PetscCall(VecGetArrayReadF90(petsc_modal_coeff,v_ptr,mpi_ierr))
-            modal_coeff(ie_loc,row:row+Np) =  v_ptr
+            modal_coeff(ie_loc,row+1:row+Np) =  v_ptr
             PetscCall(VecRestoreArrayF90(petsc_modal_coeff,v_ptr,mpi_ierr))
 
         enddo
@@ -984,7 +995,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
     deallocate(nodtet3)
     deallocate(weitet3)
-    !! deallocate(blist)
+    deallocate(blist)
 
     deallocate(uex_integral)
 

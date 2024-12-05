@@ -1,4 +1,4 @@
-module post_processing
+module solution_processing
 
 #include<petsc/finclude/petscksp.h>
 
@@ -209,7 +209,7 @@ end subroutine POST_PROCESS
         allocate(blist(Np,3))
         call basis_list(blist,p,Np)
         
-        allocate(u_nod_vet(3,4,PolyMesh%num_elem_loc))
+        allocate(u_nod_vet(DIM,4,PolyMesh%num_elem_loc))
         allocate(temp(4,PolyMesh%num_elem_loc))
 
         u_nod_vet = 0.0
@@ -414,4 +414,4 @@ function compute_hmax(PolyMesh) result(hmax)
 
 end function compute_hmax
 
-end module post_processing
+end module solution_processing

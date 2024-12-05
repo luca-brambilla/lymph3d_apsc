@@ -18,7 +18,7 @@ program Lymph3D
     use Poly_global
     use Poly_data
     use Poly_mesh
-    use post_processing
+    use solution_processing
     use SET_PETSC_SYSTEM
     use matrix_free
     use exchange_data
@@ -269,7 +269,7 @@ program Lymph3D
     call FLUSH
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    IS_MatrixFree = .true.
+    !IS_MatrixFree = .true.
     if (IS_MatrixFree .eqv. .true.) then
         print *, 'matrix-free - set matrices and vectors'
         ! allocate(internal_neigh(PolyMesh%num_elem_loc))
@@ -367,7 +367,7 @@ program Lymph3D
 
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
         call flush
-        print *, mpi_id, rhs_loc(1,:)
+        ! print *, mpi_id, rhs_loc(1,:)
         call flush
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
@@ -419,11 +419,6 @@ program Lymph3D
     ! allocate nnod_num, gathered_sizes, displacements, u
     call PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
 
-    call PetscFinalize(mpi_ierr)
-    call MPI_FINALIZE(mpi_ierr)
-
-    stop
-
     if (IS_MatrixFree .eqv. .true.) then
 
         print *, 'matrix free solver'
@@ -437,7 +432,7 @@ program Lymph3D
 
         if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", 0, " Time: ", t
 
-        print *, "Assemble initial conditions"
+        if (mpi_id==0) print *, "Assemble initial conditions"
         ! initial conditions
         allocate(u0_loc(PolyMesh%num_poly_loc, DIM*Np))
         allocate(v0_loc(PolyMesh%num_poly_loc, DIM*Np))
@@ -445,6 +440,14 @@ program Lymph3D
 
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_displacement, u0_loc)
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_velocity, v0_loc)
+
+        print *, mpi_id, u0_loc(1,:)
+        print *, mpi_id, v0_loc(1,:)
+
+        call PetscFinalize(mpi_ierr)
+        call MPI_FINALIZE(mpi_ierr)
+
+        stop
 
         ! u_1 = M^-1(dt^2/2 * f_0 - dt^2/2*A*u_0) + u0 + dt*v_0
         !! refactor matrices
@@ -528,6 +531,12 @@ program Lymph3D
             endif
 
             call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_v0, ic_velocity)
+            ! SAVE SOLUTION
+            if (IsSave_output .eqv. .true.) then
+                call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+                call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_v0, sol_ptr, u, nnod_num, gathered_sizes, displacements)
+                call EXPORT_SOLUTION(PolyMesh, u, IsPoly, -1)
+            endif
             PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
             PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
             PetscCallA(KSPSolve(ksp3, petsc_v0, petsc_tmpv, mpi_ierr))
