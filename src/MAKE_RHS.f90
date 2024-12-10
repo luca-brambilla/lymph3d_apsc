@@ -301,6 +301,8 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
     deallocate(weitet3)
     deallocate(weitria2)
 
+    deallocate(blist)
+
     print *, 'Done with assembling rhs'
             
 end subroutine MAKE_RHS

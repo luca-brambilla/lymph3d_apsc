@@ -428,6 +428,8 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     deallocate(weitet3)
     deallocate(weitria2)
 
+    deallocate(blist)
+
     PRINT *, 'Done with assembling linear system'
 
 end subroutine MAKE_MATRICES

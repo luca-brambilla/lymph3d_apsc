@@ -155,8 +155,8 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
 
     deallocate(phi)
     deallocate(dphi)
-
     deallocate(nodtet3)
     deallocate(weitet3)
+    deallocate(blist)
 
 end subroutine COMPUTE_MODAL_COEFFICIENTS_GEN

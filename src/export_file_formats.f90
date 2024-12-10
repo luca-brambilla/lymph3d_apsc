@@ -668,7 +668,6 @@ subroutine WRITE_ENSIGHT_CASE(base_filename, num_dt, solution_name)
     character(len=256) :: case_filename!, tmp_name
     integer*4 :: case_file_unit, iostat
 
-    write(*,'(A)') 'ensight case'
     ! Generate case filename
     write(case_filename, '(A, "_", I0,".case")') trim(base_filename), num_dt
 
@@ -961,7 +960,7 @@ end subroutine WRITE_ENSIGHT_CASE
         integer(kind=4) :: start_node(mpi_np), start_elem(mpi_np), gathered_sizes(mpi_np), start_solution(mpi_np)
         integer(kind=4) :: nvert_per_el
 
-        print *, 'WRITE_SOLUTION'
+        if (mpi_id == 0) print *, 'WRITE_SOLUTION'
 
         nvert_per_el = PolyMesh%Elem_loc(1)%num_vert
 

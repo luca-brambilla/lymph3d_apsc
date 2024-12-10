@@ -138,7 +138,7 @@ subroutine READ_HEADER(header_file)
             if(IS_save /= 0) IsSave_output = .true.
 
          case('MATFREE')
-            read(inline(ileft:iright),*) IS_save
+            read(inline(ileft:iright),*) IS_free
             if(IS_free /= 0) IS_MatrixFree = .true.
 
          case('DAMPING')

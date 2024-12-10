@@ -19,7 +19,7 @@ module solution_processing
 
     contains
 
-    !> allocate solution and prepare size and displacement vectors for MPI
+!> allocate global solution and prepare size and displacement vectors for MPI
 subroutine PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
 
 
@@ -58,6 +58,7 @@ subroutine PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, di
 
 end subroutine PREPROCESS_SOLUTION
 
+!> gather global solution from PETSc vector into a Fortran vector
 subroutine POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, u, nnod_num, gathered_sizes, displacements)
 
     type(Mesh_Structure), intent(in) :: PolyMesh            !< mesh
@@ -66,12 +67,13 @@ subroutine POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, u, 
     integer(kind=4), intent(in) :: global_dof               !< number of global dofs
     real(kind=8), pointer, intent(inout) :: sol_ptr(:)      !< fortran pointer
 
+    !! NOT USED??
     integer(kind=4), dimension(:), intent(in) :: nnod_num
     real(kind=8), dimension(:), allocatable :: u_loc, u_glo
     integer(kind=4), dimension(:), intent(in) :: gathered_sizes, displacements
     integer(kind=4) :: Np
 
-    Vec, intent(in) :: petsc_sol
+    type(tVec), intent(in) :: petsc_sol    !< local solutions
     ! assuming same degree everywhere
     Np = PolyMesh%Elem_loc(1)%NDof_elem ! ndof local per dimension (for 3D we need 3*Np)
 
@@ -172,9 +174,14 @@ end subroutine POST_PROCESS
 
 ! end subroutine GATHER_SOLUTION
 
-    !> Evaluate nodal values of the solution and store them in various formats
-    subroutine EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
+!> Evaluate nodal values of the solution and store them in various formats
+!> Input global modal solution, compute local vertex solution
+subroutine EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
         
+        !! COMPUTE POINTS ONLY ONCE?
+        !! HARD CODED NUMBERS
+        !! WHY COMPUTE LOCAL AGAIN AFTER GATHER??? POLYGON SPLIT IN DIFFERENT PROCESSORS?
+
         use local_search ! see Poly_global.f90
         use problem_data_and_properties
         use mpi
@@ -194,7 +201,7 @@ end subroutine POST_PROCESS
         real(kind=8), dimension(:), allocatable :: dvalx, dvaly, dvalz
         real(kind=8), dimension(2) :: intx, inty, intz
         real(kind=8), dimension(:,:), allocatable :: temp
-        real(kind=8), dimension(:,:,:), allocatable :: u_nod_vet
+        real(kind=8), dimension(:,:,:), allocatable :: u_nod_vet    !< local vertex solution
         !real(kind=8), dimension(3) :: points
         integer(kind=4) :: ie_loc, ie_glob, ipoly_loc, ipoly_glob, ivert, id_node, i, j, k, index
 
@@ -292,7 +299,6 @@ end subroutine POST_PROCESS
         deallocate(temp)
         deallocate(blist)
 
-        print *, present(num_dt)
         if (present(num_dt)) then
             call WRITE_SOLUTION(PolyMesh%num_elem_loc, PolyMesh, u_nod_vet, IsPoly, num_dt) ! see export_file_formats.f90
         else

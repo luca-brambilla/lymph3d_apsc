@@ -237,7 +237,7 @@ subroutine MESH_PARTITIONING(mpi_file, n_elem, nnode, nparts, &
       open(u_mpi,file = u_name)
       write(u_mpi,*) n_elem
       do i = 1, n_elem
-         write(u_mpi,*) i, 0
+         write(u_mpi,*) i, 0, i  ! global and local numbering is the same
       enddo
       close(u_mpi)
 
