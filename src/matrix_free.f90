@@ -319,7 +319,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                     jcol(1) = n-1
                     val(1)  = mass_loc(i,i,m,n)
 
-                    if (val(1) >= TOL) then
+                    if (abs(val(1)) >= TOL) then
                         PetscCall(MatSetValues(massa_modale(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
                         val(1) = val(1)*rho
                         PetscCall(MatSetValues(massa(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
@@ -331,6 +331,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
             ! Finalize each PETSc matrix assembly
             PetscCall(MatAssemblyBegin(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
             PetscCall(MatAssemblyEnd(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
+
+            PetscCall(MatAssemblyBegin(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
+            PetscCall(MatAssemblyEnd(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
         enddo
 
         ! current element E+
@@ -498,6 +501,7 @@ end subroutine MAKE_MATRICES_FREE
 
 !> @brief Compute the RHS vector for each element.
 subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
+
     implicit none
 
     type(Mesh_Structure), intent(inout) :: PolyMesh !< Mesh
@@ -984,7 +988,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    print *, 'Done with computing modal coefficients'
+    if (mpi_id==0) print *, 'Done with computing modal coefficients'
 
     PetscCall(MatDestroy(petsc_m_tmp, mpi_ierr))
     PetscCall(VecDestroy(petsc_exact, mpi_ierr))
@@ -1001,6 +1005,54 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
 end subroutine COMPUTE_MODAL_COEFFICIENTS_FREE
 
+!> gather global solution from local solution to compute errors and save output
+subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, local_dof, global_dof, u_loc, u_glo, gathered_sizes, displacements)
+
+    use Poly_mesh
+    use Poly_setup_MPI
+    use global_parameters
+
+    implicit none
+
+    type(Mesh_Structure), intent(in) :: PolyMesh            !< mesh
+    real(kind=8), dimension(:,:), intent(in) :: u_loc       !< local solution
+    real(kind=8), dimension(:,:), intent(inout) :: u_glo    !< global solution
+    integer(kind=4), intent(in) :: local_dof                !< number of local dofs for the process
+    integer(kind=4), intent(in) :: global_dof               !< number of global dofs
+
+    real(kind=8), dimension(PolyMesh%num_poly, PolyMesh%Elem_loc(1)%NDof_elem*DIM) :: u_tmp
+    integer(kind=4), dimension(:), intent(in) :: gathered_sizes, displacements
+    integer(kind=4) :: Np, i, jcol_glo, jcol_tmp, Npoly
+
+    ! assuming same degree everywhere
+    Np = PolyMesh%Elem_loc(1)%NDof_elem ! ndof local per dimension (for 3D we need 3*Np)
+    Npoly = PolyMesh%num_poly
+
+    ! SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    if(mpi_np == 1) then
+        u_tmp = u_loc
+    else
+        call MPI_ALLGATHERV(u_loc, local_dof, MPI_DOUBLE_PRECISION, &
+                    u_tmp, gathered_sizes, displacements, MPI_DOUBLE_PRECISION, &
+                    MPI_COMM_WORLD, mpi_ierr)
+    endif
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    ! transpose each dimension block
+    do i=1,DIM
+        jcol_glo = (i-1)*Npoly
+        jcol_tmp = (i-1)*Np
+        u_glo(:,jcol_glo+1:jcol_glo+Npoly) = transpose(u_tmp(:,jcol_tmp+1:jcol_tmp+Np))
+    enddo
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    ! print *,'Done with the solution'
+
+end subroutine POST_PROCESS_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
 subroutine TIME_STEP_MATRIX_FREE(neighbors, n_neigh, Np, time_step, t, K_loc_el, massa_el, rhs_el, u0_el, un_loc, usol_el)

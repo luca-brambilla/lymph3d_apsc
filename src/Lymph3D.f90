@@ -24,6 +24,7 @@ program Lymph3D
     use exchange_data
     !use MOD_MPI_CUSTOM
     use global_parameters
+    use utilities
 
     implicit none
 
@@ -108,7 +109,7 @@ program Lymph3D
     integer(kind=4) :: neighbor
 
     real(kind=8), dimension(:), allocatable :: prova_in, prova_out
-    integer(kind=4) :: tmp_size
+    integer(kind=4) :: tmp_size, unit_print
     type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
     ! read parameter
     ! iarg = getarg(1,arg)
@@ -443,13 +444,43 @@ program Lymph3D
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_displacement, u0_loc)
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_velocity, v0_loc)
 
-        print *, mpi_id, u0_loc(1,:)
-        print *, mpi_id, v0_loc(1,:)
+        ! print *, mpi_id, u0_loc(1,:)
+        ! print *, mpi_id, v0_loc(1,:)
 
-        call PetscFinalize(mpi_ierr)
-        call MPI_FINALIZE(mpi_ierr)
+        ! SAVE SOLUTION
+        if (IsSave_output .eqv. .true.) then
+            if (mpi_id==0) print *, '--- IC displacement ---'
+            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+            call POST_PROCESS_MATRIX_FREE(PolyMesh, local_dof, global_dof, u0_loc, u, gathered_sizes, displacements)
+            call EXPORT_SOLUTION(PolyMesh, u, IsPoly, 0)
+        endif
+        if (IsSave_output .eqv. .true.) then
+            if (mpi_id==0) print *, '---   IC velocity   ---'
+            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+            call POST_PROCESS_MATRIX_FREE(PolyMesh, local_dof, global_dof, v0_loc, u, gathered_sizes, displacements)
+            call EXPORT_SOLUTION(PolyMesh, u, IsPoly)
 
-        stop
+            open(newunit=unit_print, action='WRITE', file='v0_pre.txt', &
+                form='FORMATTED', status='replace')
+            do i=1,PolyMesh%num_poly_loc
+                write(unit_print, *) v0_loc(i,:)
+            enddo
+            close(unit=unit_print)
+
+            open(newunit=unit_print, action='WRITE', file='v0_post.txt', &
+                form='FORMATTED', status='replace')
+            do i=1,Np
+                write(unit_print, *) u(i,:)
+            enddo
+            close(unit=unit_print)
+
+        endif
+
+        call save_matrix(massa(1,1)%data, Np, Np, 'massa.txt')
+        call save_matrix(massa_modale(1,1)%data, Np, Np, 'massa_modale.txt')
+
+        !! STOP
+        call STOP_LYMPH3D
 
         ! u_1 = M^-1(dt^2/2 * f_0 - dt^2/2*A*u_0) + u0 + dt*v_0
         !! refactor matrices
@@ -540,6 +571,14 @@ program Lymph3D
                 call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
                 call POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_v0, sol_ptr, u, nnod_num, gathered_sizes, displacements)
                 call EXPORT_SOLUTION(PolyMesh, u, IsPoly)
+
+
+                open(newunit=unit_print, action='WRITE', file='v0_petsc_post.txt', &
+                form='FORMATTED', status='replace')
+                do i=1,Np
+                    write(unit_print, *) u(i,:)
+                enddo
+                close(unit=unit_print)
             endif
             PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
             PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
@@ -655,8 +694,11 @@ program Lymph3D
     ! deallocate solution for post-processing
     deallocate(u)
     deallocate(nnod_num)
-    deallocate(displacements)
-    deallocate(gathered_sizes)
+
+    if(mpi_np > 1) then
+        deallocate(displacements)
+        deallocate(gathered_sizes)
+    endif
 
     call PVD_SETUP(num_dt_mon, 0, num_dt)
 
