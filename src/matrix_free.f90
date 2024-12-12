@@ -1005,8 +1005,49 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
 end subroutine COMPUTE_MODAL_COEFFICIENTS_FREE
 
+!> allocate global solution and prepare size and displacement vectors for MPI
+subroutine PREPROCESS_SOLUTION_MATRIX_FREE(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
+
+
+    type(Mesh_Structure), intent(in) :: PolyMesh    !< mesh
+    integer(kind=4), intent(in) :: local_dof        !< number of local dof
+    ! integer(kind=4), intent(in) :: mpi_id
+    integer(kind=4), dimension(:), allocatable, intent(out) :: nnod_num
+    integer(kind=4), dimension(:), allocatable, intent(out) :: gathered_sizes !< MPI gather size per dimension
+    integer(kind=4), dimension(:), allocatable, intent(out) :: displacements !< MPI gather displacements per dimension
+    real(kind=8), dimension(:,:), allocatable, intent(out) :: u !< solution (Np, 3*num_poly)
+    integer(kind=4) :: i, Np
+
+    Np = PolyMesh%Elem_loc(1)%NDof_elem
+
+    ! Allocate solution for post-processing
+    allocate(u(Np, DIM * PolyMesh%num_poly))
+
+    ! STORE LOCAL NUMERATION TO RECONSTRUCT THE SOLUTION
+    allocate(nnod_num(local_dof))
+    call CREATE_LOCAL_NODE_NUM(nnod_num, local_dof)
+
+    if(mpi_np > 1) then
+
+        allocate(gathered_sizes(mpi_np))
+
+        call MPI_AllGather(Np*PolyMesh%num_poly_loc, 1, MPI_INTEGER, gathered_sizes, 1, &
+                    MPI_INTEGER, MPI_COMM_WORLD, ierr)
+
+        allocate(displacements(mpi_np))
+        displacements(1) = 0
+        do i = 2, mpi_np
+                displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
+        end do
+
+        ! print *, 'displacements', displacements
+        ! print *, 'gathered_sizes', gathered_sizes
+    endif
+
+end subroutine PREPROCESS_SOLUTION_MATRIX_FREE
+
 !> gather global solution from local solution to compute errors and save output
-subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, local_dof, global_dof, u_loc, u_glo, gathered_sizes, displacements)
+subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, u_loc, u_glo, gathered_sizes, displacements)
 
     use Poly_mesh
     use Poly_setup_MPI
@@ -1017,36 +1058,45 @@ subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, local_dof, global_dof, u_loc, u_gl
     type(Mesh_Structure), intent(in) :: PolyMesh            !< mesh
     real(kind=8), dimension(:,:), intent(in) :: u_loc       !< local solution
     real(kind=8), dimension(:,:), intent(inout) :: u_glo    !< global solution
-    integer(kind=4), intent(in) :: local_dof                !< number of local dofs for the process
-    integer(kind=4), intent(in) :: global_dof               !< number of global dofs
 
-    real(kind=8), dimension(PolyMesh%num_poly, PolyMesh%Elem_loc(1)%NDof_elem*DIM) :: u_tmp
+    real(kind=8), dimension(PolyMesh%Elem_loc(1)%NDof_elem, PolyMesh%num_poly_loc) :: u_loc_t
+    real(kind=8), dimension(PolyMesh%Elem_loc(1)%NDof_elem, PolyMesh%num_poly) :: u_tmp_dim
     integer(kind=4), dimension(:), intent(in) :: gathered_sizes, displacements
-    integer(kind=4) :: Np, i, jcol_glo, jcol_tmp, Npoly
+    integer(kind=4) :: Np, i, jcol_glo, jcol_tmp, Npoly, Npoly_loc
 
     ! assuming same degree everywhere
     Np = PolyMesh%Elem_loc(1)%NDof_elem ! ndof local per dimension (for 3D we need 3*Np)
     Npoly = PolyMesh%num_poly
+    Npoly_loc = PolyMesh%num_poly_loc
 
     ! SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
     if(mpi_np == 1) then
-        u_tmp = u_loc
+
+        ! transpose each dimension block
+        do i=1,DIM
+            jcol_glo = (i-1)*Npoly
+            jcol_tmp = (i-1)*Np
+            u_glo(:,jcol_glo+1:jcol_glo+Npoly) = transpose(u_loc(:,jcol_tmp+1:jcol_tmp+Np))
+        enddo
+
     else
-        call MPI_ALLGATHERV(u_loc, local_dof, MPI_DOUBLE_PRECISION, &
-                    u_tmp, gathered_sizes, displacements, MPI_DOUBLE_PRECISION, &
-                    MPI_COMM_WORLD, mpi_ierr)
+
+        do i=1,DIM
+            jcol_tmp = (i-1)*Np
+            jcol_glo = (i-1)*Npoly
+
+            u_loc_t = transpose(u_loc(:,jcol_tmp+1:jcol_tmp+Np))
+
+            call MPI_ALLGATHERV(u_loc_t, gathered_sizes(mpi_id+1), MPI_DOUBLE_PRECISION, u_tmp_dim, gathered_sizes, displacements, MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, mpi_ierr)
+
+            u_glo(:,jcol_glo+1:jcol_glo+Npoly) = u_tmp_dim
+
+            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        enddo
+
     endif
-
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-    ! transpose each dimension block
-    do i=1,DIM
-        jcol_glo = (i-1)*Npoly
-        jcol_tmp = (i-1)*Np
-        u_glo(:,jcol_glo+1:jcol_glo+Npoly) = transpose(u_tmp(:,jcol_tmp+1:jcol_tmp+Np))
-    enddo
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 

@@ -53,7 +53,9 @@ subroutine PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, di
         do i = 2, mpi_np
                 displacements(i) = displacements(i - 1) + gathered_sizes(i - 1)
         end do
+        
         ! print *, 'displacements', displacements
+        ! print *, 'gathered_sizes', gathered_sizes
     endif
 
 end subroutine PREPROCESS_SOLUTION

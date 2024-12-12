@@ -135,6 +135,9 @@ program Lymph3D
         write(*,'(A)')''
     endif
 
+    ! check FILES_MPI directory
+    if (mpi_id == 0) call check_mpi_files
+
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     READ INPUT FILES AND ALLOCATE VARIABLES
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -419,13 +422,15 @@ program Lymph3D
     ! end do
     ! n_neigh = size(internal_neigh)
 
-    ! allocate nnod_num, gathered_sizes, displacements, u
-    call PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
 
+    ! --------------------- MATRIX FREE -----------------------
     if (IS_MatrixFree .eqv. .true.) then
 
         print *, 'matrix free solver'
         if(mpi_id == 0) print *, "                   TIME LOOP START                   "
+
+        ! allocate nnod_num, gathered_sizes, displacements, u
+        call PREPROCESS_SOLUTION_MATRIX_FREE(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
 
         t = 0.0
         num_dt = 1 !!! compute number of iteration if start not t=0?
@@ -451,28 +456,30 @@ program Lymph3D
         if (IsSave_output .eqv. .true.) then
             if (mpi_id==0) print *, '--- IC displacement ---'
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-            call POST_PROCESS_MATRIX_FREE(PolyMesh, local_dof, global_dof, u0_loc, u, gathered_sizes, displacements)
+            call POST_PROCESS_MATRIX_FREE(PolyMesh, u0_loc, u, gathered_sizes, displacements)
             call EXPORT_SOLUTION(PolyMesh, u, IsPoly, 0)
         endif
         if (IsSave_output .eqv. .true.) then
             if (mpi_id==0) print *, '---   IC velocity   ---'
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-            call POST_PROCESS_MATRIX_FREE(PolyMesh, local_dof, global_dof, v0_loc, u, gathered_sizes, displacements)
+            call POST_PROCESS_MATRIX_FREE(PolyMesh, v0_loc, u, gathered_sizes, displacements)
             call EXPORT_SOLUTION(PolyMesh, u, IsPoly)
 
-            open(newunit=unit_print, action='WRITE', file='v0_pre.txt', &
-                form='FORMATTED', status='replace')
-            do i=1,PolyMesh%num_poly_loc
-                write(unit_print, *) v0_loc(i,:)
-            enddo
-            close(unit=unit_print)
+            ! open(newunit=unit_print, action='WRITE', file='v0_pre.txt', &
+            !     form='FORMATTED', status='replace')
+            ! do i=1,PolyMesh%num_poly_loc
+            !     write(unit_print, *) v0_loc(i,:)
+            ! enddo
+            ! close(unit=unit_print)
 
-            open(newunit=unit_print, action='WRITE', file='v0_post.txt', &
-                form='FORMATTED', status='replace')
-            do i=1,Np
-                write(unit_print, *) u(i,:)
-            enddo
-            close(unit=unit_print)
+            ! open(newunit=unit_print, action='WRITE', file='v0_post.txt', &
+            !     form='FORMATTED', status='replace')
+            ! do i=1,Np
+            !     write(unit_print, *) u(i,:)
+            ! enddo
+            ! close(unit=unit_print)
+            if (mpi_id==0) call save_vector(v0_loc,PolyMesh%num_poly_loc,'v0_pre.txt')
+            if (mpi_id==0) call save_vector(u,Np,'v0_post.txt')
 
         endif
 
@@ -531,7 +538,12 @@ program Lymph3D
         u0_loc(i,:) = un_loc(i,:)
         un_loc(i,:) = usol_loc(i,:) !! wrong, cannot update unless loop is over
 
+    ! ----------------------------- PETSc -------------------------------------
     else
+
+        ! allocate nnod_num, gathered_sizes, displacements, u
+        call PREPROCESS_SOLUTION(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
+
         if (IsTime_dependent .eqv. .false.) then
             ! Au=f
             PetscCallA(KSPSolve(ksp, petsc_rhs, petsc_sol, mpi_ierr))
