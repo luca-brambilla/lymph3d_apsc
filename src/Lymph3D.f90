@@ -136,7 +136,7 @@ program Lymph3D
     endif
 
     ! check FILES_MPI directory
-    if (mpi_id == 0) call check_mpi_files
+    if (mpi_id == 0) call CHECK_MPI_FILES
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     READ INPUT FILES AND ALLOCATE VARIABLES
@@ -465,26 +465,13 @@ program Lymph3D
             call POST_PROCESS_MATRIX_FREE(PolyMesh, v0_loc, u, gathered_sizes, displacements)
             call EXPORT_SOLUTION(PolyMesh, u, IsPoly)
 
-            ! open(newunit=unit_print, action='WRITE', file='v0_pre.txt', &
-            !     form='FORMATTED', status='replace')
-            ! do i=1,PolyMesh%num_poly_loc
-            !     write(unit_print, *) v0_loc(i,:)
-            ! enddo
-            ! close(unit=unit_print)
-
-            ! open(newunit=unit_print, action='WRITE', file='v0_post.txt', &
-            !     form='FORMATTED', status='replace')
-            ! do i=1,Np
-            !     write(unit_print, *) u(i,:)
-            ! enddo
-            ! close(unit=unit_print)
-            if (mpi_id==0) call save_vector(v0_loc,PolyMesh%num_poly_loc,'v0_pre.txt')
-            if (mpi_id==0) call save_vector(u,Np,'v0_post.txt')
+            ! if (mpi_id==0) call SAVE_VECTOR(v0_loc,PolyMesh%num_poly_loc,'v0_pre.txt')
+            ! if (mpi_id==0) call SAVE_VECTOR(u,Np,'v0_post.txt')
 
         endif
 
-        call save_matrix(massa(1,1)%data, Np, Np, 'massa.txt')
-        call save_matrix(massa_modale(1,1)%data, Np, Np, 'massa_modale.txt')
+        ! call SAVE_MATRIX(massa(1,1)%data, Np, Np, 'massa.txt')
+        ! call SAVE_MATRIX(massa_modale(1,1)%data, Np, Np, 'massa_modale.txt')
 
         !! STOP
         call STOP_LYMPH3D

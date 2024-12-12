@@ -7,7 +7,7 @@ implicit none
 contains
 
 !> save full PETSc matrix to a file, row by row
-subroutine save_matrix(matrix, nrows, ncols, filename)
+subroutine SAVE_MATRIX(matrix, nrows, ncols, filename)
     use petscmat
 
     implicit none
@@ -37,10 +37,10 @@ subroutine save_matrix(matrix, nrows, ncols, filename)
 
     deallocate(cols, values)
 
-end subroutine
+end subroutine SAVE_MATRIX
 
 !> save solution vector, element by element
-subroutine save_vector(vector, nrows, filename)
+subroutine SAVE_VECTOR(vector, nrows, filename)
     implicit none
 
     integer(kind=4), intent(in) :: nrows
@@ -56,11 +56,11 @@ subroutine save_vector(vector, nrows, filename)
     enddo
     close(unit=unit_print)
 
-end subroutine
+end subroutine SAVE_VECTOR
 
 !> Check files in the folder FILES_MPI and delete if the program was previously
 !> ran with a different number of processes
-subroutine check_mpi_files
+subroutine CHECK_MPI_FILES
 
     implicit none
 
@@ -72,8 +72,8 @@ subroutine check_mpi_files
     write(filename, '("FILES_MPI/mesh_", i6.6, ".mpi")') mpi_np-1
     inquire(file=filename, exist=file_exists)
     if (.not. file_exists) then
-        print *, "Program previously ran with fewer processes than", mpi_np
-        call delete_all_files()
+        write(*,'(A,I0)') "Program previously ran with fewer processes than: ", mpi_np
+        call DELETE_ALL_FILES
         return
     end if
 
@@ -81,14 +81,14 @@ subroutine check_mpi_files
     write(filename, '("FILES_MPI/mesh_", i6.6, ".mpi")') mpi_np
     inquire(file=filename, exist=file_exists)
     if (file_exists) then
-        print *, "Program previously ran with more processes than", mpi_np
-        call delete_all_files()
+        write(*,'(A,I0)') "Program previously ran with more processes than: ", mpi_np
+        call DELETE_ALL_FILES
     end if
 
-end subroutine check_mpi_files
+end subroutine CHECK_MPI_FILES
 
 !> Delete all files in the FILES_MPI directory
-subroutine delete_all_files()
+subroutine DELETE_ALL_FILES
 
     implicit none
 
@@ -96,14 +96,13 @@ subroutine delete_all_files()
 
     ! System command to delete all files
     command = "rm -f FILES_MPI/*"
-    call execute_command_line(command, wait=.true., exitstat=ierr)
+    call EXECUTE_COMMAND_LINE(command, wait=.true., exitstat=ierr)
 
     if (ierr /= 0) then
         print *, "Error deleting files. Exit code:", ierr
     else
         print *, "All files deleted in FILES_MPI directory."
     end if
-end subroutine delete_all_files
-
+end subroutine DELETE_ALL_FILES
 
 end module utilities
