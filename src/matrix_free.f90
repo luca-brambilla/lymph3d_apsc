@@ -339,6 +339,19 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
         ! current element E+
         E1 = ie_loc
 
+        ! insert values of V_loc into stiffness matrix
+        do i=1,DIM
+            row = (i-1)*Np
+            do j = 1,DIM
+                col = (j-1)*Np
+                do m = 1,Np
+                    do n = 1,Np
+                        K_loc(ie_loc, 1, row+m, col+n) = V_loc(i,j,m,n)
+                    end do
+                end do
+            end do
+        end do
+
         ! stiffness and rhs
         ! begin loop on the faces of the tetrahedron E1
         face_loop: do e=1,PolyMesh%Elem_loc(E1)%num_faces
@@ -608,7 +621,6 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
         ! initialization of the rhs term on the volume rhs_tet_loc
         rhs_tet_loc = 0.0
 
-        ! count neighbor element contribution only to allocate K_loc
         ! current element E+
         E1 = ie_loc
 

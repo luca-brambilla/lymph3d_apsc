@@ -449,9 +449,6 @@ program Lymph3D
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_displacement, u0_loc)
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_velocity, v0_loc)
 
-        ! print *, mpi_id, u0_loc(1,:)
-        ! print *, mpi_id, v0_loc(1,:)
-
         ! SAVE SOLUTION
         if (IsSave_output .eqv. .true.) then
             if (mpi_id==0) print *, '--- IC displacement ---'
@@ -470,8 +467,9 @@ program Lymph3D
 
         endif
 
-        ! call SAVE_MATRIX(massa(1,1)%data, Np, Np, 'massa.txt')
-        ! call SAVE_MATRIX(massa_modale(1,1)%data, Np, Np, 'massa_modale.txt')
+        ! call SAVE_MATRIX_PETSC(massa(1,1)%data, Np, Np, 'massa.txt')
+        ! call SAVE_MATRIX_PETSC(massa_modale(1,1)%data, Np, Np, 'massa_modale.txt')
+        if (mpi_id==0) call SAVE_MATRIX_F90(K_loc(1,:,:,:), DIM*Np, 'rigidezza.txt')
 
         !! STOP
         call STOP_LYMPH3D
@@ -479,6 +477,12 @@ program Lymph3D
         ! u_1 = M^-1(dt^2/2 * f_0 - dt^2/2*A*u_0) + u0 + dt*v_0
         !! refactor matrices
         !! select correct u0_loc
+
+        call FLUSH
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        if (mpi_id==0) print *, '------------------- FIRST ITERATION ---------------------'
+        call FLUSH
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
         do ie_loc = 1,PolyMesh%num_elem_loc
             do k=1,n_neigh
@@ -498,7 +502,6 @@ program Lymph3D
                     PetscCall(KSPSolve(ksp,petsc_tmpv,petsc_sol,mpi_ierr))
                     ! copy to fortran vector
 
-
                     ! sum
                     un_loc(ie_loc,:) = tmp + u0_loc(ie_loc,:) + time_step*v0_loc(ie_loc,:)
                 enddo
@@ -509,6 +512,9 @@ program Lymph3D
 
         num_dt = num_dt + 1
         t = t + time_step
+
+        !! STOP
+        call STOP_LYMPH3D
 
         ! loop start
         do while (t <= stop_time)

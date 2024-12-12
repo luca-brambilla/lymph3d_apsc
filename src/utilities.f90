@@ -7,7 +7,7 @@ implicit none
 contains
 
 !> save full PETSc matrix to a file, row by row
-subroutine SAVE_MATRIX(matrix, nrows, ncols, filename)
+subroutine SAVE_MATRIX_PETSC(matrix, nrows, ncols, filename)
     use petscmat
 
     implicit none
@@ -37,7 +37,30 @@ subroutine SAVE_MATRIX(matrix, nrows, ncols, filename)
 
     deallocate(cols, values)
 
-end subroutine SAVE_MATRIX
+end subroutine SAVE_MATRIX_PETSC
+
+!> save Fortan matrices of an element to a file, ordered first by neighbour then by row
+subroutine SAVE_MATRIX_F90(matrix, nrows, filename)
+
+    implicit none
+
+    real(kind=8), dimension(:,:,:), intent(in) :: matrix
+    integer(kind=4), intent(in) :: nrows
+    character(len=*), intent(in) :: filename
+
+    integer(kind=4) :: i, unit_print, ie
+
+    open(newunit=unit_print, action='WRITE', file=filename, &
+    form='FORMATTED', status='replace')
+    do ie=1,5
+        write(unit_print, *) ie
+        do i=1,nrows
+            write(unit_print, *) matrix(ie,i,:)
+        enddo
+    enddo
+    close(unit=unit_print)
+
+end subroutine SAVE_MATRIX_F90
 
 !> save solution vector, element by element
 subroutine SAVE_VECTOR(vector, nrows, filename)
