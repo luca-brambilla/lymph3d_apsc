@@ -32,8 +32,8 @@ subroutine MAKE_STIFFNESS_VOLUME(Np, Jdet, weitet3, nq3, lambda, mu, dphi, stiff
     real(kind=8), intent(in) :: lambda  !< Lamé 1st parameter
     real(kind=8), intent(in) :: mu      !< Lamé 2nd parameter
     real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
-    real(kind=8), dimension(3,Np,nq3), intent(in) :: dphi   !<
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: stiff_tet_vol    !< element stiffness matrix V_loc, volumetric contribution
+    real(kind=8), dimension(3,Np,nq3), intent(in) :: dphi   !< basis function derivative evaluations
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: stiff_tet_vol    !< element stiffness matrix volumetric contribution V
 
     integer(kind=4) :: q, i, j, m, n
     real(kind=8), dimension(DIM,DIM,Np,Np) :: temp
@@ -89,7 +89,7 @@ subroutine MAKE_MASS_VOLUME(Np, Jdet, weitet3, nq3, phi, rho, mass_tet_vol)
     real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
     real(kind=8), dimension(Np,nq3), intent(in) :: phi  !< element basis function
     real(kind=8), intent(in) :: rho         !< element density
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: mass_tet_vol !< element mass matrix
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: mass_tet_vol !< element mass matrix M
 
     integer(kind=4) :: q, i, m, n
 
@@ -130,9 +130,9 @@ subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi,
     real(kind=8), dimension(4,nq3), intent(in) :: nodtet3 !< tetrahedron quadrature nodes
     real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
     real(kind=8), dimension(Np,nq3), intent(in) :: phi  !< element basis function
-    real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk  !<
+    real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk  !< coefficients for map from reference to physical tetrahedron
     ! rhs_tet_vol dim (3,Np)
-    real(kind=8), dimension(:,:), intent(out) :: rhs_tet_vol !< element rhs
+    real(kind=8), dimension(:,:), intent(out) :: rhs_tet_vol !< element forcing term volume contribution
 
     integer(kind=4) :: q, i, j, k, m
     real(kind=8), dimension(DIM) :: points, forc_term
@@ -193,13 +193,13 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
     real(kind=8), intent(in) :: area    !< element area
     real(kind=8), intent(in) :: lambda  !< Lamé 1st parameter
     real(kind=8), intent(in) :: mu      !< Lamé 2nd parameter
-    real(kind=8), dimension(4,4,4), intent(in) :: node_maps
-    real(kind=8), dimension(4,nq2), intent(in) :: nodtria2
-    real(kind=8), dimension(nq2), intent(in) :: weitria2
+    real(kind=8), dimension(4,4,4), intent(in) :: node_maps !< map from reference triangle to tetrahedral face
+    real(kind=8), dimension(4,nq2), intent(in) :: nodtria2  !< 2D quatrature nodes for the reference triangle
+    real(kind=8), dimension(nq2), intent(in) :: weitria2  !< 2D quatrature weights for the reference triangle
     real(kind=8), dimension(DIM), intent(in) :: normal  !< face normal vector
-    real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b  
-    real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b
-    real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk
+    real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b !< basis on the boundary
+    real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b !< basis gradient on the boundary
+    real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk !< coefficients for map from reference to physical tetrahedron
     integer(kind=4), intent(in) :: space_fun_tag    !< tag corresponding to specific function for boundary conditions, see problem_and_data_properties.f90
     real(kind=8), dimension(DIM,Np), intent(out) :: rhs_tet_face !< surface integral contributions to element rhs
 
@@ -335,12 +335,12 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
     real(kind=8), intent(in) :: mu      !< Lamé 2nd parameter
     real(kind=8), dimension(nq2), intent(in) :: weitria2    !< 2d weights
     real(kind=8), dimension(DIM), intent(in) :: normal      !< normal vector
-    real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b  !< box basis
-    real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b   !< box basis gradient
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E1    !< stabilization E+ contribution (diagonal term)
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E1         !< interior flux, E+ contribution (diagonal term)
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E2        !< interior flux, E- contribution (extra-diagonal term)
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E2        !< stabilization, E- contribution (extra-diagonal term)
+    real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b  !< basis on the boundary
+    real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b   !< basis gradient on the boundary
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E1    !< element stiffness matrix stabilization S, E+ contribution
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E1         !< element stiffness matrix interior flux I, E+ contribution
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E2        !< element stiffness matrix interior flux I, E- contribution
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E2        !< element stiffness matrix stabilization S, E- contribution
 
     real(kind=8), dimension(DIM,DIM,Np,Np) :: temp, temp1, temp2
     real(kind=8), dimension(2) :: val
@@ -518,7 +518,7 @@ subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_
     real(kind=8), dimension(4,nq3), intent(in) :: nodtet3
     real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
     real(kind=8), dimension(Np,nq3), intent(in) :: phi
-    real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk
+    real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk !< coefficients for map from reference to physical tetrahedron
     real(kind=8), dimension(DIM,Np), intent(out) :: vec_loc
 
     integer(kind=4) :: q, i, j, k, m

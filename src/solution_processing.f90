@@ -1,3 +1,4 @@
+!> pre-process, post-process, export solution and compute errors
 module solution_processing
 
 #include<petsc/finclude/petscksp.h>

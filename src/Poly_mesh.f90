@@ -21,13 +21,13 @@ module Poly_mesh
         integer(kind=4), dimension(:),   pointer :: vert    !< Indexes of the vertices of the element
         integer(kind=4), dimension(:,:), pointer :: faces   !< Indexes of the vertices for every face of the element
 
-        !> Properties of the neighbor elements (6 columns):
-        !> 0 - mpi_proc: processor containing the neighbor element data
-        !> 1 - mat_id: ID of the neighbor material or tag of boundary face
-        !> 2 - el_id: global element across face ID with -1 for Dirichlet boundary, -2 for Neumann boundary
-        !> 3 - face_id: Id of neighbor local face ID (1-4 tetrahedron, 1-6 exahedron)
-        !> 4 - poly_id: global ID of the polyhedron the element belongs to
-        !> 5 - tag: tag from .mate file, numbering of BC with 0 if internal face
+        !> Properties of the neighbor elements (6 rows)
+        !> - `0` - mpi_proc: processor containing the neighbor element data
+        !> - `1` - mat_id: ID of the neighbor material or tag of boundary face
+        !> - `2` - el_id: global element across face ID with `-1` for Dirichlet boundary, `-2` for Neumann boundary @n
+        !> - `3` - face_id: ID of neighbor local face ID (1-4 tetrahedron, 1-6 hexahedron) @n
+        !> - `4` - poly_id: global ID of the polyhedron the element belongs to @n
+        !> - `5` - tag: tag from `.mate` file, numbering of BC with `0` if internal face
         integer(kind=4), dimension(:,:), pointer :: neigh_el
 
         integer(kind=4), dimension(:), pointer :: Dof_glo       !< Mapping to global degrees of freedom

@@ -43,11 +43,13 @@ module matrix_free
     end type PetscRowVec
 
     !> typedef for PETSc Matrix - to construct arrays of matrices
+    !! maybe type(tMat), dimension(:,:)
     type :: PetscMatStruct
         Mat :: data
     end type
 
     !> typedef for PETSc Vector - to construct arrays of vectors
+    !! maybe type(tVec), dimension(:)
     type :: PetscVecStruct
         Vec :: data
     end type
@@ -126,16 +128,16 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     real(kind=8), dimension(4,4,4) :: node_maps
     real(kind=8), dimension(2,3,4) :: node_maps_inv
 
-    real(kind=8), dimension(:,:), ALLOCATABLE :: nod3, nodtet3
-    real(kind=8), dimension(:), ALLOCATABLE :: wei3, weitet3
-    real(kind=8), dimension(:,:), ALLOCATABLE :: nod2, nodtria2
-    real(kind=8), dimension (:), ALLOCATABLE :: wei2, weitria2
-    integer(kind=4), dimension(:,:), ALLOCATABLE :: blist
+    real(kind=8), dimension(:,:), allocatable :: nod3, nodtet3
+    real(kind=8), dimension(:), allocatable :: wei3, weitet3
+    real(kind=8), dimension(:,:), allocatable :: nod2, nodtria2
+    real(kind=8), dimension (:), allocatable :: wei2, weitria2
+    integer(kind=4), dimension(:,:), allocatable :: blist
 
-    real(kind=8), dimension(:,:), ALLOCATABLE :: phi
-    real(kind=8), dimension(:,:,:), ALLOCATABLE :: dphi
-    real(kind=8), dimension(:,:,:), ALLOCATABLE :: phi_b
-    real(kind=8), dimension(:,:,:,:), ALLOCATABLE :: grad_b
+    real(kind=8), dimension(:,:), allocatable :: phi
+    real(kind=8), dimension(:,:,:), allocatable :: dphi
+    real(kind=8), dimension(:,:,:), allocatable :: phi_b
+    real(kind=8), dimension(:,:,:,:), allocatable :: grad_b
 
     real(kind=8), dimension(DIM,DIM+1) :: Fk    ! tranformation
     real(kind=8) :: Jdet                        ! determinant of Jacobian
@@ -150,8 +152,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     integer(kind=4) :: Npoly
     integer(kind=4) :: i, j, m, n
 
-    integer(kind=4) :: e, E1, E2!, sides
-    integer(kind=4), dimension(4) :: face_flag
+    integer(kind=4) :: iface, E1, E2!, sides
+    integer(kind=4), dimension(4) :: face_flag !! WHY VECTOR????
     real(kind=8), dimension(DIM) :: nn
     integer(kind=4) :: space_fun_tag
     !integer(kind=4) :: n_neigh      !< number of neighbor internal faces
@@ -170,7 +172,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     !real(kind=8), dimension(:, :, :, :, :), allocatable, intent(out) :: M_modal_loc
     ! real(kind=8), dimension(:,PolyMesh%num_elem_loc,3,3,Np,Np), allocatable, intent(out) :: K_loc
 
-    ! local rectangular
+    ! process local matrices, rectangular for each element
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: K_loc
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: A_dg_loc
 
@@ -245,9 +247,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
         !neigh_count = 1
 
         ! begin loop on the faces of the tetrahedron E1
-        ! do e=1,sides
-        !     E2 = PolyMesh%Elem_loc(E1)%neigh_el(e,2)
-        !     ! space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(e,5)
+        ! do iface=1,sides
+        !     E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
+        !     ! space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(iface,5)
         !     ! if not boundary, then internal face
         !     if (E2 /= -1 .and. E2 /= -2) n_neigh = n_neigh + 1
         ! end do
@@ -354,9 +356,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
         ! stiffness and rhs
         ! begin loop on the faces of the tetrahedron E1
-        face_loop: do e=1,PolyMesh%Elem_loc(E1)%num_faces
+        face_loop: do iface=1,PolyMesh%Elem_loc(E1)%num_faces
 
-            face_flag(e) = 0
+            face_flag(iface) = 0
 
             ! initialization of the face matrices I_loc, S_loc, IN_loc and SN_loc
             I_loc = 0.0
@@ -364,12 +366,12 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
             IN_loc = 0.0
             SN_loc = 0.0
 
-            ! find the neighbouring tetrahedron E2 sharing the face e with E1
+            ! find the neighbouring tetrahedron E2 sharing the face iface with E1
             ! E2 is element E-
-            E2 = PolyMesh%Elem_loc(E1)%neigh_el(e,2)
-            space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(e,5)
+            E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
+            space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(iface,5)
 
-            ! if e is not a boundary face
+            ! if iface is not a boundary face
             if (E2 /= -1 .and. E2 /= -2) then
 
                 ! find the polyhedron in which E2 is contained
@@ -382,16 +384,16 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
                 ! check if E1 and E2 belong to the same polyhedron
                 if (ipoly_glob == ipoly2_glob) then
-                    face_flag(e) = 1
+                    face_flag(iface) = 1
                 endif
 
             endif
 
             ! if it is true, then E2 does not belong to the same polyhedron E1 belongs to
-            ! or e is a boundary face
-            if (face_flag(e) == 0) then
+            ! or iface is a boundary face
+            if (face_flag(iface) == 0) then
 
-                nn = PolyMesh%Elem_loc(E1)%normal(e,:)
+                nn = PolyMesh%Elem_loc(E1)%normal(iface,:)
 
                 ! If it is true, then the two polyhedra do not belong to the same processor
                 ! so we have to retrieve b_box of neighbouring element from neigh_bbox
@@ -407,38 +409,38 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                     do j=1,n_tet_in_poly
 
                         if (PolyMesh%Poly(ipoly_loc)%tet_in_poly(j)==ie_glob) then
-                            iface_poly=PolyMesh%Elem_loc(E1)%num_faces*(j-1)+e
+                            iface_poly=PolyMesh%Elem_loc(E1)%num_faces*(j-1)+iface
                         endif
 
                     enddo
 
                     ! evaluation of the basis functions for every face of two neighbouring tetrahedra E1 and E2 at the 2D quadrature nodes
                     ! contained respectively in b_box1 and b_box2 (see basis_function.f90)
-                    call basis_boundary(phi_b,grad_b,e, E2, PolyMesh%Poly(ipoly_loc)%b_box,&
+                    call basis_boundary(phi_b,grad_b,iface, E2, PolyMesh%Poly(ipoly_loc)%b_box,&
                                         PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist, Np, Fk, node_maps, nodtria2, nq2)
 
                     call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly), nn, &
-                                        PolyMesh%Elem_loc(E1)%area(e),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
+                                        PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
 
                 else
 
-                    ! check if e is not a boundary face
+                    ! check if iface is not a boundary face
                     ! otherwise take a default "neighbouring" element (its information won't be read)
                     if (E2 /= -1 .and. E2 /= -2) then
 
-                        call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
+                        call basis_boundary(phi_b,grad_b,iface,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
                                                 PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly2_loc)%hk,nn, &
-                                                PolyMesh%Elem_loc(E1)%area(e),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
+                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
 
                     else
 
-                        call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
+                        call basis_boundary(phi_b,grad_b,iface,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
                                                 PolyMesh%Poly(1)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(1)%hk, nn, &
-                                                PolyMesh%Elem_loc(E1)%area(e),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
+                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
 
                     endif
 
@@ -447,6 +449,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
             endif
 
             !! INDEX i,j for I matrix????? WHERE THETA
+            ! Insert in stiffness matrix
             ! check face again and add boundary contributions
             ! If not Neumann boundary
             if(E2 /= -2) then
@@ -467,6 +470,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                 ! internal face contribution, not Dirichlet boundary
                 ! Add neighbor face contribution E- (SN_loc to stiffness and DG - IN_loc to stiffness)
                 ! leave matrix K_loc portion 0.0 if not Dirichlet
+                ! E- contribution in position iface+1 since position 1 is for E+
                 if (E2 /= -1) then
                     do i=1,DIM
                         do j=1,DIM
@@ -474,7 +478,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                 row = (i-1)*Np + m
                                 do n=1,Np
                                     col = (j-1)*Np + n
-                                    K_loc(ie_loc,e,row,col) = K_loc(ie_loc,e,row,col) + theta*IN_loc(i,j,m,n) - IN_loc(j,i,n,m) + SN_loc(i,j,m,n)
+                                    K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) + theta*IN_loc(i,j,m,n) - IN_loc(j,i,n,m) + SN_loc(i,j,m,n)
                                 enddo
                             enddo
                         enddo
@@ -531,16 +535,16 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
     real(kind=8), dimension(4,4,4) :: node_maps
     real(kind=8), dimension(2,3,4) :: node_maps_inv
 
-    real(kind=8), dimension(:,:), ALLOCATABLE :: nod3, nodtet3
-    real(kind=8), dimension(:), ALLOCATABLE :: wei3, weitet3
-    real(kind=8), dimension(:,:), ALLOCATABLE :: nod2, nodtria2
-    real(kind=8), dimension (:), ALLOCATABLE :: wei2, weitria2
-    integer(kind=4), dimension(:,:), ALLOCATABLE :: blist
+    real(kind=8), dimension(:,:), allocatable :: nod3, nodtet3
+    real(kind=8), dimension(:), allocatable :: wei3, weitet3
+    real(kind=8), dimension(:,:), allocatable :: nod2, nodtria2
+    real(kind=8), dimension (:), allocatable :: wei2, weitria2
+    integer(kind=4), dimension(:,:), allocatable :: blist
 
-    real(kind=8), dimension(:,:), ALLOCATABLE :: phi
-    real(kind=8), dimension(:,:,:), ALLOCATABLE :: dphi
-    real(kind=8), dimension(:,:,:), ALLOCATABLE :: phi_b
-    real(kind=8), dimension(:,:,:,:), ALLOCATABLE :: grad_b
+    real(kind=8), dimension(:,:), allocatable :: phi
+    real(kind=8), dimension(:,:,:), allocatable :: dphi
+    real(kind=8), dimension(:,:,:), allocatable :: phi_b
+    real(kind=8), dimension(:,:,:,:), allocatable :: grad_b
 
     real(kind=8), dimension(DIM,DIM+1) :: Fk
     real(kind=8) :: Jdet
@@ -555,8 +559,8 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
     integer(kind=4) :: Npoly
     integer(kind=4) :: i, j, m
 
-    integer(kind=4) :: e, E1, E2!, sides
-    integer(kind=4), dimension(4) :: face_flag
+    integer(kind=4) :: iface, E1, E2!, sides
+    integer(kind=4), dimension(4) :: face_flag !! WHY VECTOR???
     real(kind=8), dimension(DIM) :: nn
     integer(kind=4) :: space_fun_tag
     !integer(kind=4) :: n_neigh      !< number of neighbor internal faces
@@ -668,18 +672,18 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
 
         ! current element E+
         E1 = ie_loc
-        face_loop: do e=1,PolyMesh%Elem_loc(E1)%num_faces
-            face_flag(e) = 0
+        face_loop: do iface=1,PolyMesh%Elem_loc(E1)%num_faces
+            face_flag(iface) = 0
 
             ! initialization of the face rhs term rhs_face_bd_loc
             rhs_face_bd_loc = 0.0
 
-            ! find the neighbouring tetrahedron E2 sharing the face e with E1
+            ! find the neighbouring tetrahedron E2 sharing the face iface with E1
             ! E2 is element E-
-            E2 = PolyMesh%Elem_loc(E1)%neigh_el(e,2)
-            space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(e,5)
+            E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
+            space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(iface,5)
 
-            ! if e is not a boundary face
+            ! if iface is not a boundary face
             if (E2 /= -1 .and. E2 /= -2) then
 
                 ! find the polyhedron in which E2 is contained
@@ -692,16 +696,16 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
 
                 ! check if E1 and E2 belong to the same polyhedron
                 if (ipoly_glob == ipoly2_glob) then
-                    face_flag(e) = 1
+                    face_flag(iface) = 1
                 endif
 
             endif
 
             ! if it is true, then E2 does not belong to the same polyhedron E1 belongs to
-            ! or e is a boundary face
-            if (face_flag(e) == 0) then
+            ! or iface is a boundary face
+            if (face_flag(iface) == 0) then
 
-                nn = PolyMesh%Elem_loc(E1)%normal(e,:)
+                nn = PolyMesh%Elem_loc(E1)%normal(iface,:)
 
                 ! If it is true, then the two polyhedra do not belong to the same process
                 ! so we have to retrieve b_box of neighbouring element from neigh_bbox
@@ -717,44 +721,44 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
                     do j=1,n_tet_in_poly
 
                         if (PolyMesh%Poly(ipoly_loc)%tet_in_poly(j)==ie_glob) then
-                            iface_poly=PolyMesh%Elem_loc(E1)%num_faces*(j-1)+e
+                            iface_poly=PolyMesh%Elem_loc(E1)%num_faces*(j-1)+iface
                         endif
 
                     enddo
 
                     ! evaluation of the basis functions for every face of two neighbouring tetrahedra E1 and E2 at the 2D quadrature nodes
                     ! contained respectively in b_box1 and b_box2 (see basis_function.f90)
-                    call basis_boundary(phi_b,grad_b,e, E2, PolyMesh%Poly(ipoly_loc)%b_box,&
+                    call basis_boundary(phi_b,grad_b,iface, E2, PolyMesh%Poly(ipoly_loc)%b_box,&
                                         PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist, Np, Fk, node_maps, nodtria2, nq2)
 
-                    call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly),&
-                                    nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
+                    call MAKE_RHS_FACE(theta,alpha,p,Np,iface,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly),&
+                                    nn,PolyMesh%Elem_loc(E1)%area(iface),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
 
                 else
 
-                    ! check if e is not a boundary face
+                    ! check if iface is not a boundary face
                     ! otherwise take a default "neighbouring" element (its information won't be read)
                     if (E2 /= -1 .and. E2 /= -2) then
 
-                        call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
+                        call basis_boundary(phi_b,grad_b,iface,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
                                                 PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
-                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,nn, &
-                                        PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
+                        call MAKE_RHS_FACE(theta,alpha,p,Np,iface,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,nn, &
+                                        PolyMesh%Elem_loc(E1)%area(iface),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
 
                     else
 
-                        call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
+                        call basis_boundary(phi_b,grad_b,iface,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
                                                 PolyMesh%Poly(1)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
-                        call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,nn, &
-                                        PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
+                        call MAKE_RHS_FACE(theta,alpha,p,Np,iface,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,nn, &
+                                        PolyMesh%Elem_loc(E1)%area(iface),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
 
                     endif
 
                 endif
 
-                ! if e is a boundary edge, then insert the values of rhs_face_bd_loc
+                ! if iface is a boundary edge, then insert the values of rhs_face_bd_loc
                 ! in the entries of the rhs vector
                 if (E2 == -1 .or. E2 == -2) then
                     do i=1,DIM
@@ -1377,7 +1381,7 @@ end subroutine TIME_STEP_MATRIX_FREE
 !     real(kind=8), dimension(sides,3,3,Np,Np) :: A_loc
 
 !     E1 = ie_loc
-!     E2 = PolyMesh%Elem_loc(E1)%neigh_el(e,2)
+!     E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
 
 !     ! compute du only once
 !     do ie_loc=1,PolyMesh%num_elem_loc

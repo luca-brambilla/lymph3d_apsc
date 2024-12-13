@@ -1,3 +1,4 @@
+!> setup and allocate PETSc matrices and vectors
 module SET_PETSC_SYSTEM
 
 #include<petsc/finclude/petscksp.h>

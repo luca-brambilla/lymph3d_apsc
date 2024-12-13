@@ -35,16 +35,16 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
     real(kind=8), dimension(4,4,4) :: node_maps
     real(kind=8), dimension(2,3,4) :: node_maps_inv
 
-    real(kind=8), dimension(:,:), ALLOCATABLE :: nod3, nodtet3
-    real(kind=8), dimension(:), ALLOCATABLE :: wei3, weitet3
-    real(kind=8), dimension(:,:), ALLOCATABLE :: nod2, nodtria2
-    real(kind=8), dimension (:), ALLOCATABLE :: wei2, weitria2
-    integer(kind=4), dimension(:,:), ALLOCATABLE :: blist
+    real(kind=8), dimension(:,:), allocatable :: nod3, nodtet3
+    real(kind=8), dimension(:), allocatable :: wei3, weitet3
+    real(kind=8), dimension(:,:), allocatable :: nod2, nodtria2
+    real(kind=8), dimension (:), allocatable :: wei2, weitria2
+    integer(kind=4), dimension(:,:), allocatable :: blist
 
-    real(kind=8), dimension(:,:), ALLOCATABLE :: phi
-    real(kind=8), dimension(:,:,:), ALLOCATABLE :: dphi
-    real(kind=8), dimension(:,:,:), ALLOCATABLE :: phi_b
-    real(kind=8), dimension(:,:,:,:), ALLOCATABLE :: grad_b
+    real(kind=8), dimension(:,:), allocatable :: phi
+    real(kind=8), dimension(:,:,:), allocatable :: dphi
+    real(kind=8), dimension(:,:,:), allocatable :: phi_b
+    real(kind=8), dimension(:,:,:,:), allocatable :: grad_b
     
     real(kind=8), dimension(DIM,DIM+1) :: Fk
     real(kind=8) :: Jdet

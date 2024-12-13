@@ -100,9 +100,9 @@ module Poly_global
 end module Poly_global
 
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    EXIT CODES
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> @brief Exit codes !! CHECK
 module Poly_exit_codes
@@ -151,32 +151,33 @@ module Poly_exit_codes
 end module Poly_exit_codes
 
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    FAIL CODES
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
+!> Module containing specific fail codes for specific conditions and behaviors
 module Poly_fail_codes
 
     implicit none
 
-    ! if .TRUE., fails on negative anelastic coefficients (see: damping 2)
+    !> if .TRUE., fails on negative anelastic coefficients (see: damping 2)
     logical :: IS_failoncoeffs
 
-    ! if .TRUE., do not start the TIME_LOOP
-    ! only setup mesh, parameters, CFL, etc. then quit
+    !> if .TRUE., do not start the TIME_LOOP @n
+    !> only setup mesh, parameters, CFL, etc. then quit
     logical :: IS_setuponly
 
-    ! if .TRUE:, quit if CFL does not hold
+    !> if .TRUE:, quit if CFL does not hold
     logical :: IS_failCFL
 
-    ! if .TRUE., quit if simulation becomes unstable
+    !> if .TRUE., quit if simulation becomes unstable
     logical :: IS_instabilitycontrol
 
 end module Poly_fail_codes
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    DEFAULT VALUES
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> @brief Module containing default error values
 module Poly_default_codes
@@ -204,9 +205,9 @@ module Poly_default_codes
 end module Poly_default_codes
 
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    QSORT MODULE
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> @brief Module containing quick sort algorithm for vectors
 module qsort
@@ -216,48 +217,48 @@ module qsort
     private :: Partition
 
     contains
-    ! @brief Quick sort algorithm subroutine for vectors
-    recursive subroutine QsortC(A)
+    !> @brief Quick sort algorithm subroutine for vectors
+    recursive subroutine QsortC(vec)
 
-        integer(kind=4), intent(in out), dimension(:) :: A
+        integer(kind=4), intent(inout), dimension(:) :: vec !< vector to sort
         integer(kind=4) :: iq
 
-        if(size(A) > 1) then
-            call Partition(A, iq)
-            call QsortC(A(:iq-1))
-            call QsortC(A(iq:))
+        if(size(vec) > 1) then
+            call Partition(vec, iq)
+            call QsortC(vec(:iq-1))
+            call QsortC(vec(iq:))
         endif
 
     end subroutine QsortC
 
     !> @brief Subroutine in quick sort to partition a vector
-    subroutine Partition(A, marker)
+    subroutine Partition(vec, marker)
 
-        integer(kind=4), intent(in out), dimension(:) :: A
-        integer(kind=4), intent(out) :: marker
+        integer(kind=4), intent(inout), dimension(:) :: vec    !< vector to partition
+        integer(kind=4), intent(out) :: marker  !< pivot index
         integer(kind=4) :: i, j, temp, x
 
-        x = A(1)
+        x = vec(1)
         i = 0
-        j = size(A) + 1
+        j = size(vec) + 1
 
         do
             j = j-1
             do
-                if (A(j) <= x) exit
+                if (vec(j) <= x) exit
                 j = j-1
             end do
             i = i+1
             do
-                if (A(i) >= x) exit
+                if (vec(i) >= x) exit
                 i = i+1
             end do
 
             if (i < j) then
-                ! exchange A(i) and A(j)
-                temp = A(i)
-                A(i) = A(j)
-                A(j) = temp
+                ! exchange vec(i) and vec(j)
+                temp = vec(i)
+                vec(i) = vec(j)
+                vec(j) = temp
             elseif (i == j) then
                 marker = i+1
                 return
@@ -271,7 +272,8 @@ module qsort
 
 end module qsort
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 
 !> @brief Module to get a local element from a global element
 module local_search
@@ -282,13 +284,14 @@ module local_search
 
     contains
 
+    !! NECESSARY?
     !> @brief Subroutine to get a local element from a global element
     subroutine GET_EL_LOC_FROM_EL_GLO(v, n_el , ie, ie_loc)
 
-        integer(kind=4), intent(in out) :: n_el
-        integer(kind=4), intent(in out), dimension(n_el) :: v
-        integer(kind=4), intent(in) :: ie
-        integer(kind=4), intent(out) :: ie_loc
+        integer(kind=4), intent(inout) :: n_el      !< number of elements
+        integer(kind=4), intent(inout), dimension(n_el) :: v    !< input vector
+        integer(kind=4), intent(in) :: ie       !< ID of global element
+        integer(kind=4), intent(out) :: ie_loc  !< ID of local element
         integer(kind=4) :: i
 
         ie_loc = 0
@@ -299,7 +302,7 @@ module local_search
             endif
         enddo
 
-        end subroutine GET_EL_LOC_FROM_EL_GLO
+    end subroutine GET_EL_LOC_FROM_EL_GLO
 
 end module local_search
 
@@ -313,11 +316,11 @@ module find_poly
 
     !> @brief Function to find a tetrahedron in polyhedron
     function FIND_TET_IN_POLY(array,val,N)result(index)
-        integer(kind=4) :: N
-        integer(kind=4) :: val
-        integer(kind=4),dimension(N) :: array
+        integer(kind=4) :: N    !<
+        integer(kind=4) :: val  !<
+        integer(kind=4),dimension(N) :: array   !< input array
         integer(kind=4),dimension(N) :: temp1,temp2
-        integer(kind=4),dimension(:), ALLOCATABLE :: index
+        integer(kind=4),dimension(:), allocatable :: index !<
         integer(kind=4) i,ii
         ii=1
 
@@ -350,17 +353,19 @@ module find_poly
 
 end module find_poly
 
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    calc_time: description
-!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> @brief Subroutine to pass from seconds to hh:mm:ss format
 subroutine calc_time(time_h, time_m, time_s, time_in_seconds)
 
     implicit none
 
-    integer(kind=4), intent(out) :: time_h, time_m, time_s
-    integer(kind=4), intent(in)  :: time_in_seconds
+    integer(kind=4), intent(out) :: time_h  !< hours
+    integer(kind=4), intent(out) :: time_m  !< minutes
+    integer(kind=4), intent(out) :: time_s  !< seconds
+    integer(kind=4), intent(in)  :: time_in_seconds !< total duration in seconds
     real(kind=8)                 :: rem_min
 
     time_h  = int(floor(real(time_in_seconds)/3600));
@@ -369,7 +374,6 @@ subroutine calc_time(time_h, time_m, time_s, time_in_seconds)
     time_s  = mod(mod(time_in_seconds,3600),60)
 
 end subroutine calc_time
-
 
 !> Global constants
 module global_parameters
@@ -391,6 +395,7 @@ module global_parameters
 
 end module global_parameters
 
+!> Stop the simulation and print the duration
 subroutine STOP_LYMPH3D
 
     use Poly_setup_MPI
