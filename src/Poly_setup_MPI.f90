@@ -11,11 +11,14 @@ module Poly_setup_MPI
      implicit none
 
      integer(kind=4), dimension (:), allocatable :: mpi_stat
-     integer(kind=4) :: mpi_id, mpi_np, mpi_ierr
-     logical(kind=4) :: flag
+     integer(kind=4) :: mpi_id          !< MPI process ID
+     integer(kind=4) :: mpi_np          !< number of MPI processes
+     integer(kind=4) :: mpi_ierr        !< MPI error code
+     logical(kind=4) :: flag            !< flag is true if MPI_INIT has been called
 
-     PetscErrorCode :: ierr
-     PetscMPIInt :: mpi_size,rank
+     type(PetscErrorCode) :: ierr             !< PETSc error code
+     type(PetscMPIInt) :: mpi_size            !< PETSc MPI size
+     type(PetscMPIInt) :: rank                !< PETSc MPI process ID
 
      !integer*4 POLYSPEED_COMM
      !integer*4 POLYSPEED_TAG, POLYSPEED_TAG_MIN, POLYSPEED_TAG_MAX
@@ -34,7 +37,7 @@ module Poly_setup_MPI
 !> @brief Subroutine for initialization of the MPI and PETSc envinronments.
 subroutine INITIALIZATION()
 
-     !> MPI INITIALIZATION
+     ! MPI INITIALIZATION
 
      call MPI_INIT(mpi_ierr)
      call MPI_Initialized(flag,mpi_ierr)
@@ -50,10 +53,10 @@ subroutine INITIALIZATION()
      !call MPI_Comm_size(PETSC_COMM_WORLD, mpi_size, ierr)
      !call MPI_Comm_rank(PETSC_COMM_WORLD, rank, ierr)
 
-     !> Console output in case of error
+     ! Console output in case of error
 
      if (mpi_ierr.ne.0 .or. ierr .ne. 0) then
-     !> Error occured on rank number: ....
+     ! Error occured on rank number: ....
           write(*,*)'MPI Initialization error - proc : ',mpi_id
      endif
 

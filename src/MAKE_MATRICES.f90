@@ -415,10 +415,10 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     ! print *, 'Reaction coefficient c: ', c
 
     ! Matrix operation petsc_stiff + c*petsc_mass
-    ! PetscCallA(MatAXPY(petsc_stiff, c, petsc_mass, DIFFERENT_NONZERO_PATTERN, mpi_ierr))
+    ! PetscCall(MatAXPY(petsc_stiff, c, petsc_mass, DIFFERENT_NONZERO_PATTERN, mpi_ierr))
 
     ! Matrix operation mat_dg + c*petsc_mass
-    ! PetscCallA(MatAXPY(mat_dg, c, petsc_mass, DIFFERENT_NONZERO_PATTERN, mpi_ierr))
+    ! PetscCall(MatAXPY(mat_dg, c, petsc_mass, DIFFERENT_NONZERO_PATTERN, mpi_ierr))
 
     deallocate(phi)
     deallocate(dphi,phi_b)

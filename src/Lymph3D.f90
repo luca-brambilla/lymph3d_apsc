@@ -296,16 +296,16 @@ program Lymph3D
 
         ! create local vector to each proces for matrix vector multiplicaton
         ! mass matrix-free temporary vector
-        PetscCall(VecCreate(PETSC_COMM_SELF, petsc_tmpv, mpi_ierr))
-        PetscCall(VecSetSizes(petsc_tmpv, Np, Np, mpi_ierr))
-        PetscCall(VecSetFromOptions(petsc_tmpv, mpi_ierr))
+        PetscCallA(VecCreate(PETSC_COMM_SELF, petsc_tmpv, mpi_ierr))
+        PetscCallA(VecSetSizes(petsc_tmpv, Np, Np, mpi_ierr))
+        PetscCallA(VecSetFromOptions(petsc_tmpv, mpi_ierr))
 
         ! create local matrix to each process for matrix vector multiplication
         ! mass matrix-free temporary matrix
-        PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
-        PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
-        PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
-        PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
+        PetscCallA(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
+        PetscCallA(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
+        PetscCallA(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
+        PetscCallA(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
 
     else
         call FLUSH
@@ -499,7 +499,7 @@ program Lymph3D
                     irow(1)=1
                     PetscCallA(VecSetValues(petsc_tmpv,Np,irow,tmp((i-1)*Np+1:i*Np),INSERT_VALUES,mpi_ierr))
                     ! solve linear system
-                    PetscCall(KSPSolve(ksp,petsc_tmpv,petsc_sol,mpi_ierr))
+                    PetscCallA(KSPSolve(ksp,petsc_tmpv,petsc_sol,mpi_ierr))
                     ! copy to fortran vector
 
                     ! sum

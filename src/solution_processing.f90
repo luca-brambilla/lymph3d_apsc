@@ -85,7 +85,7 @@ subroutine POST_PROCESS(PolyMesh, local_dof, global_dof, petsc_sol, sol_ptr, u, 
     allocate(u_glo(global_dof))
 
     ! print *, 'SCATTER SOLUTION'
-    PetscCallA(VecGetArrayReadF90(petsc_sol, sol_ptr, mpi_ierr))
+    PetscCall(VecGetArrayReadF90(petsc_sol, sol_ptr, mpi_ierr))
     u_loc(1:local_dof) = sol_ptr
     PetscCall(VecRestoreArrayReadF90(petsc_sol,sol_ptr,mpi_ierr))
 
@@ -338,18 +338,18 @@ subroutine COMPUTE_ERROR_L2(mass, petsc_sol, petsc_uex, global_dof, err_L2_mpi, 
 
     PetscCall(VecWAXPY(error, coeff, petsc_sol, petsc_uex, mpi_ierr))
 
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'error',viewer,mpi_ierr))
-    ! PetscCallA(VecView(error,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+    ! PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'error',viewer,mpi_ierr))
+    ! PetscCall(VecView(error,viewer,mpi_ierr))
+    ! PetscCall(PetscViewerDestroy(viewer,mpi_ierr))
 
     PetscCall(MatMult(mass, error, temp, mpi_ierr))
 
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'temp',viewer,mpi_ierr))
-    ! PetscCallA(VecView(temp,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+    ! PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'temp',viewer,mpi_ierr))
+    ! PetscCall(VecView(temp,viewer,mpi_ierr))
+    ! PetscCall(PetscViewerDestroy(viewer,mpi_ierr))
 
     PetscCall(VecPointwiseMult(e_L2, error, temp, mpi_ierr))
-    PetscCallA(VecGetArrayReadF90(e_L2, error_L2_pointer, mpi_ierr))
+    PetscCall(VecGetArrayReadF90(e_L2, error_L2_pointer, mpi_ierr))
     error_L2(1:local_dof) = error_L2_pointer
     PetscCall(VecRestoreArrayReadF90(e_L2, error_L2_pointer,mpi_ierr))
     err_L2_mpi = sum(error_L2)
@@ -387,18 +387,18 @@ subroutine COMPUTE_ERROR_DG(mat_dg, petsc_sol, petsc_uex, global_dof, err_DG_mpi
 
     PetscCall(VecWAXPY(error, coeff, petsc_sol, petsc_uex, mpi_ierr))
 
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'Error_poly_10',viewer,mpi_ierr))
-    ! PetscCallA(VecView(error,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+    ! PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'Error_poly_10',viewer,mpi_ierr))
+    ! PetscCall(VecView(error,viewer,mpi_ierr))
+    ! PetscCall(PetscViewerDestroy(viewer,mpi_ierr))
 
     PetscCall(MatMult(mat_dg, error, temp, mpi_ierr))
 
-    ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'Temp_poly_10',viewer,mpi_ierr))
-    ! PetscCallA(VecView(temp,viewer,mpi_ierr))
-    ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
+    ! PetscCall(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'Temp_poly_10',viewer,mpi_ierr))
+    ! PetscCall(VecView(temp,viewer,mpi_ierr))
+    ! PetscCall(PetscViewerDestroy(viewer,mpi_ierr))
 
     PetscCall(VecPointwiseMult(e_DG, error, temp, mpi_ierr))
-    PetscCallA(VecGetArrayReadF90(e_DG, error_DG_pointer, mpi_ierr))
+    PetscCall(VecGetArrayReadF90(e_DG, error_DG_pointer, mpi_ierr))
     error_DG(1:local_dof) = error_DG_pointer
     PetscCall(VecRestoreArrayReadF90(e_DG, error_DG_pointer,mpi_ierr))
     err_DG_mpi = sum(error_DG)
