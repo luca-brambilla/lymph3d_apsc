@@ -46,7 +46,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
     real(kind=8), dimension(:,:,:), ALLOCATABLE :: phi_b
     real(kind=8), dimension(:,:,:,:), ALLOCATABLE :: grad_b
     
-    real(kind=8), dimension(3,4) :: Fk
+    real(kind=8), dimension(DIM,DIM+1) :: Fk
     real(kind=8) :: Jdet
     real(kind=8), dimension(3,3) :: Jinv
     real(kind=8), dimension(4) :: x, y, z

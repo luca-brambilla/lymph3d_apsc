@@ -15,6 +15,7 @@ module assemble_element
 !! TODO change indices
 !! TODO check hardcoded
 !! change from LOCAL to ELEMENT
+!! REMOVE SUMS FROM DOCUMENTATION???
 
 !> Assemble the element stiffness matrix `stiff_tet_vol` approximating the volume integral over the tetrahedral element
 !> \f[ [V_{K}]_{ij} = \int_K  \boldsymbol{\sigma}(\boldsymbol{\varphi}_{j,K}) : \boldsymbol{\varepsilon}(\boldsymbol{\varphi}_{i,K}) \f]
@@ -129,7 +130,7 @@ subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi,
     real(kind=8), dimension(4,nq3), intent(in) :: nodtet3 !< tetrahedron quadrature nodes
     real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
     real(kind=8), dimension(Np,nq3), intent(in) :: phi  !< element basis function
-    real(kind=8), dimension(3,4), intent(in) :: Fk  !<
+    real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk  !<
     ! rhs_tet_vol dim (3,Np)
     real(kind=8), dimension(:,:), intent(out) :: rhs_tet_vol !< element rhs
 
@@ -198,7 +199,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
     real(kind=8), dimension(DIM), intent(in) :: normal  !< face normal vector
     real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b  
     real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b
-    real(kind=8), dimension(3,4), intent(in) :: Fk
+    real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk
     integer(kind=4), intent(in) :: space_fun_tag    !< tag corresponding to specific function for boundary conditions, see problem_and_data_properties.f90
     real(kind=8), dimension(DIM,Np), intent(out) :: rhs_tet_face !< surface integral contributions to element rhs
 
@@ -517,7 +518,7 @@ subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_
     real(kind=8), dimension(4,nq3), intent(in) :: nodtet3
     real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
     real(kind=8), dimension(Np,nq3), intent(in) :: phi
-    real(kind=8), dimension(3,4), intent(in) :: Fk
+    real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk
     real(kind=8), dimension(DIM,Np), intent(out) :: vec_loc
 
     integer(kind=4) :: q, i, j, k, m

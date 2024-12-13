@@ -381,6 +381,10 @@ module global_parameters
     end type ScatteredArray
 
     integer(kind=4), parameter :: DIM = 3               !< dimension of the problem
+    integer(kind=4), parameter :: NVERT_TRIA = 3        !< number of vertices of a triangle
+    integer(kind=4), parameter :: NVERT_QUAD = 4        !< number of vertices of a quadrilateral
+    integer(kind=4), parameter :: NVERT_TET = 4         !< number of vertices of a tetrahedron
+    integer(kind=4), parameter :: NVERT_HEX = 6         !< number of vertices of a hexahedron
     real(kind=8), parameter :: SQRT2 = sqrt(2.0d0)      !< parameter for @f$ \sqrt{2} @f$
     real(kind=8), parameter :: PI = 4.d0*datan(1.0d0)   !< parameter for @f$ \pi @f$
     real(kind=8), parameter :: TOL = 1.0d-40            !< tolerance for small numbers

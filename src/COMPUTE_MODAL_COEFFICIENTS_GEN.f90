@@ -35,7 +35,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local
     integer(kind=4), dimension(:,:), allocatable :: blist
     real(kind=8) :: Jdet
     real(kind=8), dimension(4) :: x, y, z
-    real(kind=8), dimension(3,4) :: Fk
+    real(kind=8), dimension(DIM,DIM+1) :: Fk
     real(kind=8), dimension(3,3) :: Jinv
     real(kind=8), dimension(:,:), allocatable :: nod2, nod3, nodtet3
     real(kind=8), dimension(:), allocatable :: wei2, wei3, weitet3

@@ -137,9 +137,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     real(kind=8), dimension(:,:,:), ALLOCATABLE :: phi_b
     real(kind=8), dimension(:,:,:,:), ALLOCATABLE :: grad_b
 
-    real(kind=8), dimension(3,4) :: Fk
-    real(kind=8) :: Jdet
-    real(kind=8), dimension(3,3) :: Jinv
+    real(kind=8), dimension(DIM,DIM+1) :: Fk    ! tranformation
+    real(kind=8) :: Jdet                        ! determinant of Jacobian
+    real(kind=8), dimension(3,3) :: Jinv        ! inverse of Jacobian
     real(kind=8), dimension(4) :: x, y, z
 
     real(kind=8) :: lambda, mu, rho ! density used for dynamics
@@ -542,7 +542,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
     real(kind=8), dimension(:,:,:), ALLOCATABLE :: phi_b
     real(kind=8), dimension(:,:,:,:), ALLOCATABLE :: grad_b
 
-    real(kind=8), dimension(3,4) :: Fk
+    real(kind=8), dimension(DIM,DIM+1) :: Fk
     real(kind=8) :: Jdet
     real(kind=8), dimension(3,3) :: Jinv
     real(kind=8), dimension(4) :: x, y, z
@@ -825,7 +825,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     integer(kind=4), dimension(:,:), allocatable :: blist
     real(kind=8) :: Jdet
     real(kind=8), dimension(4) :: x, y, z
-    real(kind=8), dimension(3,4) :: Fk
+    real(kind=8), dimension(DIM,DIM+1) :: Fk
     real(kind=8), dimension(3,3) :: Jinv
     real(kind=8), dimension(:,:), allocatable :: nod2, nod3, nodtet3
     real(kind=8), dimension(:), allocatable :: wei2, wei3, weitet3

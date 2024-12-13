@@ -1,18 +1,21 @@
+!> create basis functions
 module basis_function
 
+    use global_parameters
     use Poly_mesh
 
     implicit none
 
     contains
 
-    ! Create a list blist of the degrees of monomials of the Np basis functions up to a total degree p
+    !> Create a list `blist` of the degrees of monomials of the Np basis functions up to a total degree p
     subroutine basis_list(blist, p, Np)
 
         implicit none
 
-        integer(kind=4), intent(in) :: p, Np
-        integer(kind=4), dimension(Np,3), intent(out) :: blist
+        integer(kind=4), intent(in) :: p    !< element polynomial degree
+        integer(kind=4), intent(in) :: Np   !< number of element dofs per dimension
+        integer(kind=4), dimension(Np,DIM), intent(out) :: blist    !< basis list
 
         integer(kind=4) :: ii
         integer(kind=4) :: q1, q2, q3
@@ -40,15 +43,18 @@ module basis_function
 
     end subroutine basis_list
 
-    ! Compute Gauss-Legendre quadrature nodes and weights on the square (-1,1)^2 and cube (-1,1)^3
+    !> Compute Gauss-Legendre quadrature nodes and weights on the square (-1,1)^2 and cube (-1,1)^3
     subroutine quadrature(nod2, wei2, nod3, wei3, p, nq3, nq2)
 
         implicit none
 
-        integer(kind=4), intent(in) :: p
-        integer(kind=4), intent(out) :: nq3, nq2
-        real(kind=8), dimension(:,:), allocatable, intent(out) :: nod2, nod3
-        real(kind=8), dimension(:), allocatable, intent(out) :: wei2, wei3
+        integer(kind=4), intent(in) :: p        !< element polynomial degree
+        integer(kind=4), intent(out) :: nq3     !< number of 3D quadrature nodes
+        integer(kind=4), intent(out) :: nq2     !< number of 2D quadrature nodes
+        real(kind=8), dimension(:,:), allocatable, intent(out) :: nod2  !< 2D quadrature nodes on reference square
+        real(kind=8), dimension(:,:), allocatable, intent(out) :: nod3 !< 3D quadrature nodes on reference cube
+        real(kind=8), dimension(:), allocatable, intent(out) :: wei2 !< 2D quadrature weights on reference square
+        real(kind=8), dimension(:), allocatable, intent(out) :: wei3 !< 3D quadrature weights on reference cube
 
         real(kind=8), dimension(:), allocatable :: nod1, wei1
         integer(kind=4) :: nqn ! number of quadrature nodes
@@ -59,12 +65,12 @@ module basis_function
         nq3 = nqn**3
         nq2 = nqn**2
 
-        ALLOCATE (nod1(nqn))
-        ALLOCATE (wei1(nqn))
-        ALLOCATE (nod2(4, nq2))
-        ALLOCATE (wei2(nq2))
-        ALLOCATE (nod3(4, nq3))
-        ALLOCATE (wei3(nq3))
+        allocate (nod1(nqn))
+        allocate (wei1(nqn))
+        allocate (nod2(4, nq2))
+        allocate (wei2(nq2))
+        allocate (nod3(4, nq3))
+        allocate (wei3(nq3))
 
         ! Construction of GL nodes and weights in 1D on the interval (-1,1)
         ! They are hard-coded until degree 7
@@ -141,7 +147,7 @@ module basis_function
 
     end subroutine quadrature
 
-    ! Compute n Gauss-Legendre quadrature nodes and weights on a given interval (a,b)
+    !> Compute n Gauss-Legendre quadrature nodes and weights on a given interval (a,b)
     subroutine GauLeg(a, b, n, x_GL, w_GL)
 
         use vet_mat_operations
@@ -149,9 +155,11 @@ module basis_function
 
         implicit none
 
-        integer(kind=4), intent(in) :: n
-        integer(kind=4), intent(in) :: a, b
-        real(kind=8), dimension(n), intent(out) :: x_GL, w_GL
+        integer(kind=4), intent(in) :: n    !< number of sub-intervals
+        integer(kind=4), intent(in) :: a    !< interval inf
+        integer(kind=4), intent(in) :: b    !< interval sup
+        real(kind=8), dimension(n), intent(out) :: x_GL !< 1D quadrature nodes
+        real(kind=8), dimension(n), intent(out) :: w_GL !< 1D quadrature weights
 
         integer(kind=4) :: m, j
         real(kind=8) :: Err
@@ -240,15 +248,16 @@ module basis_function
 
     end subroutine GauLeg
 
-    ! Evaluate the non-normalized one-dimensional Legendre Polynomial on the interval int at points x for order p
+    !> Evaluate the non-normalized one-dimensional Legendre Polynomial on the interval int at points x for order p
     subroutine LegendreP_nonnorm(LP_nonnorm, x, p, int, nq)
 
         implicit none
 
-        integer(kind=4), intent(in) :: p, nq
-        real(kind=8), dimension(2), intent(in) :: int
-        real(kind=8), dimension(nq), intent(in) :: x
-        real(kind=8), dimension(nq), intent(out) :: LP_nonnorm ! L_p not normalized
+        integer(kind=4), intent(in) :: p                !< element polynomial degree
+        integer(kind=4), intent(in) :: nq               !< number of 1D quadrature nodes
+        real(kind=8), dimension(2), intent(in) :: int   !< interval extrema (a,b)
+        real(kind=8), dimension(nq), intent(in) :: x    !< 1D node coordinates
+        real(kind=8), dimension(nq), intent(out) :: LP_nonnorm ! non-normalized evaluations of Legendre polynomials at nodes x
 
         integer(kind=4) :: ii, start
         real(kind=8), dimension(nq) :: xp
@@ -313,15 +322,16 @@ module basis_function
 
     end subroutine LegendreP_nonnorm
 
-    ! Evaluate the normalized one-dimensional Legendre Polynomial L_p on the interval int at points x for order p
+    !> Evaluate the normalized one-dimensional Legendre Polynomial L_p on the interval int at points x for order p
     subroutine LegendreP(LP, x, p, int, nq)
 
         implicit none
 
-        integer(kind=4), intent(in) :: p, nq
-        real(kind=8), dimension(2), intent(in) :: int
-        real(kind=8), dimension(nq), intent(in) :: x
-        real(kind=8), dimension(nq), intent(out) :: LP ! L_p
+        integer(kind=4), intent(in) :: p                !< element polynomial degree
+        integer(kind=4), intent(in) :: nq               !< number of 1D quadrature nodes
+        real(kind=8), dimension(2), intent(in) :: int   !< interval extrema (a,b)
+        real(kind=8), dimension(nq), intent(in) :: x    !< 1D node coordinates
+        real(kind=8), dimension(nq), intent(out) :: LP  !< evaluation of Legendre polynomial at points x
 
         real(kind=8) :: hb
         real(kind=8), dimension(nq) :: LP_nonnorm ! vector which collects the non-normalized Legendre Polynomial L_p evaluated at each point of x
@@ -339,7 +349,7 @@ module basis_function
 
     end subroutine LegendreP
 
-    ! Evaluate the normalized derivative L'_p of the one-dimensional Legendre Polynomial L_p on the interval int at points x for order p
+    !> Evaluate the normalized derivative L'_p of the one-dimensional Legendre Polynomial L_p on the interval int at points x for order p
     subroutine GradLegendreP(LPder, x, p, int, nq)
 
         implicit none
@@ -409,18 +419,19 @@ module basis_function
 
     end subroutine GradLegendreP
 
-    ! Evaluate the basis functions and their partial derivatives at the 3D quadrature nodes for a given polyhedral element contained in b_box
+    !> Evaluate the basis functions and their partial derivatives at the 3D quadrature nodes for a given polyhedral element contained in b_box
     subroutine basis(phi, dphi, b_box, Np, blist, Fk, nodtet3, nq3)
 
         implicit none
 
-        integer(kind=4), intent(in) :: nq3, Np
-        real(kind=8), dimension(3,2), intent(in) :: b_box
-        real(kind=8), dimension(3,4), intent(in) :: Fk
-        integer(kind=4), dimension(Np,3), intent(in) :: blist
-        real(kind=8), dimension(4,nq3), intent(in) :: nodtet3
-        real(kind=8), dimension(Np,nq3), intent(out) :: phi
-        real(kind=8), dimension(3,Np,nq3), intent(out) :: dphi
+        integer(kind=4), intent(in) :: nq3  !< number of 3D quadrature nodes
+        integer(kind=4), intent(in) :: Np   !< number of element dofs per dimension
+        real(kind=8), dimension(DIM,2), intent(in) :: b_box   !< bounding box coordinates of extrema
+        real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk        !< tranformation
+        integer(kind=4), dimension(Np,DIM), intent(in) :: blist   !< basis list
+        real(kind=8), dimension(4,nq3), intent(in) :: nodtet3   !<
+        real(kind=8), dimension(Np,nq3), intent(out) :: phi     !< basis function evaluations
+        real(kind=8), dimension(DIM,Np,nq3), intent(out) :: dphi !< basis function derivatives evaluations
 
         real(kind=8), dimension(nq3) :: x_p, y_p, z_p
         real(kind=8), dimension(2) :: intx, inty, intz
@@ -488,20 +499,23 @@ module basis_function
 
     end subroutine basis
 
-    ! This function evaluates the basis functions for every face of two neighbouring tetrahedra with global id E1 and E2 at the 2D quadrature nodes
-    ! contained respectively in bounding boxes b_box1 and b_box2
+    !> This function evaluates the basis functions for every face of two neighbouring tetrahedra with global id E1 and E2 at the 2D quadrature nodes
+    !> contained respectively in bounding boxes b_box1 and b_box2
     subroutine basis_boundary(phi_b, grad_b, e_E1, E2, b_box1, b_box2, blist, Np, Fk, node_maps, nodtria2, nq2)
 
-        integer(kind=4), intent(in) :: nq2, Np
-        integer(kind=4), intent(in) :: e_E1, E2
-        real(kind=8), dimension(3,2), intent(in) :: b_box1
-        real(kind=8), dimension(:,:), intent(in) :: b_box2      ! input dynamically allocated
-        integer(kind=4), dimension(Np,3), intent(in) :: blist
-        real(kind=8), dimension(3,4), intent(in) :: Fk
-        real(kind=8), dimension(4,nq2), intent(in) :: nodtria2
-        real(kind=8), dimension(4,4,4), intent(in) :: node_maps
-        real(kind=8), dimension(Np,nq2,2), intent(out) :: phi_b
-        real(kind=8), dimension(3,Np,nq2,2), intent(out) :: grad_b
+        integer(kind=4), intent(in) :: nq2  !< number of 2D quadrature nodes
+        integer(kind=4), intent(in) :: Np   !< number of element dofs per dimension
+        integer(kind=4), intent(in) :: e_E1 !< E+ face
+        integer(kind=4), intent(in) :: E2   !< neighbour E- ID
+        real(kind=8), dimension(DIM,2), intent(in) :: b_box1    !< E+ bounding box
+        ! input dynamically allocated
+        real(kind=8), dimension(:,:), intent(in) :: b_box2      !< E- bounding box
+        integer(kind=4), dimension(Np,DIM), intent(in) :: blist !< basis function list
+        real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk    !< tranformation
+        real(kind=8), dimension(4,nq2), intent(in) :: nodtria2  !<
+        real(kind=8), dimension(4,4,4), intent(in) :: node_maps !< map nodes from reference to physical tetrahedron
+        real(kind=8), dimension(Np,nq2,2), intent(out) :: phi_b !< evaluation of basis function on the 2D boundary
+        real(kind=8), dimension(3,Np,nq2,2), intent(out) :: grad_b !< evaluation of basis function gradient on the 2D boundary
 
         real(kind=8), dimension(3,nq2) :: pt
         real(kind=8), dimension(3,4) :: temp
