@@ -42,7 +42,7 @@ include .depend
 # matrix_free.o: matrix_free.f90 Poly_setup_MPI.o problem_data_and_properties.o
 # Lymph3D:%.o: %.f90 Poly_data.o Poly_setup_MPI.o problem_data_and_properties.o Poly_mesh.o post_processing.o SET_PETSC_SYSTEM.o matrix_free.o global_parameters.o
 
-# $(OBJS):%.o: %.f90 assemble_local.o post_processing.o SET_PETSC_SYSTEM.o MOD_VTK.o Poly_ref_mappings.o basis_function.o Poly_setup_MPI.o Poly_mesh.o Poly_data.o Poly_global.o vet_mat_operations.o problem_data_and_properties.o MOD_MPI.o matrix_free.o global_parameters.o
+# $(OBJS):%.o: %.f90 assemble_element.o post_processing.o SET_PETSC_SYSTEM.o MOD_VTK.o Poly_ref_mappings.o basis_function.o Poly_setup_MPI.o Poly_mesh.o Poly_data.o Poly_global.o vet_mat_operations.o problem_data_and_properties.o MOD_MPI.o matrix_free.o global_parameters.o
 # 	$(COMP) $(PETSC_FC_FLAGS) $(COMP_FC_FLAGS) $(METIS_FC_FLAGS) $(DEBUG_FC_FLAGS) $< -o $@
 
 .PHONY: clean

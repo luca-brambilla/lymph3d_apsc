@@ -8,7 +8,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
     use Poly_setup_mpi
     use problem_data_and_properties
     use basis_function
-    use assemble_local
+    use assemble_element
     use local_search
     use Poly_ref_mappings
     use Poly_data
@@ -153,8 +153,8 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
         ! (see basis_functions.f90)
         call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
 
-        ! computation of the rhs term on the volume rhs_tet_loc (see assemble_local.f90)
-        call MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
+        ! computation of the rhs term on the volume rhs_tet_loc (see assemble_element.f90)
+        call MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
 
         ! this allows to assemble the local vector correctly into the global vector
         beg = (ipoly_glob-1)*Np + 1

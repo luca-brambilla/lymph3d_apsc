@@ -1,4 +1,5 @@
-module assemble_local
+!> Assemble contributions for element matrices and element vectors
+module assemble_element
 
     use problem_data_and_properties
     use Poly_mesh
@@ -13,26 +14,30 @@ module assemble_local
 !! OLD INDICES i,j,m,n
 !! TODO change indices
 !! TODO check hardcoded
+!! change from LOCAL to ELEMENT
 
-! Assemble the local stiffness matrix stiff_loc_tet
-subroutine MAKE_STIFF_TET_LOC(Np, Jdet, weitet3, nq3, lambda, mu, dphi, stiff_loc_tet)
+!> Assemble the element stiffness matrix `stiff_tet_vol` approximating the volume integral over the tetrahedral element
+!> \f[ [V_{K}]_{ij} = \int_K  \boldsymbol{\sigma}(\boldsymbol{\varphi}_{j,K}) : \boldsymbol{\varepsilon}(\boldsymbol{\varphi}_{i,K}) \f]
+subroutine MAKE_STIFFNESS_VOLUME(Np, Jdet, weitet3, nq3, lambda, mu, dphi, stiff_tet_vol)
 
     ! dphi is provided by the subroutine basis in basis_function.f90
     ! weitet3 is provided by the subroutine mapping_quadrature_3D in Poly_ref_mappings.f90
     ! nq3 is provided by the subroutine quadrature in basis_function.f90
     ! Jdet is provided by the subroutine jacobians in Poly_ref_mappings.f90
 
-    integer(kind=4), intent(in) :: nq3, Np
-    real(kind=8), intent(in) :: Jdet
-    real(kind=8), intent(in) :: lambda, mu
-    real(kind=8), dimension(nq3), intent(in) :: weitet3
-    real(kind=8), dimension(3,Np,nq3), intent(in) :: dphi
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: stiff_loc_tet
+    integer(kind=4), intent(in) :: nq3  !< number of 3D quadrature nodes
+    integer(kind=4), intent(in) :: Np   !< number of element dof per dimension
+    real(kind=8), intent(in) :: Jdet    !< transormation determinant
+    real(kind=8), intent(in) :: lambda  !< Lamé 1st parameter
+    real(kind=8), intent(in) :: mu      !< Lamé 2nd parameter
+    real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
+    real(kind=8), dimension(3,Np,nq3), intent(in) :: dphi   !<
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: stiff_tet_vol    !< element stiffness matrix V_loc, volumetric contribution
 
     integer(kind=4) :: q, i, j, m, n
     real(kind=8), dimension(DIM,DIM,Np,Np) :: temp
 
-    stiff_loc_tet = 0.0
+    stiff_tet_vol = 0.0
 
     ! loop on 3D quadrature points
     do q = 1,nq3
@@ -57,7 +62,7 @@ subroutine MAKE_STIFF_TET_LOC(Np, Jdet, weitet3, nq3, lambda, mu, dphi, stiff_lo
 
                 do i=1,DIM
                     do j=1,DIM
-                        stiff_loc_tet(i,j,m,n) = stiff_loc_tet(i,j,m,n) + weitet3(q)*abs(Jdet)*temp(i,j,m,n)
+                        stiff_tet_vol(i,j,m,n) = stiff_tet_vol(i,j,m,n) + weitet3(q)*abs(Jdet)*temp(i,j,m,n)
                     enddo
                 enddo
 
@@ -66,26 +71,28 @@ subroutine MAKE_STIFF_TET_LOC(Np, Jdet, weitet3, nq3, lambda, mu, dphi, stiff_lo
 
     enddo
 
-end subroutine MAKE_STIFF_TET_LOC
+end subroutine MAKE_STIFFNESS_VOLUME
 
-! Assemble the local mass matrix mass_loc
-subroutine MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, rho, mass_loc)
+!> Assemble the mass matrix `mass_tet_vol` approximating the volume integral over the tetrahedral element
+!> \f[ [M_{K}]_{ij} = \int_K \boldsymbol{\phi}_{j,K} \cdot \boldsymbol{\phi}_{i,K} \f]
+subroutine MAKE_MASS_VOLUME(Np, Jdet, weitet3, nq3, phi, rho, mass_tet_vol)
 
     ! phi is provided by the subroutine basis in basis_function.f90
     ! weitet3 is provided by the subroutine mapping_quadrature_3D in Poly_ref_mappings.f90
     ! nq3 is provided by the subroutine quadrature in basis_function.f90
     ! Jdet is provided by the subroutine jacobians in Poly_ref_mappings.f90
 
-    integer(kind=4), intent(in) :: nq3, Np
-    real(kind=8), intent(in) :: Jdet
-    real(kind=8), dimension(nq3), intent(in) :: weitet3
-    real(kind=8), dimension(Np,nq3), intent(in) :: phi
-    real(kind=8), intent(in) :: rho
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: mass_loc
+    integer(kind=4), intent(in) :: nq3      !< number of 3D quadrature nodes
+    integer(kind=4), intent(in) :: Np       !< number of element dofs per dimension
+    real(kind=8), intent(in) :: Jdet        !< transformation determinant
+    real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
+    real(kind=8), dimension(Np,nq3), intent(in) :: phi  !< element basis function
+    real(kind=8), intent(in) :: rho         !< element density
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: mass_tet_vol !< element mass matrix
 
     integer(kind=4) :: q, i, m, n
 
-    mass_loc = 0.0
+    mass_tet_vol = 0.0
 
     ! loop on 3D quadrature points
     do q = 1,nq3
@@ -93,17 +100,18 @@ subroutine MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, rho, mass_loc)
             do n=1,Np
 
                 do i = 1,DIM
-                    mass_loc(i,i,m,n) = mass_loc(i,i,m,n) + rho * weitet3(q)*abs(Jdet)*phi(m,q)*phi(n,q)
+                    mass_tet_vol(i,i,m,n) = mass_tet_vol(i,i,m,n) + rho * weitet3(q)*abs(Jdet)*phi(m,q)*phi(n,q)
                 enddo
 
             end do
         end do
     enddo
 
-end subroutine MAKE_MASS_LOC
+end subroutine MAKE_MASS_VOLUME
 
-! Assemble the local rhs term rhs_tet_loc approximating the integral on the tetrahedron
-subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
+!> Assemble the term `rhs_tet_vol` approximating the volume integral over the tetrahedral element
+!> \f[ [F_{K}]_{i} = \int_K \boldsymbol{f} \cdot \boldsymbol{\varphi}_{i,K} \f]
+subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_vol, rho)
 
     ! phi is provided by the subroutine basis in basis_function.f90
     ! weitet3 is provided by the subroutine mapping_quadrature_3D in Poly_ref_mappings.f90
@@ -111,22 +119,24 @@ subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rh
     ! Fk and Jdet are provided by the subroutine jacobians in Poly_ref_mappings.f90
 
     ! density is 0.0 in static case
-    real(kind=8), intent(in) :: rho
+    real(kind=8), intent(in) :: rho !< element density
 
-    integer(kind=4), intent(in) :: nq3, Np
-    real(kind=8), intent(in) :: Jdet
-    real(kind=8), intent(in) :: lambda, mu
-    real(kind=8), dimension(4,nq3), intent(in) :: nodtet3
-    real(kind=8), dimension(nq3), intent(in) :: weitet3
-    real(kind=8), dimension(Np,nq3), intent(in) :: phi
-    real(kind=8), dimension(3,4), intent(in) :: Fk
-    real(kind=8), dimension(:,:), intent(out) :: rhs_tet_loc ! dim (3,Np)
+    integer(kind=4), intent(in) :: nq3 !< number of 3D quadrature nodes
+    integer(kind=4), intent(in) :: Np !< number of element dofs per dimension
+    real(kind=8), intent(in) :: Jdet !< transformation determinant
+    real(kind=8), intent(in) :: lambda      !< Lamé 1st parameter
+    real(kind=8), intent(in) :: mu          !< Lamé 2nd parameter
+    real(kind=8), dimension(4,nq3), intent(in) :: nodtet3 !< tetrahedron quadrature nodes
+    real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
+    real(kind=8), dimension(Np,nq3), intent(in) :: phi  !< element basis function
+    real(kind=8), dimension(3,4), intent(in) :: Fk  !<
+    ! rhs_tet_vol dim (3,Np)
+    real(kind=8), dimension(:,:), intent(out) :: rhs_tet_vol !< element rhs
 
     integer(kind=4) :: q, i, j, k, m
     real(kind=8), dimension(DIM) :: points, forc_term
 
-    rhs_tet_loc = 0.0
-
+    rhs_tet_vol = 0.0
 
     ! time dependence
     ! loop on 3D quadrature nodes
@@ -148,7 +158,7 @@ subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rh
             forc_term = f_time(lambda,mu,points,rho)
 
             do i=1,DIM
-                rhs_tet_loc(i,m) = rhs_tet_loc(i,m) + abs(Jdet)*weitet3(q)*forc_term(i)*phi(m,q)
+                rhs_tet_vol(i,m) = rhs_tet_vol(i,m) + abs(Jdet)*weitet3(q)*forc_term(i)*phi(m,q)
             enddo
 
         end do
@@ -156,11 +166,12 @@ subroutine MAKE_RHS_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rh
     end do
 
 
-end subroutine MAKE_RHS_TET
+end subroutine MAKE_RHS_VOLUME
 
-! Assemble the local rhs term rhs_face_bd_loc approximating the integral on the boundary faces of the tetrahedron
+!> Assemble the element rhs term `rhs_tet_face` approximating the integral on the boundary faces of the tetrahedron (boundary conditions)
+!> \f[ [F_{\partial K}]_i = \sum_{F \in {\mathcal{F}_h^{N}}|_{K} } \int_F \boldsymbol{g}_N \cdot \boldsymbol{\varphi}_{i,K} +  \theta \sum_{F \in \mathcal{F}_h^D |_{K} } \int_F \{\boldsymbol{\sigma}(\boldsymbol{g}_D) \} \cdot [\![ \boldsymbol{\varphi}_{i,K} ]\!] + \sum_{F\in \mathcal{F}_h^D |_{K} } \int_F \eta [\![ \boldsymbol{g}_D ]\!] \cdot [\![ \boldsymbol{\varphi}_{i,K} ]\!]  \f]
 subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, Fk, nodtria2, weitria2, nq2, lambda, mu, node_maps, &
-                            phi_b, grad_b, space_fun_tag, rhs_face_bd_loc)
+                            phi_b, grad_b, space_fun_tag, rhs_tet_face)
 
     ! theta and alpha are provided by the subroutine set_properties in problem_data_and_properties.f90
     ! phi_b and grad_b are provided by the subroutine basis_boundary in basis_functions.f90
@@ -169,21 +180,27 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
     ! Fk is provided by by the subroutine jacobians in Poly_ref_mappings.f90
 
 
-    integer(kind=4), intent(in) :: nq2, Np, p
-    integer(kind=4), intent(in) :: e, E2
-    real(kind=8), intent(in) :: theta, alpha
-    real(kind=8), intent(in) :: hk_1, hk_2
-    real(kind=8), intent(in) :: area
-    real(kind=8), intent(in) :: lambda, mu
+    integer(kind=4), intent(in) :: nq2  !< number of 2D quadrature nodes
+    integer(kind=4), intent(in) :: Np   !< number of element dofs per dimension
+    integer(kind=4), intent(in) :: p    !< element polynomial degree
+    integer(kind=4), intent(in) :: e    !< current face
+    integer(kind=4), intent(in) :: E2   !< E- neighbour element ID
+    real(kind=8), intent(in) :: theta   !< penalty method (SIP, NIP, IIP)
+    real(kind=8), intent(in) :: alpha   !< penalty constant
+    real(kind=8), intent(in) :: hk_1    !< E+ element diameter
+    real(kind=8), intent(in) :: hk_2    !< E- neighbour element diameter
+    real(kind=8), intent(in) :: area    !< element area
+    real(kind=8), intent(in) :: lambda  !< Lamé 1st parameter
+    real(kind=8), intent(in) :: mu      !< Lamé 2nd parameter
     real(kind=8), dimension(4,4,4), intent(in) :: node_maps
     real(kind=8), dimension(4,nq2), intent(in) :: nodtria2
     real(kind=8), dimension(nq2), intent(in) :: weitria2
-    real(kind=8), dimension(DIM), intent(in) :: normal
-    real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b
+    real(kind=8), dimension(DIM), intent(in) :: normal  !< face normal vector
+    real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b  
     real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b
     real(kind=8), dimension(3,4), intent(in) :: Fk
-    integer(kind=4), intent(in) :: space_fun_tag
-    real(kind=8), dimension(DIM,Np), intent(out) :: rhs_face_bd_loc
+    integer(kind=4), intent(in) :: space_fun_tag    !< tag corresponding to specific function for boundary conditions, see problem_and_data_properties.f90
+    real(kind=8), dimension(DIM,Np), intent(out) :: rhs_tet_face !< surface integral contributions to element rhs
 
     integer(kind=4) :: q, i, j, k, t, m
     real(kind=8) :: sigma, D_bar
@@ -203,7 +220,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
         sigma = alpha*(p**2) / minval(val) * D_bar
     end if
 
-    rhs_face_bd_loc = 0.0
+    rhs_tet_face = 0.0
 
     ! loop on 2D quadrature nodes
     do q = 1,nq2
@@ -249,7 +266,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
                                     0.5*phi_b(m,q,1)*diri_data(1)*normal(1)*normal(3) + 0.5*phi_b(m,q,1)*diri_data(2)*normal(2)*normal(3)
 
                 do i=1,DIM
-                    rhs_face_bd_loc(i,m) = rhs_face_bd_loc(i,m) &
+                    rhs_tet_face(i,m) = rhs_tet_face(i,m) &
                                     + theta*weitria2(q)*temp(i,m)*area &
                                     + sigma*weitria2(q)*temp2(i,m)*area
                 enddo
@@ -276,7 +293,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
                 neum_data = gn(lambda,mu,normal,points,space_fun_tag)
 
                 do i=1,DIM
-                    rhs_face_bd_loc(i,m) = rhs_face_bd_loc(i,m) &
+                    rhs_tet_face(i,m) = rhs_tet_face(i,m) &
                                     + weitria2(q)*phi_b(m,q,1)*neum_data(i)*area
                 enddo
 
@@ -288,27 +305,41 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
 
 end subroutine MAKE_RHS_FACE
 
-! Assemble the terms of the stiffness matrix  S_loc and I_loc approximating the integrals on the faces of the tetrahedron
-! and the ones SN_loc and IN_loc approximating the integrals on the faces of the neighbouring tetrahedron E2
-subroutine MAKE_STIFF_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2, nq2, lambda, mu, &
-                            phi_b, grad_b, S_loc, I_loc, IN_loc, SN_loc)
+!> Assemble the terms of the stiffness matrix  `S_E1` and `I_E1` approximating the integrals on the faces of the tetrahedron
+!> and the ones `S_E2` and `I_E2` approximating the integrals on the faces of the neighbouring tetrahedron E-
+!> \f[ [I_K]_{ij} = \sum_{F\in (F_h^I \cup F_h^D)|_{K} } \int_F  \{ \boldsymbol{\sigma}(\boldsymbol{\varphi}_{j,K}) \} \cdot [\![ \boldsymbol{\varphi}_{i,K} ]\!] \quad  [S_K]_{ij} =  \sum_{F\in (F_h^I \cup F_h^D) |_{K} } \int_F \eta [\![ \boldsymbol{\varphi}_{j,K} ]\!] \cdot [\![ \boldsymbol{\varphi}_{i,K} ]\!] \f]
+!> components
+!> \f[ [S_{K+}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+):(\boldsymbol{\varphi}_{i,K}^+ \textbf{n}^+ ) + \sum_{F\in F_h^D|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+):(\boldsymbol{\varphi}_{i,K}^+ \textbf{n}^+) \f]
+!> \f[ [S_{K-}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+):( \boldsymbol{\varphi}_{i,K}^- \textbf{n}^-) \f]
+!> \f[ [I_{K+}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) + \sum_{F\in F_h^D|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
+!> \f[ [I_{K-}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F ( \boldsymbol{\varphi}_{j,K}^- \textbf{n}^- ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
+
+subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2, nq2, lambda, mu, &
+                            phi_b, grad_b, S_E1, I_E1, I_E2, S_E2)
 
     ! theta and alpha are provided by the subroutine set_properties in problem_data_and_properties.f90
     ! phi_b and grad_b are provided by the subroutine basis_boundary in basis_functions.f90
     ! weitria2 is provided by the subroutine mapping_quadrature_2D in Poly_ref_mappings.f90
     ! nq2 is provided by the subroutine quadrature in basis_function.f90
 
-    integer(kind=4), intent(in) :: nq2, Np, p
-    integer(kind=4), intent(in) :: E2
-    real(kind=8), intent(in) :: alpha
-    real(kind=8), intent(in) :: hk_1, hk_2
-    real(kind=8), intent(in) :: area
-    real(kind=8), intent(in) :: lambda, mu
-    real(kind=8), dimension(nq2), intent(in) :: weitria2
-    real(kind=8), dimension(DIM), intent(in) :: normal
-    real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b
-    real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_loc, I_loc, IN_loc, SN_loc
+    integer(kind=4), intent(in) :: nq2  !< number of 2D quadrature nodes
+    integer(kind=4), intent(in) :: Np   !< element dof per dimension
+    integer(kind=4), intent(in) :: p    !< element polynomial degree
+    integer(kind=4), intent(in) :: E2   !< E- neighbour element ID
+    real(kind=8), intent(in) :: alpha   !< penaly constant
+    real(kind=8), intent(in) :: hk_1    !< E+ diameter
+    real(kind=8), intent(in) :: hk_2    !< E- diameter
+    real(kind=8), intent(in) :: area    !< element area
+    real(kind=8), intent(in) :: lambda  !< Lamé 1st parameter
+    real(kind=8), intent(in) :: mu      !< Lamé 2nd parameter
+    real(kind=8), dimension(nq2), intent(in) :: weitria2    !< 2d weights
+    real(kind=8), dimension(DIM), intent(in) :: normal      !< normal vector
+    real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b  !< box basis
+    real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b   !< box basis gradient
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E1    !< stabilization E+ contribution (diagonal term)
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E1         !< interior flux, E+ contribution (diagonal term)
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E2        !< interior flux, E- contribution (extra-diagonal term)
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E2        !< stabilization, E- contribution (extra-diagonal term)
 
     real(kind=8), dimension(DIM,DIM,Np,Np) :: temp, temp1, temp2
     real(kind=8), dimension(2) :: val
@@ -327,10 +358,10 @@ subroutine MAKE_STIFF_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2,
         sigma = alpha*(p**2) / minval(val) * D_bar
     end if
 
-    S_loc = 0.0
-    I_loc = 0.0
-    IN_loc = 0.0
-    SN_loc = 0.0
+    S_E1 = 0.0
+    I_E1 = 0.0
+    I_E2 = 0.0
+    S_E2 = 0.0
 
     ! check if the actual face is not a Neumann boundary face
     if(E2 /= -2) then
@@ -355,7 +386,7 @@ subroutine MAKE_STIFF_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2,
 
                     do i=1,DIM
                         do j=1,DIM
-                            S_loc(i,j,m,n) = S_loc(i,j,m,n) + sigma*weitria2(q)*temp(i,j,m,n)*area
+                            S_E1(i,j,m,n) = S_E1(i,j,m,n) + sigma*weitria2(q)*temp(i,j,m,n)*area
                         enddo
                     enddo
 
@@ -385,7 +416,7 @@ subroutine MAKE_STIFF_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2,
 
                         do i=1,DIM
                             do j=1,DIM
-                                I_loc(i,j,m,n) = I_loc(i,j,m,n) + weitria2(q)*area*temp(i,j,m,n)
+                                I_E1(i,j,m,n) = I_E1(i,j,m,n) + weitria2(q)*area*temp(i,j,m,n)
                             enddo
                         enddo
 
@@ -415,7 +446,7 @@ subroutine MAKE_STIFF_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2,
                         enddo
                         do i=1,DIM
                             do j=1,DIM
-                                I_loc(i,j,m,n) = I_loc(i,j,m,n) + 0.5*weitria2(q)*area*temp(i,j,m,n)
+                                I_E1(i,j,m,n) = I_E1(i,j,m,n) + 0.5*weitria2(q)*area*temp(i,j,m,n)
                             enddo
                         enddo
 
@@ -433,7 +464,7 @@ subroutine MAKE_STIFF_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2,
                         enddo
                         do i=1,DIM
                             do j=1,DIM
-                                IN_loc(i,j,m,n) = IN_loc(i,j,m,n) - 0.5*weitria2(q)*area*temp1(i,j,m,n)
+                                I_E2(i,j,m,n) = I_E2(i,j,m,n) - 0.5*weitria2(q)*area*temp1(i,j,m,n)
                             enddo
                         enddo
 
@@ -449,7 +480,7 @@ subroutine MAKE_STIFF_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2,
 
                         do i=1,DIM
                             do j=1,DIM
-                                SN_loc(i,j,m,n) = SN_loc(i,j,m,n) - sigma*weitria2(q)*temp2(i,j,m,n)*area
+                                S_E2(i,j,m,n) = S_E2(i,j,m,n) - sigma*weitria2(q)*temp2(i,j,m,n)*area
                             enddo
                         enddo
 
@@ -462,7 +493,7 @@ subroutine MAKE_STIFF_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2,
 
     endif
 
-end subroutine MAKE_STIFF_FACE
+end subroutine MAKE_STIFFNESS_FACE
 
 !> @brief Assemble the local vector term vec_loc approximating the integral on the tetrahedron
 subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_analytic)
@@ -472,7 +503,7 @@ subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_
     ! nq3 is provided by the subroutine quadrature in basis_function.f90
     ! Fk and Jdet are provided by the subroutine jacobians in Poly_ref_mappings.f90
 
-    !! PASS FUNCTION AS ARGUMENT
+    ! pass function as argument
     interface
         function f_analytic(point) result(res)
             use global_parameters
@@ -480,10 +511,11 @@ subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_
         end function f_analytic
     end interface
 
-    integer(kind=4), intent(in) :: nq3, Np
+    integer(kind=4), intent(in) :: nq3
+    integer(kind=4), intent(in) :: Np
     real(kind=8), intent(in) :: Jdet
     real(kind=8), dimension(4,nq3), intent(in) :: nodtet3
-    real(kind=8), dimension(nq3), intent(in) :: weitet3
+    real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
     real(kind=8), dimension(Np,nq3), intent(in) :: phi
     real(kind=8), dimension(3,4), intent(in) :: Fk
     real(kind=8), dimension(DIM,Np), intent(out) :: vec_loc
@@ -519,4 +551,4 @@ subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_
 
 end subroutine MAKE_VECTOR_TET
 
-end module assemble_local
+end module assemble_element

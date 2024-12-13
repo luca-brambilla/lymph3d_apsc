@@ -44,7 +44,6 @@ mpirun -np 2 ../Lymph3D
 where the number of processors is set to two in this case.
 
 ## Notes
-- Remember to remove all files in the folder MPI_FILES before executing the main file with a different mesh and/or with a different number of processors!
 - Remember to remove the file convergence_test.vtk before performing a new convergence test!
 
 ## Structure
@@ -123,12 +122,12 @@ It calls also the following subroutines:
 
 * SET_PETSC_SYSTEM.f90: contains a module with the same name that contains the subroutines SET_PETSC_VECTOR and SET_PETSC_MATRIX which create and initialize vector and matrices within the PETSc environment, respectively.
 
-* assemble_local.f90: assembles the local matrices and the local rhs vector by iterating over either the three-dimensional quadrature nodes or the two-dimensional quadrature nodes. In particular, this module contains the following 5 subroutines:
-  - MAKE_STIFF_TET_LOC: assembles V_loc, the local term of the stiffness matrix approximating the integral on the tetrahedron;
-  - MAKE_STIFF_FACE: assembles I_loc, S_loc, the terms of the stiffness matrix approximating the integrals on the faces of the tetrahedron, and IN_loc and SN_loc on the faces of the neighbouring tetrahedra;
-  - MAKE_RHS_TET: assembles rhs_tet_loc, the local rhs term approximating the integral on the tetrahedron;
+* assemble_element.f90: assembles the local matrices and the local rhs vector by iterating over either the three-dimensional quadrature nodes or the two-dimensional quadrature nodes. In particular, this module contains the following 5 subroutines:
+  - MAKE_STIFFNESS_VOLUME: assembles V_loc, the local term of the stiffness matrix approximating the integral on the tetrahedron;
+  - MAKE_STIFFNESS_FACE: assembles I_loc, S_loc, the terms of the stiffness matrix approximating the integrals on the faces of the tetrahedron, and IN_loc and SN_loc on the faces of the neighbouring tetrahedra;
+  - MAKE_RHS_VOLUME: assembles rhs_tet_loc, the local rhs term approximating the integral on the tetrahedron;
   - MAKE_RHS_FACE: assembles rhs_face_bd_loc, the local rhs term that approximates the integral on the faces of the tetrahedron that are boundary faces;
-  - MAKE_MASS_LOC: assembles of M_loc, the local term of the mass matrix that approximates the integral on the tetrahedron.
+  - MAKE_MASS_VOLUME: assembles of M_loc, the local term of the mass matrix that approximates the integral on the tetrahedron.
 
 * MAKE_MATRICES.f90: contains a subroutine with the same name which assembles the global stiffness matrix pestc_stiff, mass matrix petsc_mass and DG matrix mat_dg by performing a loop on the elements.
 
@@ -144,7 +143,7 @@ It calls also the following subroutines:
   - WRITE_SOLUTION_VISUALIZATION: writes the values of the numerical solution at the vertices of the tetrahedra in num_sol.mpi;
 For WRITE_MESH_VISUALIZATION and WRITE_SOLUTION_VISUALIZATION, the corresponding vtk files generated can be visualized using software such as [Paraview](https://www.paraview.org/).
 
-* post_processing.f90: contains a module with the same name that performs the post-processing. It stores the following subroutines:
+* solution_processing.f90: contains a module with the same name that performs the post-processing. It stores the following subroutines:
   - EXPORT_SOLUTION: evaluates the solution function at the vertices of the tetrahedra and then calls the subroutine WRITE_SOLUTION_VISUALIZATION to write these values to a vtk file;
   - COMPUTE_ERROR_L2: computes the error in the $L^2$ norm, utilizing both the (exact) modal solution and the numerical solution.
   - COMPUTE_ERROR_DG: computes the error in the DG norm, again utilizing both the (exact) modal solution and the numerical solution.

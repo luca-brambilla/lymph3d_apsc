@@ -67,3 +67,5 @@ src/test
 
 setup_host.sh
 run_sims.sh
+tmp.md
+.gitignore

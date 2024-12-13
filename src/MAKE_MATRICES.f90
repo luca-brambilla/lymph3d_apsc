@@ -9,7 +9,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     use Poly_setup_mpi
     use problem_data_and_properties
     use basis_function
-    use assemble_local
+    use assemble_element
     use local_search
     use Poly_ref_mappings
     use Poly_data
@@ -145,12 +145,12 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
         ! (see basis_functions.f90)
         call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
 
-        ! computation of the local stiffness matrix V_loc (see assemble_local.f90)
-        call MAKE_STIFF_TET_LOC(Np, Jdet, weitet3, nq3, lambda, mu, dphi, V_loc)
+        ! computation of the local stiffness matrix V_loc (see assemble_element.f90)
+        call MAKE_STIFFNESS_VOLUME(Np, Jdet, weitet3, nq3, lambda, mu, dphi, V_loc)
 
-        ! computation of the local mass matrix M_loc (see assemble_local.f90)
+        ! computation of the local mass matrix M_loc (see assemble_element.f90)
         ! used rho=1.0 for modal matrix, then multiplied for true mass matrix
-        call MAKE_MASS_LOC(Np, Jdet, weitet3, nq3, phi, 1.0d0, M_loc)
+        call MAKE_MASS_VOLUME(Np, Jdet, weitet3, nq3, phi, 1.0d0, M_loc)
 
         ! this allows to assemble the local matrix correctly into the global matrices
         beg = (ipoly_glob-1)*Np + 1
@@ -261,7 +261,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
                     call basis_boundary(phi_b,grad_b,e, E2, PolyMesh%Poly(ipoly_loc)%b_box,&
                                         PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist, Np, Fk, node_maps, nodtria2, nq2)
 
-                    call MAKE_STIFF_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly), nn, &
+                    call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly), nn, &
                                         PolyMesh%Elem_loc(E1)%area(e),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
 
                 else
@@ -273,7 +273,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
                         call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
                                                 PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
-                        call MAKE_STIFF_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly2_loc)%hk, nn, &
+                        call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly2_loc)%hk, nn, &
                                                 PolyMesh%Elem_loc(E1)%area(e),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
 
                     else
@@ -281,7 +281,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
                         call basis_boundary(phi_b,grad_b,e,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
                                                 PolyMesh%Poly(1)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
-                        call MAKE_STIFF_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(1)%hk, nn, &
+                        call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(1)%hk, nn, &
                                                 PolyMesh%Elem_loc(E1)%area(e),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
 
                     endif
