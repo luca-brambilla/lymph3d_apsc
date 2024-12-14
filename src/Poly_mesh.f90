@@ -21,7 +21,7 @@ module Poly_mesh
         integer(kind=4), dimension(:),   pointer :: vert    !< Indexes of the vertices of the element
         integer(kind=4), dimension(:,:), pointer :: faces   !< Indexes of the vertices for every face of the element
 
-        !> Properties of the neighbor elements (6 rows)
+        !> Properties of the neighbor elements (6 columns)
         !> - `0` - mpi_proc: processor containing the neighbor element data
         !> - `1` - mat_id: ID of the neighbor material or tag of boundary face
         !> - `2` - el_id: global element across face ID with `-1` for Dirichlet boundary, `-2` for Neumann boundary @n
@@ -104,18 +104,18 @@ contains
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> Print properties of the mesh
-subroutine print_Dime_Mesh_Structure(Struct)
+subroutine print_Dime_Mesh_Structure(PolyMesh)
 
     implicit none
 
-    type(Mesh_Structure), intent(inout) :: Struct
+    type(Mesh_Structure), intent(inout) :: PolyMesh
 
-    write(*,'(A,I8)')'#Nodes          : ', Struct%num_node
-    write(*,'(A,I8)')'#Hexahedra      : ', Struct%num_hex
-    write(*,'(A,I8)')'#Tetrahedra     : ', Struct%num_tet
-    write(*,'(A,I8)')'#Prysms         : ', Struct%num_prysm
-    write(*,'(A,I8)')'#Quad faces     : ', Struct%num_quad
-    write(*,'(A,I8)')'#Tria faces     : ', Struct%num_tria
+    write(*,'(A,I8)')'#Nodes          : ', PolyMesh%num_node
+    write(*,'(A,I8)')'#Hexahedra      : ', PolyMesh%num_hex
+    write(*,'(A,I8)')'#Tetrahedra     : ', PolyMesh%num_tet
+    write(*,'(A,I8)')'#Prysms         : ', PolyMesh%num_prysm
+    write(*,'(A,I8)')'#Quad faces     : ', PolyMesh%num_quad
+    write(*,'(A,I8)')'#Tria faces     : ', PolyMesh%num_tria
 
 
 end subroutine print_Dime_Mesh_Structure
@@ -124,61 +124,61 @@ end subroutine print_Dime_Mesh_Structure
 ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 !> Allocate memory for mesh properties
-subroutine allocate_Mesh_Structure(Struct)
+subroutine allocate_Mesh_Structure(PolyMesh)
 
     implicit none
 
-    type(Mesh_Structure), intent(inout) :: Struct
+    type(Mesh_Structure), intent(inout) :: PolyMesh
 
-    Struct%num_elem = Struct%num_hex + Struct%num_tet + Struct%num_prysm
+    PolyMesh%num_elem = PolyMesh%num_hex + PolyMesh%num_tet + PolyMesh%num_prysm
 
-    if (Struct%num_elem  == 0) then
+    if (PolyMesh%num_elem  == 0) then
         write(*,'(A)')'ERROR! NUM OF ELEMENTS = 0'
         call EXIT(EXIT_NO_ELEMENTS)
     endif
-    if (Struct%num_hex > 0) then
-        allocate (Struct%con_hex(Struct%num_hex,9))
-        Struct%con_hex = 0;
+    if (PolyMesh%num_hex > 0) then
+        allocate (PolyMesh%con_hex(PolyMesh%num_hex,9))
+        PolyMesh%con_hex = 0;
     endif
-    if (Struct%num_tet > 0) then
-        allocate (Struct%con_tet(Struct%num_tet,5))
-        Struct%con_tet = 0;
+    if (PolyMesh%num_tet > 0) then
+        allocate (PolyMesh%con_tet(PolyMesh%num_tet,5))
+        PolyMesh%con_tet = 0;
     endif
-    if (Struct%num_prysm > 0) then
-        allocate (Struct%con_prysm(Struct%num_prysm,6))
-        Struct%con_prysm = 0;
+    if (PolyMesh%num_prysm > 0) then
+        allocate (PolyMesh%con_prysm(PolyMesh%num_prysm,6))
+        PolyMesh%con_prysm = 0;
     endif
 
-    !write(*,*) Struct%num_hex, Struct%num_tet, Struct%num_prysm, Struct%con_tet
+    !write(*,*) PolyMesh%num_hex, PolyMesh%num_tet, PolyMesh%num_prysm, PolyMesh%con_tet
     !read(*,*)
 
-    if (Struct%num_quad > 0) allocate (Struct%con_quad(Struct%num_quad,5))
-    if (Struct%num_tria > 0) allocate (Struct%con_tria(Struct%num_tria,5)) !it is modified so that it contains the tag of the boundary
+    if (PolyMesh%num_quad > 0) allocate (PolyMesh%con_quad(PolyMesh%num_quad,5))
+    if (PolyMesh%num_tria > 0) allocate (PolyMesh%con_tria(PolyMesh%num_tria,5)) !it is modified so that it contains the tag of the boundary
 
     !Remove this for big simulation
-    !allocate(Struct%vert_x(Struct%num_node), &
-    !         Struct%vert_y(Struct%num_node), &
-    !         Struct%vert_z(Struct%num_node))
-    !allocate(Struct%part_elem(Struct%num_elem))
-    allocate(Struct%elem_in_poly(Struct%num_elem))
-    allocate(Struct%elem_glo2loc(Struct%num_elem))
+    !allocate(PolyMesh%vert_x(PolyMesh%num_node), &
+    !         PolyMesh%vert_y(PolyMesh%num_node), &
+    !         PolyMesh%vert_z(PolyMesh%num_node))
+    !allocate(PolyMesh%part_elem(PolyMesh%num_elem))
+    allocate(PolyMesh%elem_in_poly(PolyMesh%num_elem))
+    allocate(PolyMesh%elem_glo2loc(PolyMesh%num_elem))
 
 end subroutine allocate_Mesh_Structure
 
 
-        !subroutine allocate_Poly_in_Mesh_Structure(Struct)
+        !subroutine allocate_Poly_in_Mesh_Structure(PolyMesh)
         !  implicit none
 
-          !type(Mesh_Structure), intent(inout) :: Struct
+          !type(Mesh_Structure), intent(inout) :: PolyMesh
           !integer(kind=4) :: ipoly
 
-          !allocate(Struct%Poly(Struct%num_poly))
+          !allocate(PolyMesh%Poly(PolyMesh%num_poly))
 
-          !do ipoly=1,Struct%num_poly
-          !  Struct%Poly(ipoly)%hk=0.0
-          !  Struct%Poly(ipoly)%b_box(1,:)=[0.0,0.0]
-          !  Struct%Poly(ipoly)%b_box(2,:)=[0.0,0.0]
-          !  Struct%Poly(ipoly)%b_box(3,:)=[0.0,0.0]
+          !do ipoly=1,PolyMesh%num_poly
+          !  PolyMesh%Poly(ipoly)%hk=0.0
+          !  PolyMesh%Poly(ipoly)%b_box(1,:)=[0.0,0.0]
+          !  PolyMesh%Poly(ipoly)%b_box(2,:)=[0.0,0.0]
+          !  PolyMesh%Poly(ipoly)%b_box(3,:)=[0.0,0.0]
           !end do
 
         !end subroutine allocate_Poly_in_Mesh_Structure
@@ -188,11 +188,11 @@ end subroutine allocate_Mesh_Structure
 !! IT WORKS ONLY IN SERIAL
 
 !> Save to a different file the mesh for each processor
-subroutine print_Local_Mesh_Structure_VTK(Struct)
+subroutine print_Local_Mesh_Structure_VTK(PolyMesh)
 
     implicit none
 
-    type(Mesh_Structure), intent(inout) :: Struct
+    type(Mesh_Structure), intent(inout) :: PolyMesh
     integer(kind=4) :: i
 
     open(50,file='mesh_visualization/mesh_partition.vtk')
@@ -201,52 +201,52 @@ subroutine print_Local_Mesh_Structure_VTK(Struct)
     write(50,'(A)') 'Comment'
     write(50,'(A)') 'ASCII'
     write(50,'(A)') 'DATASET UNSTRUCTURED_GRID'
-    write(50,*)     'POINTS  ', Struct%num_node, '  float'
+    write(50,*)     'POINTS  ', PolyMesh%num_node, '  float'
 
-    do i = 1, Struct%num_node
-        write(50,*) Struct%coord_x(i), Struct%coord_y(i), Struct%coord_z(i)
+    do i = 1, PolyMesh%num_node
+        write(50,*) PolyMesh%coord_x(i), PolyMesh%coord_y(i), PolyMesh%coord_z(i)
     enddo
 
-    write(50,*) 'CELLS ', Struct%num_elem, 9*Struct%num_hex &
-                        + 5*Struct%num_tet + 6*Struct%num_prysm
+    write(50,*) 'CELLS ', PolyMesh%num_elem, 9*PolyMesh%num_hex &
+                        + 5*PolyMesh%num_tet + 6*PolyMesh%num_prysm
 
-    do i = 1, Struct%num_hex
-        write(50,*) 8, Struct%con_hex(i,2)-1, Struct%con_hex(i,3)-1, &
-                    Struct%con_hex(i,4)-1, Struct%con_hex(i,5)-1, &
-                    Struct%con_hex(i,6)-1, Struct%con_hex(i,7)-1, &
-                    Struct%con_hex(i,8)-1, Struct%con_hex(i,9)-1
+    do i = 1, PolyMesh%num_hex
+        write(50,*) 8, PolyMesh%con_hex(i,2)-1, PolyMesh%con_hex(i,3)-1, &
+                    PolyMesh%con_hex(i,4)-1, PolyMesh%con_hex(i,5)-1, &
+                    PolyMesh%con_hex(i,6)-1, PolyMesh%con_hex(i,7)-1, &
+                    PolyMesh%con_hex(i,8)-1, PolyMesh%con_hex(i,9)-1
     enddo
-    do i = 1, Struct%num_tet
-        write(50,*) 4, Struct%con_tet(i,2)-1, Struct%con_tet(i,3)-1, &
-                    Struct%con_tet(i,4)-1, Struct%con_tet(i,5)-1
+    do i = 1, PolyMesh%num_tet
+        write(50,*) 4, PolyMesh%con_tet(i,2)-1, PolyMesh%con_tet(i,3)-1, &
+                    PolyMesh%con_tet(i,4)-1, PolyMesh%con_tet(i,5)-1
     enddo
-    do i = 1, Struct%num_prysm
-        write(50,*) 5, Struct%con_prysm(i,2)-1, Struct%con_prysm(i,3)-1, &
-                    Struct%con_prysm(i,4)-1, Struct%con_prysm(i,5)-1, &
-                    Struct%con_prysm(i,6)-1
+    do i = 1, PolyMesh%num_prysm
+        write(50,*) 5, PolyMesh%con_prysm(i,2)-1, PolyMesh%con_prysm(i,3)-1, &
+                    PolyMesh%con_prysm(i,4)-1, PolyMesh%con_prysm(i,5)-1, &
+                    PolyMesh%con_prysm(i,6)-1
     enddo
 
     ! Vtk Cell type file formats
-    write(50,*) 'CELL_TYPES ', Struct%num_elem
-    do i = 1, Struct%num_hex
+    write(50,*) 'CELL_TYPES ', PolyMesh%num_elem
+    do i = 1, PolyMesh%num_hex
         write(50,*) 12  ! hexahedra
     enddo
-    do i = 1, Struct%num_tet
+    do i = 1, PolyMesh%num_tet
         write(50,*) 10  ! tetrahedra
     enddo
-    do i = 1, Struct%num_prysm
+    do i = 1, PolyMesh%num_prysm
         write(50,*) 14 ! pyramids? !!
     enddo
 
-    write(50,*) 'CELL_DATA ', Struct%num_elem
+    write(50,*) 'CELL_DATA ', PolyMesh%num_elem
 
     write(50,*) 'SCALARS  mpi_id int 1'
     !write(50,*) 'SCALARS  poly_id int 1'
     write(50,*) 'LOOKUP_TABLE default'
 
-    do i = 1, Struct%num_elem
-        write(50,*) Struct%part_elem(i)
-        !write(50,*) Struct%elem_in_poly(i)
+    do i = 1, PolyMesh%num_elem
+        write(50,*) PolyMesh%part_elem(i)
+        !write(50,*) PolyMesh%elem_in_poly(i)
     enddo
 
     close(50);

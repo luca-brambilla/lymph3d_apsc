@@ -1,24 +1,9 @@
 !    Copyright (C) 2021 The SPEED FOUNDATION
 !    Author: Ilario Mazzieri
-!
-!    This file is part of PolyWAVE.
-!
-!    PolyWAVE is free software; you can redistribute it and/or modify it
-!    under the terms of the GNU Affero General Public License as
-!    published by the Free Software Foundation, either version 3 of the
-!    License, or (at your option) any later version.
-!
-!    PolyWAVE is distributed in the hope that it will be useful, but
-!    WITHOUT ANY WARRANTY; without even the implied warranty of
-!    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-!    Affero General Public License for more details.
-!
-!    You should have received a copy of the GNU Affero General Public License
-!    along with PolyWAVE.  If not, see <http://www.gnu.org/licenses/>.
 
-!> @brief definition of the struct Data_Structure, which stores the material
-! file parameters such as the density and Lamé parameters, and subroutines
-! related to print, allocation and setting of default values to the parameters.
+!> @brief definition of the struct `Data_Structure`, which stores the material
+!> file parameters such as the density and Lamé parameters, and subroutines
+!> related to print, allocation and setting of default values to the parameters.
 module Poly_data
 
     use Poly_global
@@ -27,6 +12,7 @@ module Poly_data
 
     implicit none
 
+    !> Material and loads parameters
     type Data_Structure
     !*******************************************************************************
     ! Material file parameters -
@@ -133,266 +119,270 @@ module Poly_data
 
     contains
 
-    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine set_Data_Structure_default_value(Struct)
+    !> Set material parameters to default values
+    subroutine set_Data_Structure_default_value(PolyData)
 
         implicit none
 
-        type(Data_Structure), intent(inout) :: Struct
+        type(Data_Structure), intent(inout) :: PolyData !< materials and loads
 
-        Struct%nmat = 0             !< number of elastic material
-        Struct%nmat_nle = 0         !< number of nonlinear el. material
-        Struct%nmat_rnd = 0         !< number of random el. material
+        PolyData%nmat = 0             ! number of elastic material
+        PolyData%nmat_nle = 0         ! number of nonlinear el. material
+        PolyData%nmat_rnd = 0         ! number of random el. material
 
-        Struct%nload_diri_el = 0    !< number of el. Dirichlet bound. (XYZ load)
+        PolyData%nload_diri_el = 0    ! number of el. Dirichlet bound. (XYZ load)
 
-        Struct%nload_neum_el = 0    !< number of el. Neumann bound. (XYZ load)
+        PolyData%nload_neum_el = 0    ! number of el. Neumann bound. (XYZ load)
 
-        Struct%nload_neuN_el = 0    !< number of el. Neumann bound. (normal load)
+        PolyData%nload_neuN_el = 0    ! number of el. Neumann bound. (normal load)
 
-        Struct%nload_poiX_el = 0    !< number of el. point load (XYZ load)
-        Struct%nload_poiY_el = 0
-        Struct%nload_poiZ_el = 0
+        PolyData%nload_poiX_el = 0    ! number of el. point load (XYZ load)
+        PolyData%nload_poiY_el = 0
+        PolyData%nload_poiZ_el = 0
 
-        Struct%nload_plaX_el = 0     !< number of el. plane wave load (XYZ load)
-        Struct%nload_plaY_el = 0
-        Struct%nload_plaZ_el = 0
+        PolyData%nload_plaX_el = 0     ! number of el. plane wave load (XYZ load)
+        PolyData%nload_plaY_el = 0
+        PolyData%nload_plaZ_el = 0
 
-        Struct%nload_forX_el = 0     !< number of el. volume load (XYZ load)
-        Struct%nload_forY_el = 0
-        Struct%nload_forZ_el = 0
+        PolyData%nload_forX_el = 0     ! number of el. volume load (XYZ load)
+        PolyData%nload_forY_el = 0
+        PolyData%nload_forZ_el = 0
 
-        Struct%nload_abc_el  = 0     !< number of el. absorbing conditions
+        PolyData%nload_abc_el  = 0     ! number of el. absorbing conditions
 
-        Struct%nfunc         = 0     !< number of keyword FUNC
+        PolyData%nfunc         = 0     ! number of keyword FUNC
 
-        Struct%nfunc_data    = 0     !< number of data for all FUNC keywords
+        PolyData%nfunc_data    = 0     ! number of data for all FUNC keywords
 
-        Struct%nload_sism_el = 0     !< number of seismic load (kinematic source)
+        PolyData%nload_sism_el = 0     ! number of seismic load (kinematic source)
 
-        Struct%n_case        = 0     !< CASE number for not-honoring
+        PolyData%n_case        = 0     ! CASE number for not-honoring
 
-        Struct%nmat_nhe      = 0     !< material number for not-honoring enhanced
+        PolyData%nmat_nhe      = 0     ! material number for not-honoring enhanced
 
-        Struct%srcmodflag    = 0     !<f lag for srcmod - sism lines
+        PolyData%srcmodflag    = 0     !f lag for srcmod - sism lines
 
     end subroutine set_Data_Structure_default_value
 
-    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine print_Dime_Data_Structure(Struct)
+    !> Print number of material parameters to terminal
+    subroutine print_Dime_Data_Structure(PolyData)
 
         implicit none
 
-        type(Data_Structure), intent(inout) :: Struct
+        type(Data_Structure), intent(inout) :: PolyData !< materials and loads
 
-        if (Struct%nmat <= 0) then
+        if (PolyData%nmat <= 0) then
             write(*,*)'Error ! Number of material is 0'
             call EXIT(EXIT_NO_MATERIALS)
         endif
 
-        write(*,'(A,I8)') 'Materials        : ',Struct%nmat
+        write(*,'(A,I8)') 'Materials        : ',PolyData%nmat
 
-        if(Struct%nmat_nle > 0) &
-            write(*,'(A,I8)')     'Materials NL-El. : ',Struct%nmat_nle
-        if(Struct%nmat_rnd > 0) &
-            write(*,'(A,I8)')     'Materials Random : ',Struct%nmat_rnd
-        if(Struct%nload_diri_el > 0) &
-            write(*,'(A,I8)')'Dirichlet B.C.   : ',Struct%nload_diri_el
-        if(Struct%nload_neum_el > 0) &
-            write(*,'(A,I8)')'Neumann B.C.     : ',Struct%nload_neum_el
-        if(Struct%nload_neuN_el > 0) &
-            write(*,'(A,I8)')'Neumann N B.C.   : ',Struct%nload_neuN_el
-        if(Struct%nload_poiX_el > 0) &
-            write(*,'(A,I8)')'Point Loads X    : ',Struct%nload_poiX_el
-        if(Struct%nload_poiY_el > 0) &
-            write(*,'(A,I8)')'Point Loads Y    : ',Struct%nload_poiY_el
-        if(Struct%nload_poiZ_el > 0) &
-            write(*,'(A,I8)')'Point Loads Z    : ',Struct%nload_poiZ_el
-        if(Struct%nload_plaX_el > 0) &
-            write(*,'(A,I8)')'Plane Loads X    : ',Struct%nload_plaX_el
-        if(Struct%nload_plaY_el > 0) &
-            write(*,'(A,I8)')'Plane Loads Y    : ',Struct%nload_plaY_el
-        if(Struct%nload_plaZ_el > 0) &
-            write(*,'(A,I8)')'Plane Loads Z    : ',Struct%nload_plaZ_el
-        if(Struct%nload_forX_el > 0) &
-            write(*,'(A,I8)')'Force X          : ',Struct%nload_forX_el
-        if(Struct%nload_forY_el > 0) &
-            write(*,'(A,I8)')'Force Y          : ',Struct%nload_forY_el
-        if(Struct%nload_forZ_el > 0) &
-            write(*,'(A,I8)')'Force Z          : ',Struct%nload_forZ_el
-        if(Struct%nload_abc_el > 0)  &
-            write(*,'(A,I8)')'ABSO Boundaries  : ',Struct%nload_abc_el
-        if(Struct%nfunc > 0) &
-            write(*,'(A,I8)')'Functions        : ',Struct%nfunc
-        if(Struct%srcmodflag == 1) &
+        if(PolyData%nmat_nle > 0) &
+            write(*,'(A,I8)')     'Materials NL-El. : ',PolyData%nmat_nle
+        if(PolyData%nmat_rnd > 0) &
+            write(*,'(A,I8)')     'Materials Random : ',PolyData%nmat_rnd
+        if(PolyData%nload_diri_el > 0) &
+            write(*,'(A,I8)')'Dirichlet B.C.   : ',PolyData%nload_diri_el
+        if(PolyData%nload_neum_el > 0) &
+            write(*,'(A,I8)')'Neumann B.C.     : ',PolyData%nload_neum_el
+        if(PolyData%nload_neuN_el > 0) &
+            write(*,'(A,I8)')'Neumann N B.C.   : ',PolyData%nload_neuN_el
+        if(PolyData%nload_poiX_el > 0) &
+            write(*,'(A,I8)')'Point Loads X    : ',PolyData%nload_poiX_el
+        if(PolyData%nload_poiY_el > 0) &
+            write(*,'(A,I8)')'Point Loads Y    : ',PolyData%nload_poiY_el
+        if(PolyData%nload_poiZ_el > 0) &
+            write(*,'(A,I8)')'Point Loads Z    : ',PolyData%nload_poiZ_el
+        if(PolyData%nload_plaX_el > 0) &
+            write(*,'(A,I8)')'Plane Loads X    : ',PolyData%nload_plaX_el
+        if(PolyData%nload_plaY_el > 0) &
+            write(*,'(A,I8)')'Plane Loads Y    : ',PolyData%nload_plaY_el
+        if(PolyData%nload_plaZ_el > 0) &
+            write(*,'(A,I8)')'Plane Loads Z    : ',PolyData%nload_plaZ_el
+        if(PolyData%nload_forX_el > 0) &
+            write(*,'(A,I8)')'Force X          : ',PolyData%nload_forX_el
+        if(PolyData%nload_forY_el > 0) &
+            write(*,'(A,I8)')'Force Y          : ',PolyData%nload_forY_el
+        if(PolyData%nload_forZ_el > 0) &
+            write(*,'(A,I8)')'Force Z          : ',PolyData%nload_forZ_el
+        if(PolyData%nload_abc_el > 0)  &
+            write(*,'(A,I8)')'ABSO Boundaries  : ',PolyData%nload_abc_el
+        if(PolyData%nfunc > 0) &
+            write(*,'(A,I8)')'Functions        : ',PolyData%nfunc
+        if(PolyData%srcmodflag == 1) &
             write(*,*)'Using Not Honoring Fault Method For Siesmic Sources'
-        if(Struct%nload_sism_el > 0) &
-            write(*,'(A,I8)')'Seis. Mom. Load  : ',Struct%nload_sism_el
+        if(PolyData%nload_sism_el > 0) &
+            write(*,'(A,I8)')'Seis. Mom. Load  : ',PolyData%nload_sism_el
 
-        if (Struct%n_case > 1) then
+        if (PolyData%n_case > 1) then
             write(*,'(A)')'CASE WARNING: More than one case defined,'
             write(*,'(A)')'              only the 1st case will be adopted'
         endif
-        write(*,'(A,I8)') 'CASE             : ',Struct%n_case
+        write(*,'(A,I8)') 'CASE             : ',PolyData%n_case
 
-        if(Struct%nmat_nhe > 0) &
-            write(*,'(A,I8)')     'Not_Honoring Enhanced Blocks : ',Struct%nmat_nhe
+        if(PolyData%nmat_nhe > 0) &
+            write(*,'(A,I8)')     'Not_Honoring Enhanced Blocks : ',PolyData%nmat_nhe
 
 
     end subroutine print_Dime_Data_Structure
 
-    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine allocate_Data_Structure(Struct)
+    !> Allocate material parameters
+    subroutine allocate_Data_Structure(PolyData)
 
         implicit none
 
-        type(Data_Structure), intent(inout) :: Struct
+        type(Data_Structure), intent(inout) :: PolyData !< materials and loads
         integer(kind=4)  :: size_sism
 
         ! material parameters
-        allocate (Struct%prop_mat(Struct%nmat,4), &
-                    Struct%sdeg_mat(Struct%nmat), &
-                    Struct%tag_mat(Struct%nmat))
+        allocate (PolyData%prop_mat(PolyData%nmat,4), &
+                    PolyData%sdeg_mat(PolyData%nmat), &
+                    PolyData%tag_mat(PolyData%nmat))
 
         ! Quality factors for damping
-        allocate(Struct%QS(Struct%nmat), Struct%QP(Struct%nmat));
-        Struct%QS = 0.d0; Struct%QP = 0.d0;
+        allocate(PolyData%QS(PolyData%nmat), PolyData%QP(PolyData%nmat));
+        PolyData%QS = 0.d0; PolyData%QP = 0.d0;
 
 
         ! non linear material
-        if (Struct%nmat_nle > 0) &
-            allocate(Struct%sdeg_mat_nle(Struct%nmat_nle), &
-                        Struct%tag_func_mat_nle(Struct%nmat_nle,1), &
-                        Struct%val_mat_nle(Struct%nmat_nle,1), &
-                        Struct%tag_mat_nle(Struct%nmat_nle))
+        if (PolyData%nmat_nle > 0) &
+            allocate(PolyData%sdeg_mat_nle(PolyData%nmat_nle), &
+                        PolyData%tag_func_mat_nle(PolyData%nmat_nle,1), &
+                        PolyData%val_mat_nle(PolyData%nmat_nle,1), &
+                        PolyData%tag_mat_nle(PolyData%nmat_nle))
 
         ! random material
-        if (Struct%nmat_rnd > 0) allocate(Struct%rand_mat(Struct%nmat_rnd))
+        if (PolyData%nmat_rnd > 0) allocate(PolyData%rand_mat(PolyData%nmat_rnd))
 
         ! Dirichlet boundary conditions
-        if (Struct%nload_diri_el > 0) &
-            allocate (Struct%val_diri_el(Struct%nload_diri_el,4), &
-                        Struct%space_fun_tag_diri_el(Struct%nload_diri_el), &
-                        Struct%face_tag_diri_el(Struct%nload_diri_el))
+        if (PolyData%nload_diri_el > 0) &
+            allocate (PolyData%val_diri_el(PolyData%nload_diri_el,4), &
+                        PolyData%space_fun_tag_diri_el(PolyData%nload_diri_el), &
+                        PolyData%face_tag_diri_el(PolyData%nload_diri_el))
 
         ! Neumann boundary conditions
-        if (Struct%nload_neum_el > 0) &
-            allocate (Struct%val_neum_el(Struct%nload_neum_el,4), &
-                        Struct%space_fun_tag_neum_el(Struct%nload_neum_el), &
-                        Struct%face_tag_neum_el(Struct%nload_neum_el))
+        if (PolyData%nload_neum_el > 0) &
+            allocate (PolyData%val_neum_el(PolyData%nload_neum_el,4), &
+                        PolyData%space_fun_tag_neum_el(PolyData%nload_neum_el), &
+                        PolyData%face_tag_neum_el(PolyData%nload_neum_el))
 
-        if (Struct%nload_neuN_el > 0) &
-            allocate (Struct%val_neuN_el(Struct%nload_neuN_el,4), &
-                        Struct%fun_neuN_el(Struct%nload_neuN_el), &
-                        Struct%tag_neuN_el(Struct%nload_neuN_el))
+        if (PolyData%nload_neuN_el > 0) &
+            allocate (PolyData%val_neuN_el(PolyData%nload_neuN_el,4), &
+                        PolyData%fun_neuN_el(PolyData%nload_neuN_el), &
+                        PolyData%tag_neuN_el(PolyData%nload_neuN_el))
 
         ! Point Load
-        if (Struct%nload_poiX_el > 0) &
-            allocate (Struct%val_poiX_el(Struct%nload_poiX_el,4), &
-                        Struct%fun_poiX_el(Struct%nload_poiX_el))
+        if (PolyData%nload_poiX_el > 0) &
+            allocate (PolyData%val_poiX_el(PolyData%nload_poiX_el,4), &
+                        PolyData%fun_poiX_el(PolyData%nload_poiX_el))
 
-        if (Struct%nload_poiY_el > 0) &
-            allocate (Struct%val_poiY_el(Struct%nload_poiY_el,4), &
-                        Struct%fun_poiY_el(Struct%nload_poiY_el))
+        if (PolyData%nload_poiY_el > 0) &
+            allocate (PolyData%val_poiY_el(PolyData%nload_poiY_el,4), &
+                        PolyData%fun_poiY_el(PolyData%nload_poiY_el))
 
-        if (Struct%nload_poiZ_el > 0) &
-            allocate (Struct%val_poiZ_el(Struct%nload_poiZ_el,4), &
-                        Struct%fun_poiZ_el(Struct%nload_poiZ_el))
+        if (PolyData%nload_poiZ_el > 0) &
+            allocate (PolyData%val_poiZ_el(PolyData%nload_poiZ_el,4), &
+                        PolyData%fun_poiZ_el(PolyData%nload_poiZ_el))
 
         ! Plane Wave
-        if (Struct%nload_plaX_el > 0) &
-            allocate (Struct%val_plaX_el(Struct%nload_plaX_el,1), &
-                        Struct%fun_plaX_el(Struct%nload_plaX_el), &
-                        Struct%tag_plaX_el(Struct%nload_plaX_el))
+        if (PolyData%nload_plaX_el > 0) &
+            allocate (PolyData%val_plaX_el(PolyData%nload_plaX_el,1), &
+                        PolyData%fun_plaX_el(PolyData%nload_plaX_el), &
+                        PolyData%tag_plaX_el(PolyData%nload_plaX_el))
 
-        if (Struct%nload_plaY_el > 0) &
-            allocate (Struct%val_plaY_el(Struct%nload_plaY_el,1), &
-                        Struct%fun_plaY_el(Struct%nload_plaY_el), &
-                        Struct%tag_plaY_el(Struct%nload_plaY_el))
+        if (PolyData%nload_plaY_el > 0) &
+            allocate (PolyData%val_plaY_el(PolyData%nload_plaY_el,1), &
+                        PolyData%fun_plaY_el(PolyData%nload_plaY_el), &
+                        PolyData%tag_plaY_el(PolyData%nload_plaY_el))
 
-        if (Struct%nload_plaZ_el > 0) &
-            allocate (Struct%val_plaZ_el(Struct%nload_plaZ_el,1), &
-                        Struct%fun_plaZ_el(Struct%nload_plaZ_el), &
-                        Struct%tag_plaZ_el(Struct%nload_plaZ_el))
+        if (PolyData%nload_plaZ_el > 0) &
+            allocate (PolyData%val_plaZ_el(PolyData%nload_plaZ_el,1), &
+                        PolyData%fun_plaZ_el(PolyData%nload_plaZ_el), &
+                        PolyData%tag_plaZ_el(PolyData%nload_plaZ_el))
 
         ! Volume force
-        if (Struct%nload_forX_el > 0) &
-            allocate (Struct%val_forX_el(Struct%nload_forX_el,4), &
-                      Struct%fun_forX_el(Struct%nload_forX_el))
+        if (PolyData%nload_forX_el > 0) &
+            allocate (PolyData%val_forX_el(PolyData%nload_forX_el,4), &
+                      PolyData%fun_forX_el(PolyData%nload_forX_el))
 
-        if (Struct%nload_forY_el > 0) &
-            allocate (Struct%val_forY_el(Struct%nload_forY_el,4), &
-                      Struct%fun_forY_el(Struct%nload_forY_el))
+        if (PolyData%nload_forY_el > 0) &
+            allocate (PolyData%val_forY_el(PolyData%nload_forY_el,4), &
+                      PolyData%fun_forY_el(PolyData%nload_forY_el))
 
-        if (Struct%nload_forZ_el > 0) &
-            allocate (Struct%val_forZ_el(Struct%nload_forZ_el,4), &
-                      Struct%fun_forZ_el(Struct%nload_forZ_el))
+        if (PolyData%nload_forZ_el > 0) &
+            allocate (PolyData%val_forZ_el(PolyData%nload_forZ_el,4), &
+                      PolyData%fun_forZ_el(PolyData%nload_forZ_el))
 
         ! Absorbing boundaries
-        if (Struct%nload_abc_el > 0) &
-            allocate (Struct%tag_abc_el(Struct%nload_abc_el))
+        if (PolyData%nload_abc_el > 0) &
+            allocate (PolyData%tag_abc_el(PolyData%nload_abc_el))
 
         ! Slip mode
-        if (Struct%srcmodflag == 0) then
+        if (PolyData%srcmodflag == 0) then
             size_sism = 21
-            if (Struct%nload_sism_el > 0) &
-                allocate (Struct%val_sism_el(Struct%nload_sism_el,21), &
-                            Struct%fun_sism_el(Struct%nload_sism_el), &
-                            Struct%tag_sism_el(Struct%nload_sism_el))
-        elseif (Struct%srcmodflag == 1) then
+            if (PolyData%nload_sism_el > 0) &
+                allocate (PolyData%val_sism_el(PolyData%nload_sism_el,21), &
+                            PolyData%fun_sism_el(PolyData%nload_sism_el), &
+                            PolyData%tag_sism_el(PolyData%nload_sism_el))
+        elseif (PolyData%srcmodflag == 1) then
             size_sism = 15
-            if (Struct%nload_sism_el > 0) &
-                allocate (Struct%val_sism_el(Struct%nload_sism_el,15), &
-                            Struct%fun_sism_el(Struct%nload_sism_el), &
-                            Struct%tag_sism_el(Struct%nload_sism_el))
+            if (PolyData%nload_sism_el > 0) &
+                allocate (PolyData%val_sism_el(PolyData%nload_sism_el,15), &
+                            PolyData%fun_sism_el(PolyData%nload_sism_el), &
+                            PolyData%tag_sism_el(PolyData%nload_sism_el))
         endif
 
         ! Not honoring case
-        if (Struct%n_case > 0) &
-            allocate (Struct%val_case(Struct%n_case), &
-                        Struct%tag_case(Struct%n_case), &
-                        Struct%tol_case(Struct%n_case))
+        if (PolyData%n_case > 0) &
+            allocate (PolyData%val_case(PolyData%n_case), &
+                        PolyData%tag_case(PolyData%n_case), &
+                        PolyData%tol_case(PolyData%n_case))
 
 
-        if (Struct%n_case == 0) &
-            allocate(Struct%tag_case(1)); Struct%tag_case(1) = 0;
+        if (PolyData%n_case == 0) &
+            allocate(PolyData%tag_case(1)); PolyData%tag_case(1) = 0;
 
         ! Not honoring enhanced
-        if (Struct%nmat_nhe > 0) &
-            allocate (Struct%val_nhe(Struct%nmat_nhe), &
-                        Struct%tol_nhe(Struct%nmat_nhe))
+        if (PolyData%nmat_nhe > 0) &
+            allocate (PolyData%val_nhe(PolyData%nmat_nhe), &
+                        PolyData%tol_nhe(PolyData%nmat_nhe))
 
         ! Functions
-        if (Struct%nfunc > 0) &
-            allocate (Struct%tag_func(Struct%nfunc), &
-                        Struct%func_type(Struct%nfunc), &
-                        Struct%func_indx(Struct%nfunc +1), &
-                        Struct%func_data(Struct%nfunc_data))
+        if (PolyData%nfunc > 0) &
+            allocate (PolyData%tag_func(PolyData%nfunc), &
+                        PolyData%func_type(PolyData%nfunc), &
+                        PolyData%func_indx(PolyData%nfunc +1), &
+                        PolyData%func_data(PolyData%nfunc_data))
 
 
     end subroutine allocate_Data_Structure
 
-    !>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+    ! - >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    subroutine print_Data_Structure(Struct)
+    !> Print to material and loading parameters terminal
+    subroutine print_Data_Structure(PolyData)
 
         implicit none
 
-        type(Data_Structure), intent(inout) :: Struct
+        type(Data_Structure), intent(inout) :: PolyData   !< materials and loads
         integer(kind=4) :: i, im
 
 
         write(*,'(A)') 'Read.'
         write(*,'(A)')
 
-        if (Struct%n_case > 0) then
-            do i = 1, Struct%n_case
+        if (PolyData%n_case > 0) then
+            do i = 1, PolyData%n_case
                 write(*,'(A)') '------------------Not-Honoring case-------------------'
-                write(*,'(A,I8)') 'CASE :', Struct%tag_case(i)
-                select case (Struct%tag_case(i))
+                write(*,'(A,I8)') 'CASE :', PolyData%tag_case(i)
+                select case (PolyData%tag_case(i))
                     case(1); write(*,'(A)')'GRENOBLE HONORING'
                     case(2); write(*,'(A)')'GRENOBLE'
                     case(3); write(*,'(A)')'GUBBIO'
@@ -431,39 +421,39 @@ module Poly_data
                         call EXIT(EXIT_NOTHONORING_ERROR)
                 end select
 
-                write(*,'(A,I8)') 'MATERIAL TYPE    : ',Struct%val_case(i)
-                write(*,'(A,E12.4)') 'MATERIAL TOL.    : ',Struct%tol_case(i)
+                write(*,'(A,I8)') 'MATERIAL TYPE    : ',PolyData%val_case(i)
+                write(*,'(A,E12.4)') 'MATERIAL TOL.    : ',PolyData%tol_case(i)
                 write(*,'(A)')
             enddo
         endif
 
         write(*,'(A)')
-        do im = 1, Struct%nmat
-            write(*,'(A,I8)')    'MATERIAL#   : ',Struct%tag_mat(im)
-            write(*,'(A,I8)')    'degree      : ',Struct%sdeg_mat(im)
-            write(*,'(A,E12.4)') 'rho [kg/m3] : ',Struct%prop_mat(im,1)
+        do im = 1, PolyData%nmat
+            write(*,'(A,I8)')    'MATERIAL#   : ',PolyData%tag_mat(im)
+            write(*,'(A,I8)')    'degree      : ',PolyData%sdeg_mat(im)
+            write(*,'(A,E12.4)') 'rho [kg/m3] : ',PolyData%prop_mat(im,1)
             write(*,'(A,E12.4)') 'vs  [m/s]   : ', &
-                    (Struct%prop_mat(im,3)/Struct%prop_mat(im,1))**0.5
+                    (PolyData%prop_mat(im,3)/PolyData%prop_mat(im,1))**0.5
             write(*,'(A,E12.4)') 'vp  [m/s]   : ', &
-                    ((Struct%prop_mat(im,2) + 2*Struct%prop_mat(im,3))&
-                      / Struct%prop_mat(im,1))**0.5
-            write(*,'(A,E12.4)') 'zeta [1/s]  : ',Struct%prop_mat(im,4)
-            write(*,'(A,E12.4)') 'Qs [-]      : ',Struct%QS(im)
-            write(*,'(A,E12.4)') 'Qp [-]      : ',Struct%QP(im)
+                    ((PolyData%prop_mat(im,2) + 2*PolyData%prop_mat(im,3))&
+                      / PolyData%prop_mat(im,1))**0.5
+            write(*,'(A,E12.4)') 'zeta [1/s]  : ',PolyData%prop_mat(im,4)
+            write(*,'(A,E12.4)') 'Qs [-]      : ',PolyData%QS(im)
+            write(*,'(A,E12.4)') 'Qp [-]      : ',PolyData%QP(im)
             write(*,*)
         enddo
 
         write(*,'(A)')
-        do im = 1, Struct%nmat_nle
+        do im = 1, PolyData%nmat_nle
             write(*,'(A,I8)')    'NON LINEAR ELASTIC MATERIAL# : ', &
-                Struct%tag_mat_nle(im)
-            write(*,'(A,I8)')    'Tag func nle : ',(Struct%tag_func_mat_nle(im,1))
-            write(*,'(A,E12.4)') 'Depth  [m]   : ',(Struct%val_mat_nle(im,1))
-            write(*,'(A,I8)')    'Degree       : ', Struct%sdeg_mat_nle(im)
+                PolyData%tag_mat_nle(im)
+            write(*,'(A,I8)')    'Tag func nle : ',(PolyData%tag_func_mat_nle(im,1))
+            write(*,'(A,E12.4)') 'Depth  [m]   : ',(PolyData%val_mat_nle(im,1))
+            write(*,'(A,I8)')    'Degree       : ', PolyData%sdeg_mat_nle(im)
             write(*,'(A)')
         enddo
 
-        if ((Struct%fpeak == 0).and. (Struct%nmat_nle > 0)) then
+        if ((PolyData%fpeak == 0).and. (PolyData%nmat_nle > 0)) then
             write(*,'(A)')'ERROR: Peak frequency for damping not defined!'
             call EXIT(EXIT_DAMPING_PEAK)
         endif

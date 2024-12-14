@@ -2864,9 +2864,10 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
    !! NUM FACES IS WRONG... IT SHOULD BE NUMBER OF FACES NEEDED BY PROCESSOR
    integer(kind=4), dimension(:,:), allocatable :: elem_interface_tmp !< list of needed faces on processor
    integer(kind=4), dimension(mpi_np) :: recvcounts, displs
-   integer(kind=4), dimension(mpi_np) :: inter_displs_loc    !< vector containing displacement index for each process (progressive)
 
-   integer(kind=4), dimension(mpi_np,mpi_np) :: tmp_mat
+   !integer(kind=4), dimension(mpi_np) :: inter_displs_loc    !< vector containing displacement index for each process (progressive)
+   !integer(kind=4), dimension(mpi_np,mpi_np) :: tmp_mat
+   
    integer(kind=4), dimension(:), allocatable :: elem_inter_loc
 
    unit_int = 40000 + mpi_id

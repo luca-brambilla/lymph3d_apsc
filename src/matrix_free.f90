@@ -163,7 +163,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     integer(kind=4), intent(out) :: max_faces !< maximum number of polygon faces
 
     real(kind=8), dimension(DIM, DIM, Np, Np) :: V_loc
-    real(kind=8), dimension(DIM, DIM, Np, Np) :: S_loc, I_loc, IN_loc, SN_loc
+    real(kind=8), dimension(DIM, DIM, Np, Np) :: S_E1, I_E1, I_E2, S_E2
 
     ! each local has a matrix
     ! local square
@@ -360,11 +360,11 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
             face_flag(iface) = 0
 
-            ! initialization of the face matrices I_loc, S_loc, IN_loc and SN_loc
-            I_loc = 0.0
-            S_loc = 0.0
-            IN_loc = 0.0
-            SN_loc = 0.0
+            ! initialization of the face matrices I_E1, S_E1, I_E2 and S_E2
+            I_E1 = 0.0
+            S_E1 = 0.0
+            I_E2 = 0.0
+            S_E2 = 0.0
 
             ! find the neighbouring tetrahedron E2 sharing the face iface with E1
             ! E2 is element E-
@@ -420,7 +420,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                         PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist, Np, Fk, node_maps, nodtria2, nq2)
 
                     call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly), nn, &
-                                        PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
+                                        PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_E1,I_E1,I_E2,S_E2)
 
                 else
 
@@ -432,7 +432,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                                 PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly2_loc)%hk,nn, &
-                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
+                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_E1,I_E1,I_E2,S_E2)
 
                     else
 
@@ -440,7 +440,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                                 PolyMesh%Poly(1)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(1)%hk, nn, &
-                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_loc,I_loc,IN_loc,SN_loc)
+                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_E1,I_E1,I_E2,S_E2)
 
                     endif
 
@@ -454,21 +454,21 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
             ! If not Neumann boundary
             if(E2 /= -2) then
 
-                ! Add E+ contribution (S_loc and I_loc) to stiffness and DG
+                ! Add E+ contribution (S_E1 and I_E1) to stiffness and DG
                 do i=1,DIM
                     do j=1,DIM
                         do m=1,Np
                             row = (i-1)*Np + m
                             do n=1,Np
                                 col = (j-1)*Np + n
-                                K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_loc(i,j,m,n) - I_loc(j,i,n,m) + S_loc(i,j,m,n)
+                                K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_E1(i,j,m,n) - I_E1(j,i,n,m) + S_E1(i,j,m,n)
                             enddo
                         enddo
                     enddo
                 enddo
 
                 ! internal face contribution, not Dirichlet boundary
-                ! Add neighbor face contribution E- (SN_loc to stiffness and DG - IN_loc to stiffness)
+                ! Add neighbor face contribution E- (S_E2 to stiffness and DG - I_E2 to stiffness)
                 ! leave matrix K_loc portion 0.0 if not Dirichlet
                 ! E- contribution in position iface+1 since position 1 is for E+
                 if (E2 /= -1) then
@@ -478,7 +478,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                 row = (i-1)*Np + m
                                 do n=1,Np
                                     col = (j-1)*Np + n
-                                    K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) + theta*IN_loc(i,j,m,n) - IN_loc(j,i,n,m) + SN_loc(i,j,m,n)
+                                    K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) + theta*I_E2(i,j,m,n) - I_E2(j,i,n,m) + S_E2(i,j,m,n)
                                 enddo
                             enddo
                         enddo
@@ -1241,16 +1241,16 @@ subroutine TIME_STEP_MATRIX_FREE(neighbors, n_neigh, Np, time_step, t, K_loc_el,
 
     ! one dimension at a time - 3 separate blocks of Np
     PetscCall(MatZeroEntries(petsc_m_tmp, mpi_ierr))
-    irow(1) = 1
+    irow(1) = 0 ! PETSc numbering from 0
     do i=1,DIM
-        row = (i-1)*Np+1
+        row = (i-1)*Np
         ! tmp_v = dt^2*(f-K*u)
         ! tmp_v(row:row+Np) = - tmp_v(row:row+Np) + rhs_el(row:row+Np)*time_function(t)
         ! tmp_v(row:row+Np) = dt2 * tmp_v(row:row+Np)
 
         ! vector assignment
         ! copy whole vector at once - #Np values
-        val = tmp_v(row:row+Np)
+        val = tmp_v(row+1:row+Np)
         PetscCall(VecSetValues(petsc_v_tmp, Np, irow, val, INSERT_VALUES, mpi_ierr))
 
         ! elemnt-wise copy
