@@ -43,7 +43,7 @@ subroutine SOLVER_SETTINGS(stiff, ksp, pc)
 
     !> 0 :: Direct solver
     !> 1 :: Iterative solver
-    solver_type = 1;
+    solver_type = 1
 
     !> Create solver object ksp
     if (IS_MatrixFree .eqv. .true.) then
@@ -92,8 +92,8 @@ subroutine SOLVER_SETTINGS(stiff, ksp, pc)
         preconditioner_type = 5
 
         !> Iterative solver settings
-        rel_tolerance = 1.d-50
-        max_krylov_it = 100000 ! 100
+        rel_tolerance = 1.d-16
+        max_krylov_it = 100 ! 100
 
         !> Set the convergence tolerances and iteration limits for the KSP solver
         !> Absolute tolerance and divergence tolerance are set to the default value

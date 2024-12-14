@@ -43,8 +43,8 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
    !write(*,*) PolyMesh%num_elem, PolyMesh%num_node
    !read(*,*)
 
-   allocate(PolyMesh%part_elem(PolyMesh%num_elem));
-   PolyMesh%part_elem = mpi_id;
+   allocate(PolyMesh%part_elem(PolyMesh%num_elem))
+   PolyMesh%part_elem = mpi_id
 
    if (mpi_id == 0) then
       if(len_trim(folder_mpi) /= 70) then
@@ -97,20 +97,20 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
 
    allocate(PolyMesh%elem_in_poly_loc(PolyMesh%num_elem_loc))
 
-   npoly_loc=npoly/mpi_np;
+   npoly_loc=npoly/mpi_np
    ! if(mod(npoly,mpi_np) .ne. 0) then
    !    write(*,'(A,I0,A,I0,A,I0,A)'), "Since the number of processors (", mpi_np, ") is not a multiple of the number of polyhedra (", npoly, &
    !              ") then the mesh will be agglomerated with ", npoly_loc*mpi_np, " polyhedra"
    ! endif
-   PolyMesh%num_poly=npoly;
-   PolyMesh%num_poly_loc=npoly_loc;
+   PolyMesh%num_poly=npoly
+   PolyMesh%num_poly_loc=npoly_loc
 
    if (npoly/=PolyMesh%num_elem) then
       print *,'WRITE MESH AGGLOMERATION'
       call MESH_AGGLOMERATION(folder_mpi, PolyMesh, PolyMesh%num_elem_loc,PolyMesh%num_node,npoly_loc, con_tet_loc,mpi_np, mpi_id)
       ! call MESH_CORRECTION(PolyMesh, mpi_np)
    else
-      PolyMesh%num_poly=npoly;
+      PolyMesh%num_poly=npoly
       PolyMesh%num_poly_loc=PolyMesh%num_elem_loc
       call WRITE_POLY_INFO(folder_mpi,PolyMesh,mpi_id,mpi_np)
    endif
@@ -245,8 +245,8 @@ subroutine MESH_PARTITIONING(mpi_file, n_elem, nnode, nparts, &
 
       !write(*,*) num_hex, num_tet, num_prysm
       !read(*,*)
-      eptr(1) = 1;
-      ic = 1;
+      eptr(1) = 1
+      ic = 1
       !first hex
       do ie = 1, num_hex
          eptr(ie+1) = eptr(ie) + 8
@@ -415,8 +415,8 @@ subroutine MESH_AGGLOMERATION(mpi_file, PolyMesh,nelem_loc, nnode, nparts, con_t
    endif
 
    !print *,u_name
-   eptr(1) = 1;
-   ic = 1;
+   eptr(1) = 1
+   ic = 1
 
    !then tetra
    do ie = 1, nelem_loc
@@ -494,24 +494,24 @@ subroutine WRITE_POLY_INFO(mpi_file,PolyMesh,mpi_id,mpi_np)
 
    type(Mesh_Structure), intent(inout) :: PolyMesh
 
-   num_elem_send=0;
+   num_elem_send=0
 
    do ip=1,mpi_np
       if (mpi_id==ip-1) then
          do i=1,PolyMesh%num_elem_loc
             !print *,num_elem_send,PolyMesh%num_elem_loc,mpi_id
-            !PolyMesh%elem_in_poly_loc(i)=PolyMesh%num_elem_loc*mpi_id+i;
+            !PolyMesh%elem_in_poly_loc(i)=PolyMesh%num_elem_loc*mpi_id+i
 
             ! Polygon numbered locally, ordering given by partitioning
-            PolyMesh%elem_in_poly_loc(i)=num_elem_send+i;
+            PolyMesh%elem_in_poly_loc(i)=num_elem_send+i
 
-            !PolyMesh%elem_in_poly_loc(i)=PolyMesh%elem_loc2glo(i);
+            !PolyMesh%elem_in_poly_loc(i)=PolyMesh%elem_loc2glo(i)
 
          enddo
-         last_elem_send=PolyMesh%elem_in_poly_loc(i-1);
-         !print *,last_elem_send;
+         last_elem_send=PolyMesh%elem_in_poly_loc(i-1)
+         !print *,last_elem_send
       endif
-      if (mpi_id==ip-1) num_elem_send=last_elem_send;
+      if (mpi_id==ip-1) num_elem_send=last_elem_send
 
       call MPI_BCAST(num_elem_send,1,&
                      MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
@@ -574,20 +574,20 @@ subroutine CREATE_GLOBAL_POLY_MAP(mpi_file,vec_glob,num_elem,PolyMesh,mpi_id,mpi
 
    type(Mesh_Structure), intent(inout) :: PolyMesh
 
-   vec_glob=0;
+   vec_glob=0
    num_elem_loc=PolyMesh%num_elem_loc
    allocate(vec_loc(num_elem_loc))
-   vec_loc=PolyMesh%elem_in_poly_loc;
+   vec_loc=PolyMesh%elem_in_poly_loc
 
    do ip = 1, mpi_np
 
       allocate(vec_send(num_elem_loc))
 
-      if(mpi_id == ip-1) vec_send = vec_loc;
+      if(mpi_id == ip-1) vec_send = vec_loc
 
       !PRINT *,vec_loc
 
-      if(mpi_id == ip-1) num_elem_send = num_elem;
+      if(mpi_id == ip-1) num_elem_send = num_elem
 
       if (mpi_id==ip-1) then
          do i=1,num_elem_loc
@@ -656,7 +656,7 @@ subroutine WRITE_PARTITION(mpi_file, PolyMesh, mpi_np, mpi_id)
    !read(*,*)
 
    ! first count hex
-   num_hex_mpi = 0;
+   num_hex_mpi = 0
    do ie = 1, PolyMesh%num_hex
    !   write(*,*) ie
       if(PolyMesh%part_elem(ie) == mpi_id) &
@@ -668,7 +668,7 @@ subroutine WRITE_PARTITION(mpi_file, PolyMesh, mpi_np, mpi_id)
    !read(*,*)
 
    ! then count tetra
-   num_tet_mpi = 0;
+   num_tet_mpi = 0
    do ie = 1, PolyMesh%num_tet
    !   write(*,*) ie+PolyMesh%num_hex
       if(PolyMesh%part_elem(ie+PolyMesh%num_hex) == mpi_id) &
@@ -681,7 +681,7 @@ subroutine WRITE_PARTITION(mpi_file, PolyMesh, mpi_np, mpi_id)
    !read(*,*)
 
    ! finally count prysm
-   num_prysm_mpi = 0;
+   num_prysm_mpi = 0
    do ie = 1, PolyMesh%num_prysm
       if(PolyMesh%part_elem(ie+PolyMesh%num_hex+PolyMesh%num_tet) == mpi_id) &
                num_prysm_mpi = num_prysm_mpi + 1
@@ -754,7 +754,7 @@ subroutine WRITE_PARTITION(mpi_file, PolyMesh, mpi_np, mpi_id)
    mpi_file_quad = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_quad
    mpi_file_tria = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_tria
 
-   kiter = 1;
+   kiter = 1
 
    ! Hexhedron
    open(unit_mpi,file=mpi_file_hex)
@@ -993,7 +993,7 @@ end subroutine WRITE_PARTITION
       mpi_file_tet = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_tet
       mpi_file_pry = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_pry
 
-      allocate(PolyMesh%Elem_loc(PolyMesh%num_elem_loc));
+      allocate(PolyMesh%Elem_loc(PolyMesh%num_elem_loc))
       !allocate(PolyMesh%Elem_loc(PolyMesh%num_Poly))
 
       ! first hex
@@ -1014,7 +1014,7 @@ end subroutine WRITE_PARTITION
           PolyMesh%Elem_loc(ie)%Degree   = PolyData%sdeg_mat(vect_read(1))
           PolyMesh%Elem_loc(ie)%NDof_elem = (PolyMesh%Elem_loc(ie)%Degree + 1) * &
                                            (PolyMesh%Elem_loc(ie)%Degree + 2) * &
-                                           (PolyMesh%Elem_loc(ie)%Degree + 3) / 6;
+                                           (PolyMesh%Elem_loc(ie)%Degree + 3) / 6
 !          PolyMesh%Elem_loc(ie)%Rho    = PolyData%prop_mat(vect_read(1),1)
 !          PolyMesh%Elem_loc(ie)%Lambda = PolyData%prop_mat(vect_read(1),2)
 !          PolyMesh%Elem_loc(ie)%Mu     = PolyData%prop_mat(vect_read(1),3)
@@ -1069,7 +1069,7 @@ end subroutine WRITE_PARTITION
           PolyMesh%Elem_loc(ie)%Degree   = PolyData%sdeg_mat(vect_read(1))
           PolyMesh%Elem_loc(ie)%NDof_elem = (PolyMesh%Elem_loc(ie)%Degree + 1) * &
                                            (PolyMesh%Elem_loc(ie)%Degree + 2) * &
-                                           (PolyMesh%Elem_loc(ie)%Degree + 3) / 6;
+                                           (PolyMesh%Elem_loc(ie)%Degree + 3) / 6
 
           PolyMesh%Elem_loc(ie_shift)%num_faces = 4
           PolyMesh%Elem_loc(ie_shift)%num_vert = 4
@@ -1119,7 +1119,7 @@ end subroutine WRITE_PARTITION
           PolyMesh%Elem_loc(ie)%Degree   = PolyData%sdeg_mat(vect_read(1))
           PolyMesh%Elem_loc(ie)%NDof_elem = (PolyMesh%Elem_loc(ie)%Degree + 1) * &
                                            (PolyMesh%Elem_loc(ie)%Degree + 2) * &
-                                           (PolyMesh%Elem_loc(ie)%Degree + 3) / 6;
+                                           (PolyMesh%Elem_loc(ie)%Degree + 3) / 6
 
           PolyMesh%Elem_loc(ie_shift)%num_faces = 5
           PolyMesh%Elem_loc(ie_shift)%num_vert = 5
@@ -1152,7 +1152,7 @@ end subroutine WRITE_PARTITION
       deallocate(vect_read)
       close(unit_mpi)
 
-      unit_mpi=400;
+      unit_mpi=400
 
       if (PolyMesh%num_poly/=PolyMesh%num_elem) then
          open(unit_mpi,file = u_name)
@@ -1193,7 +1193,7 @@ end subroutine WRITE_PARTITION
       type(Mesh_Structure), intent(inout) :: PolyMesh
 
       ! calculating number of local vertices with duplicates
-      num_vert_with_duplicate = 0;
+      num_vert_with_duplicate = 0
       do ie = 1, PolyMesh%num_elem_loc
          num_vert_with_duplicate =  num_vert_with_duplicate + &
                                            PolyMesh%Elem_loc(ie)%num_vert
@@ -1201,11 +1201,11 @@ end subroutine WRITE_PARTITION
 
       ! storing the number of vertices with duplicates
       allocate(vert_with_duplicate(num_vert_with_duplicate))
-      i = 1;
+      i = 1
       do ie = 1, PolyMesh%num_elem_loc
          do ivert = 1, PolyMesh%Elem_loc(ie)%num_vert
-           vert_with_duplicate(i) = PolyMesh%Elem_loc(ie)%vert(ivert);
-           i = i + 1;
+           vert_with_duplicate(i) = PolyMesh%Elem_loc(ie)%vert(ivert)
+           i = i + 1
          enddo
       enddo
 
@@ -1226,19 +1226,19 @@ end subroutine WRITE_PARTITION
       PolyMesh%num_node_loc = 1
       do i = 2, num_vert_with_duplicate
          if (vert_with_duplicate(i) /= vert_with_duplicate(i-1)) &
-             PolyMesh%num_node_loc = PolyMesh%num_node_loc + 1;
+             PolyMesh%num_node_loc = PolyMesh%num_node_loc + 1
       enddo
       !write(*,*) PolyMesh%num_node_loc
       !read(*,*)
 
       !computing global to local map
-      allocate(PolyMesh%node_loc2glo(PolyMesh%num_node_loc));
-      PolyMesh%node_loc2glo(1) = vert_with_duplicate(1);
-      k = 2;
+      allocate(PolyMesh%node_loc2glo(PolyMesh%num_node_loc))
+      PolyMesh%node_loc2glo(1) = vert_with_duplicate(1)
+      k = 2
       do i = 2, num_vert_with_duplicate
          if (vert_with_duplicate(i) /= vert_with_duplicate(i-1)) then
-             PolyMesh%node_loc2glo(k) = vert_with_duplicate(i);
-             k = k + 1;
+             PolyMesh%node_loc2glo(k) = vert_with_duplicate(i)
+             k = k + 1
          endif
       enddo
 
@@ -1260,18 +1260,18 @@ end subroutine WRITE_PARTITION
 
       read(inline,*) num_node, elem_total
 
-      kiter = 1;
+      kiter = 1
       do i = 1, num_node
 
         read(40,*) id_node, xx, yy, zz
         !print *,kiter,id_node, PolyMesh%node_loc2glo(kiter)
         if (id_node == PolyMesh%node_loc2glo(kiter)) then
-            PolyMesh%coord_x(kiter) = xx;
-            PolyMesh%coord_y(kiter) = yy;
-            PolyMesh%coord_z(kiter) = zz;
-            kiter = kiter + 1;
+            PolyMesh%coord_x(kiter) = xx
+            PolyMesh%coord_y(kiter) = yy
+            PolyMesh%coord_z(kiter) = zz
+            kiter = kiter + 1
         endif
-        if (kiter > PolyMesh%num_node_loc) exit;
+        if (kiter > PolyMesh%num_node_loc) exit
 
       enddo
 
@@ -1308,7 +1308,7 @@ end subroutine WRITE_PARTITION
       type(Mesh_Structure), intent(inout) :: PolyMesh
 
       ! calculating number of local vertices with duplicates
-      num_poly_with_duplicate = 0;
+      num_poly_with_duplicate = 0
 
       do ie_loc = 1, PolyMesh%num_elem_loc
          num_poly_with_duplicate =  num_poly_with_duplicate + 1
@@ -1323,7 +1323,7 @@ end subroutine WRITE_PARTITION
          !ie_glob=PolyMesh%elem_loc2glo(ie_loc)
          ipoly=PolyMesh%elem_in_poly_loc(ie_loc)
          !print *,'tet',ie_glob,'in poly',ipoly
-         poly_with_duplicate(ie_loc) = ipoly;
+         poly_with_duplicate(ie_loc) = ipoly
          !print *,mpi_id,'index',ie_loc,'poly',poly_with_duplicate(ie_loc)
       enddo
 
@@ -1345,21 +1345,21 @@ end subroutine WRITE_PARTITION
       PolyMesh%num_poly_loc = 1
       do i = 2, num_poly_with_duplicate
          if (poly_with_duplicate(i) /= poly_with_duplicate(i-1)) &
-               PolyMesh%num_poly_loc = PolyMesh%num_poly_loc + 1;
+               PolyMesh%num_poly_loc = PolyMesh%num_poly_loc + 1
       enddo
 
       !write(*,*) PolyMesh%num_poly_loc
       !read(*,*)
 
       !computing global to local map
-      allocate(PolyMesh%poly_loc2glo(PolyMesh%num_poly_loc));
-      PolyMesh%poly_loc2glo(1) = poly_with_duplicate(1);
-      k = 2;
+      allocate(PolyMesh%poly_loc2glo(PolyMesh%num_poly_loc))
+      PolyMesh%poly_loc2glo(1) = poly_with_duplicate(1)
+      k = 2
       do i = 2, num_poly_with_duplicate
          if (poly_with_duplicate(i) /= poly_with_duplicate(i-1)) then
-               PolyMesh%poly_loc2glo(k) = poly_with_duplicate(i);
+               PolyMesh%poly_loc2glo(k) = poly_with_duplicate(i)
                !print *,k
-               k = k + 1;
+               k = k + 1
          endif
       enddo
       !poly_loc2glo
@@ -1373,7 +1373,7 @@ end subroutine WRITE_PARTITION
 
       allocate(PolyMesh%Poly(PolyMesh%num_poly_loc))
 
-      kiter = 1;
+      kiter = 1
       do ipoly = 1, PolyMesh%num_poly
          !if (ipoly==21) print *,'bbbb'
          if (ipoly == PolyMesh%poly_loc2glo(kiter)) then
@@ -1383,7 +1383,7 @@ end subroutine WRITE_PARTITION
             index_glob=FIND_TET_IN_POLY(PolyMesh%elem_in_poly_loc,ipoly,PolyMesh%num_elem_loc)
             num_tet_in_poly=size(index_glob)
             !if (size(index_glob)==1 .and. index_glob(1)==0) print *,'AAA'
-            num_faces_in_poly=num_tet_in_poly*4;
+            num_faces_in_poly=num_tet_in_poly*4
             !print *,num_tet_in_poly
             PolyMesh%Poly(kiter)%num_tet_in_poly=num_tet_in_poly
             allocate(PolyMesh%Poly(kiter)%tet_in_poly(num_tet_in_poly))
@@ -1407,9 +1407,9 @@ end subroutine WRITE_PARTITION
                !print *,'tet: ',PolyMesh%Poly(kiter)%tet_in_poly(j)
             enddo
 
-            kiter = kiter + 1;
+            kiter = kiter + 1
          endif
-         if (kiter > PolyMesh%num_poly_loc) exit;
+         if (kiter > PolyMesh%num_poly_loc) exit
       enddo
 
       end subroutine CREATE_POLY_LIST
@@ -1442,27 +1442,27 @@ subroutine CREATE_NORMAL_FACE(PolyMesh, mpi_id)
          ivert = PolyMesh%Elem_loc(ie)%faces(iface,1:3)
 
          call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                 ivert(1),id_node1);
+                                 ivert(1),id_node1)
          call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                 ivert(2),id_node2);
+                                 ivert(2),id_node2)
          call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                 ivert(3),id_node3);
+                                 ivert(3),id_node3)
 
 
-         Qx = PolyMesh%coord_x(id_node1) - PolyMesh%coord_x(id_node2);
-         Qy = PolyMesh%coord_y(id_node1) - PolyMesh%coord_y(id_node2);
-         Qz = PolyMesh%coord_z(id_node1) - PolyMesh%coord_z(id_node2);
+         Qx = PolyMesh%coord_x(id_node1) - PolyMesh%coord_x(id_node2)
+         Qy = PolyMesh%coord_y(id_node1) - PolyMesh%coord_y(id_node2)
+         Qz = PolyMesh%coord_z(id_node1) - PolyMesh%coord_z(id_node2)
 
-         Px = PolyMesh%coord_x(id_node3) - PolyMesh%coord_x(id_node2);
-         Py = PolyMesh%coord_y(id_node3) - PolyMesh%coord_y(id_node2);
-         Pz = PolyMesh%coord_z(id_node3) - PolyMesh%coord_z(id_node2);
+         Px = PolyMesh%coord_x(id_node3) - PolyMesh%coord_x(id_node2)
+         Py = PolyMesh%coord_y(id_node3) - PolyMesh%coord_y(id_node2)
+         Pz = PolyMesh%coord_z(id_node3) - PolyMesh%coord_z(id_node2)
 
          !write(*,*) Px, Py, Pz
          !write(*,*) Qx, Qy, Qz
 
-         n1 = Py*Qz - Pz*Qy;
-         n2 = - Px*Qz + Pz*Qx;
-         n3 = Px*Qy - Py*Qx;
+         n1 = Py*Qz - Pz*Qy
+         n2 = - Px*Qz + Pz*Qx
+         n3 = Px*Qy - Py*Qx
 
          !write(*,*) n1, n2, n3
          !read(*,*)
@@ -1505,14 +1505,14 @@ end subroutine CREATE_NORMAL_FACE
 
          ipoly_glob=PolyMesh%poly_loc2glo(ipoly_loc)
 
-         num_tet_in_poly=PolyMesh%Poly(ipoly_loc)%num_tet_in_poly;
+         num_tet_in_poly=PolyMesh%Poly(ipoly_loc)%num_tet_in_poly
 
          num_vert_poly=num_tet_in_poly*PolyMesh%Elem_loc(1)%num_vert ! number of vertices of the polyhedron ipoly_loc
 
          allocate(xx_vert(num_vert_poly), &
                yy_vert(num_vert_poly), &
                zz_vert(num_vert_poly))
-         t=1;
+         t=1
 
          do ie=1,num_tet_in_poly
 
@@ -1525,21 +1525,21 @@ end subroutine CREATE_NORMAL_FACE
             do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
 
                call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                     PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node);
+                     PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)
 
                xx_vert(t) = PolyMesh%coord_x(id_node)
                yy_vert(t) = PolyMesh%coord_y(id_node)
                zz_vert(t) = PolyMesh%coord_z(id_node)
-               t=t+1;
+               t=t+1
             end do
          enddo
 
-         PolyMesh%Poly(ipoly_loc)%b_box(1,1) = minval(xx_vert);
-         PolyMesh%Poly(ipoly_loc)%b_box(1,2) = maxval(xx_vert);
-         PolyMesh%Poly(ipoly_loc)%b_box(2,1) = minval(yy_vert);
-         PolyMesh%Poly(ipoly_loc)%b_box(2,2) = maxval(yy_vert);
-         PolyMesh%Poly(ipoly_loc)%b_box(3,1) = minval(zz_vert);
-         PolyMesh%Poly(ipoly_loc)%b_box(3,2) = maxval(zz_vert);
+         PolyMesh%Poly(ipoly_loc)%b_box(1,1) = minval(xx_vert)
+         PolyMesh%Poly(ipoly_loc)%b_box(1,2) = maxval(xx_vert)
+         PolyMesh%Poly(ipoly_loc)%b_box(2,1) = minval(yy_vert)
+         PolyMesh%Poly(ipoly_loc)%b_box(2,2) = maxval(yy_vert)
+         PolyMesh%Poly(ipoly_loc)%b_box(3,1) = minval(zz_vert)
+         PolyMesh%Poly(ipoly_loc)%b_box(3,2) = maxval(zz_vert)
 
          PolyMesh%Poly(ipoly_loc)%hk=0.0
          do  t = 1,num_vert_poly
@@ -1673,9 +1673,12 @@ end subroutine CREATE_NORMAL_FACE
                 call FIND_NEIGHBOUR_EL(i,con_quad_loc,num_quad_loc,&
                                        IsFound_int,Row2,IsQuad)
                 if(IsFound_int) then
-                   mat   = con_quad_loc(i,1); mat_ne   = con_quad_loc(Row2,1)
-                   ie    = con_quad_loc(i,2); ie_ne    = con_quad_loc(Row2,2)
-                   iface = con_quad_loc(i,3); iface_ne = con_quad_loc(Row2,3)
+                   mat   = con_quad_loc(i,1)
+                   mat_ne   = con_quad_loc(Row2,1)
+                   ie    = con_quad_loc(i,2)
+                   ie_ne    = con_quad_loc(Row2,2)
+                   iface = con_quad_loc(i,3)
+                   iface_ne = con_quad_loc(Row2,3)
 
                    call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
                                                PolyMesh%num_elem_loc, &
@@ -1692,8 +1695,8 @@ end subroutine CREATE_NORMAL_FACE
                    PolyMesh%Elem_loc(ie_ne_loc)%neigh_el(iface_ne,0) = mpi_id
                    PolyMesh%Elem_loc(ie_ne_loc)%neigh_el(iface_ne,1:3) = [mat, ie, iface]
 
-                   con_quad_loc(i,:) = 0;
-                   con_quad_loc(Row2,:) = 0;
+                   con_quad_loc(i,:) = 0
+                   con_quad_loc(Row2,:) = 0
                 else
 
                    call FIND_BOUNDARY_EL(i,con_quad_loc,num_quad_loc,&
@@ -1701,9 +1704,12 @@ end subroutine CREATE_NORMAL_FACE
                                          IsFound_bnd,Row2,IsQuad)
 
                    if(IsFound_bnd) then
-                      mat   = con_quad_loc(i,1); mat_ne   = - PolyMesh%con_quad(Row2,1)
-                      ie    = con_quad_loc(i,2); ie_ne    =   con_quad_loc(i,2)
-                      iface = con_quad_loc(i,3); iface_ne =   con_quad_loc(i,3);
+                      mat   = con_quad_loc(i,1)
+                      mat_ne   = - PolyMesh%con_quad(Row2,1)
+                      ie    = con_quad_loc(i,2)
+                      ie_ne    =   con_quad_loc(i,2)
+                      iface = con_quad_loc(i,3)
+                      iface_ne =   con_quad_loc(i,3)
 
                       call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
                                                   PolyMesh%num_elem_loc, &
@@ -1712,8 +1718,8 @@ end subroutine CREATE_NORMAL_FACE
                       PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = mpi_id
                       PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1:3) = &
                                                              [mat_ne, ie_ne, iface_ne]
-                      con_quad_loc(i,:) = 0;
-                      PolyMesh%con_quad(Row2,:) = 0;
+                      con_quad_loc(i,:) = 0
+                      PolyMesh%con_quad(Row2,:) = 0
                    endif
                 endif
            endif
@@ -1777,7 +1783,7 @@ end subroutine CREATE_NORMAL_FACE
      !5 - Broadcasting elements
      do ip = 1, mpi_np
 
-       if(mpi_id == ip-1) num_quad_send_mpi = 7*num_quad_send;
+       if(mpi_id == ip-1) num_quad_send_mpi = 7*num_quad_send
 !       if(mpi_id == ip-1) write(*,*)  num_quad_send_mpi
 
        call MPI_BCAST(num_quad_send_mpi, 1, MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
@@ -1787,7 +1793,7 @@ end subroutine CREATE_NORMAL_FACE
        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
        allocate(con_quad_send_mpi(num_quad_send_mpi))
-       if(mpi_id == ip-1) con_quad_send_mpi = con_quad_send;
+       if(mpi_id == ip-1) con_quad_send_mpi = con_quad_send
 
 !       if(mpi_id == ip-1) write(*,*) mpi_id, ip-1,'con', con_quad_send_mpi
 
@@ -1832,19 +1838,22 @@ end subroutine CREATE_NORMAL_FACE
                                             IsFound_int,Row2, IsQuad)
 
             if(IsFound_int) then
-              mat   = con_quad_loc(i,1); mat_ne   = con_quad_recv_mpi(Row2,1)
-              ie    = con_quad_loc(i,2); ie_ne    = con_quad_recv_mpi(Row2,2)
-              iface = con_quad_loc(i,3); iface_ne = con_quad_recv_mpi(Row2,3);
+              mat   = con_quad_loc(i,1)
+              mat_ne   = con_quad_recv_mpi(Row2,1)
+              ie    = con_quad_loc(i,2)
+              ie_ne    = con_quad_recv_mpi(Row2,2)
+              iface = con_quad_loc(i,3)
+              iface_ne = con_quad_recv_mpi(Row2,3)
 
               call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
                                           PolyMesh%num_elem_loc, &
                                           ie,ie_loc)
 
-              PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = ip - 1;
+              PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) = ip - 1
               PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1:3) = [mat_ne, ie_ne, iface_ne]
 
               !put zero if found
-              con_quad_loc(i,:) = 0;
+              con_quad_loc(i,:) = 0
               con_quad_recv_mpi(Row2,:) = 0
               num_quad_send_loc = num_quad_send_loc - 1
 
@@ -2005,9 +2014,12 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
                                     IsFound_int, Row2, IsQuad)
             ! internal face
             if(IsFound_int) then
-               mat   = con_tria_loc(i,1); mat_ne   = con_tria_loc(Row2,1)
-               ie    = con_tria_loc(i,2); ie_ne    = con_tria_loc(Row2,2)
-               iface = con_tria_loc(i,3); iface_ne = con_tria_loc(Row2,3)
+               mat   = con_tria_loc(i,1)
+               mat_ne   = con_tria_loc(Row2,1)
+               ie    = con_tria_loc(i,2)
+               ie_ne    = con_tria_loc(Row2,2)
+               iface = con_tria_loc(i,3)
+               iface_ne = con_tria_loc(Row2,3)
 !                   write(*,*) con_quad_loc(i,:)
 !                   write(*,*) con_quad_loc(Row2,:)
 !                   write(*,*) mat, ie, iface
@@ -2041,13 +2053,13 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
                !PolyMesh%Elem_loc(ie_ne_loc)%flag(iface_ne)=0
 
 
-               con_tria_loc(i,:) = 0;
-               con_tria_loc(Row2,:) = 0;
+               con_tria_loc(i,:) = 0
+               con_tria_loc(Row2,:) = 0
                !print *,ipoly_loc
-               !faces_found_loc(i)=1;
+               !faces_found_loc(i)=1
                !print *,'local internal'
                !print *,i,Row2
-               !faces_found_loc(Row2)=1;
+               !faces_found_loc(Row2)=1
 
             ! boundary face
             else
@@ -2058,9 +2070,10 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
                !write(*,*) IsFound_bnd
                !endif
                   if(IsFound_bnd) then
-                  mat   = con_tria_loc(i,1); mat_ne   =   PolyMesh%con_tria(Row2,1)
+                  mat   = con_tria_loc(i,1)
+                  mat_ne   =   PolyMesh%con_tria(Row2,1)
                   space_fun_tag = PolyMesh%con_tria(Row2,5)
-                  ie    = con_tria_loc(i,2);
+                  ie    = con_tria_loc(i,2)
 
                   !! PROBLEM
                   ! TODO - case with more faces on domain? case with different BC? make automatic
@@ -2072,7 +2085,8 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
                   if(mat_ne == 5 .or. mat_ne == 6 .or. mat_ne == 7) ie_ne = -2
                   ! if(mat_ne == 3 .or. mat_ne == 4 .or. mat_ne == 5 .or. mat_ne == 6 .or. mat_ne == 7) ie_ne = -2
 
-                  iface = con_tria_loc(i,3); iface_ne =   con_tria_loc(i,3);
+                  iface = con_tria_loc(i,3)
+                  iface_ne =   con_tria_loc(i,3)
 
                   call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
                                              PolyMesh%num_elem_loc, &
@@ -2087,13 +2101,13 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
                   ! print *, "neigh_el: ", PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,:)
                   ! print *, ""
 
-                  !PolyMesh%Elem_loc(ie_loc)%flag(iface)=0;
-                  con_tria_loc(i,:) = 0;
-                  PolyMesh%con_tria(Row2,:) = 0;
-                     !faces_found_loc(i)=1;
+                  !PolyMesh%Elem_loc(ie_loc)%flag(iface)=0
+                  con_tria_loc(i,:) = 0
+                  PolyMesh%con_tria(Row2,:) = 0
+                     !faces_found_loc(i)=1
                   !  print *,'boundary'
                   !  print *,i,Row2
-                     !faces_found_loc(Row2)=1;
+                     !faces_found_loc(Row2)=1
                endif
             endif
          endif
@@ -2165,14 +2179,14 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
 
    proc_loop: do ip = 1, mpi_np
 
-      if(mpi_id == ip-1) num_tria_send_mpi = 6*num_tria_send;
+      if(mpi_id == ip-1) num_tria_send_mpi = 6*num_tria_send
       !print *,num_tria_send_mpi
       call MPI_BCAST(num_tria_send_mpi, 1, MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
 
       !call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
       allocate(con_tria_send_mpi(num_tria_send_mpi))
-      if(mpi_id == ip-1) con_tria_send_mpi = con_tria_send;
+      if(mpi_id == ip-1) con_tria_send_mpi = con_tria_send
       !print *,num_tria_send_mpi
       call MPI_BCAST(con_tria_send_mpi,num_tria_send_mpi,&
                      MPI_INTEGER, ip-1, MPI_COMM_WORLD, mpi_ierr)
@@ -2232,7 +2246,7 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
          kiter2=1
          do i=1,2*num_poly_send_mpi,2
             x1_send_mpi(kiter2)=xx_send(i)
-            kiter2=kiter2+1;
+            kiter2=kiter2+1
          enddo
       endif
 
@@ -2248,7 +2262,7 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
          kiter2=1
          do i=1,2*num_poly_send_mpi,2
             x2_send_mpi(kiter2)=xx_send(i+1)
-            kiter2=kiter2+1;
+            kiter2=kiter2+1
          enddo
       endif
 
@@ -2264,7 +2278,7 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
          kiter2=1
          do i=1,2*num_poly_send_mpi,2
             y1_send_mpi(kiter2)=yy_send(i)
-            kiter2=kiter2+1;
+            kiter2=kiter2+1
          enddo
       endif
 
@@ -2280,7 +2294,7 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
          kiter2=1
          do i=1,2*num_poly_send_mpi,2
             y2_send_mpi(kiter2)=yy_send(i+1)
-            kiter2=kiter2+1;
+            kiter2=kiter2+1
          enddo
       endif
 
@@ -2293,10 +2307,10 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
       allocate(z1_send_mpi(num_poly_send_mpi))
 
       if (mpi_id==ip-1) then
-         kiter2=1;
+         kiter2=1
          do i=1,2*num_poly_send_mpi,2
             z1_send_mpi(kiter2)=zz_send(i)
-            kiter2=kiter2+1;
+            kiter2=kiter2+1
          enddo
       endif
 
@@ -2309,11 +2323,10 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
       allocate(z2_send_mpi(num_poly_send_mpi))
 
       if (mpi_id==ip-1) then
-         kiter2=1;
-
+         kiter2=1
          do i=1,2*num_poly_send_mpi,2
             z2_send_mpi(kiter2)=zz_send(i+1)
-            kiter2=kiter2+1;
+            kiter2=kiter2+1
          enddo
       endif
 
@@ -2324,10 +2337,10 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
       call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
       !find neighbouring elements
-      !iter_face=1;
+      !iter_face=1
       do i = 1, num_tria_loc
-         !flag=0;
-         !iface_poly=1;
+         !flag=0
+         !iface_poly=1
          isFound_int = .false.
          if (con_tria_loc(i,1) /= 0 .and. mpi_id /= ip-1) then
             !print *,'PROC:',mpi_id
@@ -2336,9 +2349,12 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
                                           IsFound_int, Row2, IsQuad)
 
             if(IsFound_int) then
-               mat   = con_tria_loc(i,1); mat_ne   = con_tria_recv_mpi(Row2,1)
-               ie    = con_tria_loc(i,2); ie_ne    = con_tria_recv_mpi(Row2,2)
-               iface = con_tria_loc(i,3); iface_ne = con_tria_recv_mpi(Row2,3);
+               mat   = con_tria_loc(i,1)
+               mat_ne   = con_tria_recv_mpi(Row2,1)
+               ie    = con_tria_loc(i,2)
+               ie_ne    = con_tria_recv_mpi(Row2,2)
+               iface = con_tria_loc(i,3)
+               iface_ne = con_tria_recv_mpi(Row2,3)
 
                call GET_EL_LOC_FROM_EL_GLO(PolyMesh%elem_loc2glo, &
                                              PolyMesh%num_elem_loc, &
@@ -2382,14 +2398,14 @@ subroutine CREATE_NEIGH_EL_TRIA(mpifile, PolyMesh, mpi_np, mpi_id)
                   PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,2,1:2)=[y1_send_mpi(ipoly2_loc),y2_send_mpi(ipoly2_loc)]
                   PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,3,1:2)=[z1_send_mpi(ipoly2_loc),z2_send_mpi(ipoly2_loc)]
                   PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly)=hk_send_mpi(ipoly2_loc)
-                  !index_loc(ipoly2_loc)=0;
+                  !index_loc(ipoly2_loc)=0
 
                   !print *,'_______'
 
                endif
 
-               con_tria_loc(i,:) = 0;
-               con_tria_recv_mpi(Row2,:) = 0;
+               con_tria_loc(i,:) = 0
+               con_tria_recv_mpi(Row2,:) = 0
                num_tria_send_loc = num_tria_send_loc - 1
             endif
          endif
@@ -2444,11 +2460,12 @@ end subroutine CREATE_NEIGH_EL_TRIA
 
       !> first compute how many elements per materials
       allocate(el_per_mat_loc(PolyData%nmat),el_per_mat(PolyData%nmat))
-      el_per_mat_loc = 0; el_per_mat = 0
+      el_per_mat_loc = 0
+      el_per_mat = 0
 
       do ie = 1, PolyMesh%num_elem_loc
          im = PolyMesh%Elem_loc(ie)%mat_prop
-         el_per_mat(im) = el_per_mat(im) + 1;
+         el_per_mat(im) = el_per_mat(im) + 1
       enddo
 
 
@@ -2460,14 +2477,14 @@ end subroutine CREATE_NEIGH_EL_TRIA
 
          allocate(PolyMesh%Elem_loc(ie)%Dof_glo(PolyMesh%Elem_loc(ie)%NDof_elem))
 
-         iglo_el  = PolyMesh%elem_loc2glo(ie);
+         iglo_el  = PolyMesh%elem_loc2glo(ie)
          mat_type = PolyMesh%Elem_loc(ie)%mat_prop
 
          ndof_shift = 0
          do im = 1, mat_type-1
 
             Deg      = PolyData%sdeg_mat(im)
-            ndof_mat = (deg+1)*(deg+2)*(deg+3)/6;
+            ndof_mat = (deg+1)*(deg+2)*(deg+3)/6
 
             ndof_shift = ndof_shift + ndof_mat*el_per_mat(im)
 
@@ -2661,7 +2678,7 @@ subroutine FIND_POS_LOC_NODE(vect, dim_vect, is, it)
 
    do i = 1, dim_vect
       if (vect(i) == is ) then
-         it = i;
+         it = i
          return
       endif
    enddo
@@ -2732,7 +2749,7 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh)
       do ivert = 1, PolyMesh%Elem_loc(ie)%num_vert
 
          call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-                                 PolyMesh%Elem_loc(ie)%vert(ivert),id_node);
+                                 PolyMesh%Elem_loc(ie)%vert(ivert),id_node)
 
          write(unit_mpi,*) 'Vertices # ', PolyMesh%Elem_loc(ie)%vert(ivert), &
                            'of coords : ', PolyMesh%coord_x(id_node), &
@@ -2806,7 +2823,7 @@ subroutine WRITE_MESH_INFO(mpi_file, PolyMesh)
    !  do ivert = 1, PolyMesh%Elem_loc(ie)%num_vert
 
    !    call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
-   !                            PolyMesh%Elem_loc(ie)%vert(ivert),id_node);
+   !                            PolyMesh%Elem_loc(ie)%vert(ivert),id_node)
 
    !    write(unit_mat,*) PolyMesh%coord_x(id_node), &
    !                     PolyMesh%coord_y(id_node), &

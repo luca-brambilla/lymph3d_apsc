@@ -88,7 +88,7 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
         ! ******************
         ! POINTS
         ! ******************
-        write(VTK_file_unit,'(A7,I12,A7)')'POINTS ', n_elem_tot*nvert_per_el,' double';
+        write(VTK_file_unit,'(A7,I12,A7)')'POINTS ', n_elem_tot*nvert_per_el,' double'
         POINT_LOOP: do ie=1,n_elem
         !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
             do j=1,nvert_per_el
@@ -121,16 +121,16 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
         ! **************
         ! CELLS
         ! **************
-        write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem_tot, n_elem_tot*(nvert_per_el+1);
+        write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem_tot, n_elem_tot*(nvert_per_el+1)
         ELEM_LOOP: do ie=1,n_elem_tot
             ! ordering
             do j=1,nvert_per_el
                 tnew(ie,j) = (ie-1)*nvert_per_el +j-1
             end do
             ! write ordering
-            write(VTK_file_unit,'(I12,8I12)')nvert_per_el, tnew(ie,:);
+            write(VTK_file_unit,'(I12,8I12)')nvert_per_el, tnew(ie,:)
             !write(VTK_file_unit,'(I12,8I12)')nvert_per_el, PolyMesh%con_tet(i,2)-1,PolyMesh%con_tet(i,3)-1,&
-            !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1;
+            !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1
         end do ELEM_LOOP
         write(VTK_file_unit,'(A)')
 
@@ -138,9 +138,9 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
         ! CELL TYPES
         ! ******************
         !! hardcoded tetrahedra
-        write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem_tot;
+        write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem_tot
             ELEM_TYPE_LOOP: do ie=1,n_elem_tot
-                write(VTK_file_unit,'(I2)')10;
+                write(VTK_file_unit,'(I2)')10
             end do ELEM_TYPE_LOOP
         write(VTK_file_unit,'(A)')
 
@@ -149,7 +149,7 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
         ! *********************
         if (present(u_name) .and. present(u)) then
             ! process 0 data
-            write(VTK_file_unit,'(A11,I12)')'POINT_DATA ', n_elem_tot * nvert_per_el;
+            write(VTK_file_unit,'(A11,I12)')'POINT_DATA ', n_elem_tot * nvert_per_el
             write(VTK_file_unit,'(A8,A12,A7)')'VECTORS ', u_name, ' double'
             !write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
             VECTOR_FIELD_LOOP: do ie=1,n_elem
@@ -181,7 +181,7 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
         ! **********************
         ! POLYHEDRA
         ! **********************
-        write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem_tot;
+        write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem_tot
         write(VTK_file_unit,'(A8,A12,A9)')'SCALARS ','POLYHEDRA', ' int 1'
         write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
 
@@ -471,7 +471,7 @@ subroutine VTU_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
         ! **********************
         ! POLYHEDRA
         ! **********************
-        ! write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem_tot;
+        ! write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem_tot
         ! write(VTK_file_unit,'(A8,A12,A9)')'SCALARS ','POLYHEDRA', ' int 1'
         ! write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
 
@@ -741,7 +741,7 @@ end subroutine WRITE_ENSIGHT_CASE
             write(VTK_file_unit,'(A)')
             write(VTK_file_unit,'(A)')'DATASET UNSTRUCTURED_GRID'
 
-      write(VTK_file_unit,'(A7,I12,A7)')'POINTS ',n_elem*nvert_per_el,' double';
+      write(VTK_file_unit,'(A7,I12,A7)')'POINTS ',n_elem*nvert_per_el,' double'
             POINT_LOOP: do i=1,n_elem
             !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
               do j=1,nvert_per_el
@@ -750,21 +750,21 @@ end subroutine WRITE_ENSIGHT_CASE
             end do POINT_LOOP
       write(VTK_file_unit,'(A)')
 
-      write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem, n_elem*(nvert_per_el+1);
+      write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem, n_elem*(nvert_per_el+1)
             ELEM_LOOP: do i=1,n_elem
-              write(VTK_file_unit,'(I12,8I12)')nvert_per_el, tnew(i,:);
+              write(VTK_file_unit,'(I12,8I12)')nvert_per_el, tnew(i,:)
               !write(VTK_file_unit,'(I12,8I12)')nvert_per_el, PolyMesh%con_tet(i,2)-1,PolyMesh%con_tet(i,3)-1,&
-              !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1;
+              !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1
             end do ELEM_LOOP
       write(VTK_file_unit,'(A)')
 
-      write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem;
+      write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem
             ELEM_TYPE_LOOP: do i=1,n_elem
-              write(VTK_file_unit,'(I2)')10;
+              write(VTK_file_unit,'(I2)')10
             end do ELEM_TYPE_LOOP
       write(VTK_file_unit,'(A)')
 
-      write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem;
+      write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem
       write(VTK_file_unit,'(A8,A12,A9)')'SCALARS ','mpi_id', ' int 1'
       write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
             POLY_LOOP2: do i=1,n_elem
@@ -811,7 +811,7 @@ end subroutine WRITE_ENSIGHT_CASE
             write(VTK_file_unit,'(A)')
             write(VTK_file_unit,'(A)')'DATASET UNSTRUCTURED_GRID'
 
-      write(VTK_file_unit,'(A7,I12,A7)')'POINTS ',n_elem*nvert_per_el,' double';
+      write(VTK_file_unit,'(A7,I12,A7)')'POINTS ',n_elem*nvert_per_el,' double'
             POINT_LOOP: do i=1,n_elem
             !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
               do j=1,nvert_per_el
@@ -820,21 +820,21 @@ end subroutine WRITE_ENSIGHT_CASE
             end do POINT_LOOP
       write(VTK_file_unit,'(A)')
 
-      write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem, n_elem*(nvert_per_el+1);
+      write(VTK_file_unit,'(A6,I12,I12)')'CELLS ', n_elem, n_elem*(nvert_per_el+1)
             ELEM_LOOP: do i=1,n_elem
-              write(VTK_file_unit,'(I12,8I12)')nvert_per_el, tnew(i,:);
+              write(VTK_file_unit,'(I12,8I12)')nvert_per_el, tnew(i,:)
               !write(VTK_file_unit,'(I12,8I12)')nvert_per_el, PolyMesh%con_tet(i,2)-1,PolyMesh%con_tet(i,3)-1,&
-              !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1;
+              !                                                PolyMesh%con_tet(i,4)-1,PolyMesh%con_tet(i,5)-1
             end do ELEM_LOOP
       write(VTK_file_unit,'(A)')
 
-      write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem;
+      write(VTK_file_unit,'(A11,I12)')'CELL_TYPES ', n_elem
             ELEM_TYPE_LOOP: do i=1,n_elem
-              write(VTK_file_unit,'(I2)')10;
+              write(VTK_file_unit,'(I2)')10
             end do ELEM_TYPE_LOOP
       write(VTK_file_unit,'(A)')
 
-      write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem;
+      write(VTK_file_unit,'(A11,I12)')'CELL_DATA ', n_elem
       write(VTK_file_unit,'(A8,A12,A9)')'SCALARS ','poly_id', ' int 1'
       write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
             POLY_LOOP3: do i=1,n_elem
@@ -866,24 +866,24 @@ end subroutine WRITE_ENSIGHT_CASE
         open(newunit=VTK_file_unit, action='WRITE', file=filename, &
               form='FORMATTED', status='replace')
 
-        write(VTK_file_unit,'(A)')'degree';
-        write(VTK_file_unit,'(I1)') p;
+        write(VTK_file_unit,'(A)')'degree'
+        write(VTK_file_unit,'(I1)') p
 
-        write(VTK_file_unit,'(A)')'err_L2';
+        write(VTK_file_unit,'(A)')'err_L2'
               !ERRL2_LOOP: do i=1,nit
               !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
               write(VTK_file_unit,'(1F16.8)') err_L2
               !end do ERRL2_LOOP
 
-        write(VTK_file_unit,'(A)')'err_DG';
+        write(VTK_file_unit,'(A)')'err_DG'
               !ERRH1_LOOP: do i=1,nit
               !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
               write(VTK_file_unit,'(1F16.8)') err_DG
               !end do ERRH1_LOOP
 
-        write(VTK_file_unit,'(A)')'h';
+        write(VTK_file_unit,'(A)')'h'
               !ELEM_LOOP: do i=1,nit
-                !write(VTK_file_unit,'(I12,8I12)')nvert_per_el, t(i,:)-1;
+                !write(VTK_file_unit,'(I12,8I12)')nvert_per_el, t(i,:)-1
               write(VTK_file_unit,'(1F16.8)') hh
               !end do ELEM_LOOP
 
@@ -911,27 +911,27 @@ end subroutine WRITE_ENSIGHT_CASE
       open(newunit=VTK_file_unit, action='WRITE', file=filename, &
             form='FORMATTED', position='append', status='unknown')
 
-      write(VTK_file_unit,'(A)')'degree';
-      write(VTK_file_unit,'(I1)') p;
+      write(VTK_file_unit,'(A)')'degree'
+      write(VTK_file_unit,'(I1)') p
 
-      write(VTK_file_unit,'(A)')'err_L2';
+      write(VTK_file_unit,'(A)')'err_L2'
             !ERRL2_LOOP: do i=1,nit
             !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
             write(VTK_file_unit,'(1F16.8)') err_L2
             !end do ERRL2_LOOP
 
-      write(VTK_file_unit,'(A)')'err_DG';
+      write(VTK_file_unit,'(A)')'err_DG'
             !ERRH1_LOOP: do i=1,nit
             !write(VTK_file_unit,'(3E16.8,1X)') xx(1:4,i),yy(1:4,i),zz(1:4,i)
             write(VTK_file_unit,'(1F16.8)') err_DG
             !end do ERRH1_LOOP
 
-      write(VTK_file_unit,'(A)')'h';
+      write(VTK_file_unit,'(A)')'h'
             !ELEM_LOOP: do i=1,nit
-              !write(VTK_file_unit,'(I12,8I12)')nvert_per_el, t(i,:)-1;
+              !write(VTK_file_unit,'(I12,8I12)')nvert_per_el, t(i,:)-1
             write(VTK_file_unit,'(1F16.8)') hh
             !end do ELEM_LOOP
-      write(VTK_file_unit,'(A)') ' ';
+      write(VTK_file_unit,'(A)') ' '
 
       close(unit=VTK_file_unit)
 
