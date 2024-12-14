@@ -154,7 +154,7 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
             !write(VTK_file_unit,'(A20)')'LOOKUP_TABLE default'
             VECTOR_FIELD_LOOP: do ie=1,n_elem
                 do j=1,nvert_per_el
-                    write(VTK_file_unit,'(3F16.8)') u(1,j,ie), u(2,j,ie), u(3,j,ie)
+                    write(VTK_file_unit,'(3E20.10)') u(1,j,ie), u(2,j,ie), u(3,j,ie)
                     !write(VTK_file_unit,'(3F16.8)') u(1:3,j,i)
                 enddo
             end do VECTOR_FIELD_LOOP
@@ -169,7 +169,7 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
                 ! write solution
                 VECTOR_FIELD_LOOP_k: do ie=1,tmp_nelem
                     do j=1,nvert_per_el
-                        write(VTK_file_unit,'(3F16.8)') ( tmp_solution(d,j,ie), d=1,DIM) !, tmp_solution(2,j,i), tmp_solution(3,j,i)
+                        write(VTK_file_unit,'(3E20.10)') ( tmp_solution(d,j,ie), d=1,DIM) !, tmp_solution(2,j,i), tmp_solution(3,j,i)
                     enddo
                 end do VECTOR_FIELD_LOOP_k
                 ! deallocate solution - different sizes
@@ -1045,7 +1045,7 @@ end subroutine WRITE_ENSIGHT_CASE
         if (mpi_id==0) print *, 'Writing .vtk file...'
         call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
 
-        if (present(num_dt)) then
+        if (present(num_dt) .and. .false.) then
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
             if (mpi_id==0) print *, 'Writing .vtu file...'
 

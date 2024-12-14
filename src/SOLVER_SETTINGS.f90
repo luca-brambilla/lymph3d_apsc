@@ -47,7 +47,8 @@ subroutine SOLVER_SETTINGS(stiff, ksp, pc)
 
     !> Create solver object ksp
     if (IS_MatrixFree .eqv. .true.) then
-        PetscCall(KSPCreate(PETSC_COMM_SELF, ksp, mpi_ierr))
+        !! CREATE ONLY ONCE OUTSIDE
+        !PetscCall(KSPCreate(PETSC_COMM_SELF, ksp, mpi_ierr))
     else
         PetscCall(KSPCreate(PETSC_COMM_WORLD, ksp, mpi_ierr))
     endif

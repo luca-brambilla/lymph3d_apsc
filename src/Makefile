@@ -10,7 +10,7 @@ DIR_PETSC=/home/luca/petsc
 COMP_FC_FLAGS=-O5 -g -c -cpp -ffree-form -ffree-line-length-none -fopenmp -fbounds-check
 COMP_LD_FLAGS=-O5  -fopenmp
 
-DEBUG_FC_FLAGS = -Wunused -Wconversion -fcheck=all -fcheck-array-temporaries -finit-real=snan -fbacktrace #-Wall -fcheck=all -fbacktrace
+DEBUG_FC_FLAGS = -Wunused -Wconversion -fcheck=all -fcheck-array-temporaries -finit-real=snan -ffpe-trap=invalid -fbacktrace #-Wall -fcheck=all -fbacktrace
 
 METIS_FC_FLAGS=-I$(DIR_FMETIS)/include -I$(DIR_METIS)/include
 METIS_LD_FLAGS=-L$(DIR_FMETIS)/lib -lfmetis -L$(DIR_METIS)/libmetis -lmetis

@@ -81,6 +81,8 @@ module Poly_global
     !> time of end of simulation
     real(kind=8)    :: finish
 
+    real(kind=8)    :: tmatrix, tsolve, tstiffness, tvector, tsset
+
     !file found
     !> logical variable to identify if file was found
     logical :: IS_filefound

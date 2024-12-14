@@ -104,7 +104,7 @@ program Lymph3D
     Mat :: petsc_m_tmp
 
     !integer(kind=4) :: j,k,m,n,row,col
-    integer(kind=4) :: j, row
+    integer(kind=4) :: row
 
     real(kind=8), dimension(:), allocatable :: prova_in, prova_out
     integer(kind=4) :: tmp_size, unit_print
@@ -113,8 +113,6 @@ program Lymph3D
     integer(kind=4) :: E1, E2, iface, ie_neigh_loc
     logical :: is_E2_local
     real(kind=8), dimension(:), pointer :: v_ptr
-    PetscScalar, dimension(:), allocatable :: val
-    PetscInt, dimension(:), allocatable :: irow
     
     ! read parameter
     ! iarg = getarg(1,arg)
@@ -406,6 +404,8 @@ program Lymph3D
     if (IS_MatrixFree .eqv. .true.) then
 
         print *, 'SET LOCAL matrix-free solvers'
+
+        PetscCallA(KSPCreate(PETSC_COMM_SELF, ksp, mpi_ierr))
         call SOLVER_SETTINGS(petsc_m_tmp, ksp, pc)
     else
         print *, 'SETTING SOLVERS'
@@ -434,6 +434,20 @@ program Lymph3D
     ! end do
     ! n_neigh = size(internal_neigh)
 
+    IsSave_output = .true.
+
+    !! CHECK IF START AT num_dt=0
+    t = 0.0
+    num_dt = 1
+
+    !stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
+    time_step = 0.001
+    num_dt_mon = 20
+
+    !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
+    stop_time = SQRT2 / 4.0 + 0.0 * SQRT2
+
+    half_dt2 = 0.5*time_step*time_step
 
     ! --------------------- MATRIX FREE -----------------------
     if (IS_MatrixFree .eqv. .true.) then
@@ -444,12 +458,6 @@ program Lymph3D
         ! allocate nnod_num, gathered_sizes, displacements, u
         call PREPROCESS_SOLUTION_MATRIX_FREE(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
 
-        t = 0.0
-        num_dt = 1 !!! compute number of iteration if start not t=0?
-        time_step = 0.001
-        stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
-        !stop_time = 1.0
-
         if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", 0, " Time: ", t
 
         if (mpi_id==0) print *, "Assemble initial conditions"
@@ -458,8 +466,6 @@ program Lymph3D
         allocate(un_loc(PolyMesh%num_poly_loc, DIM*Np))
         allocate(v0_loc(PolyMesh%num_poly_loc, DIM*Np))
         allocate(tmp(DIM*Np))
-        allocate(val(Np))
-        allocate(irow(Np))
 
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_displacement, u0_loc)
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_velocity, v0_loc)
@@ -528,42 +534,39 @@ program Lymph3D
             end do neigh_loop
 
             ! add forcing term and rescale
-            tmp = half_dt2 * ( tmp + rhs_loc(ie_loc,:) * time_function(t) )
+            tmp = half_dt2 * ( - tmp + rhs_loc(ie_loc,:) * time_function(t) )
             
             ! mass linear system in matrix-free
             do i=1,DIM
-                ! copy tmp vector block to PETSc, numbering starts from 0
-                row = (i-1)*Np
-                irow = [(j, j=0, Np-1)]
-                val = tmp(row+1:row+Np)
 
-                PetscCallA(VecSetValues(petsc_tmpv, Np, irow, val, INSERT_VALUES, mpi_ierr))
-                PetscCallA(VecAssemblyBegin(petsc_tmpv,mpi_ierr))
-                PetscCallA(VecAssemblyEnd(petsc_tmpv,mpi_ierr))
-
-                ! copy block i of mass matrix
+                ! copy block (i,i) of mass matrix
                 PetscCallA(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
                 PetscCallA(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
                 PetscCallA(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
 
-                ! solve linear system
+                ! copy vector block to PETSc
+                row = (i-1)*Np
+
+                PetscCall(VecGetArrayF90(petsc_tmpv,v_ptr,mpi_ierr))
+                v_ptr = tmp(row+1:row+Np)
+                PetscCall(VecRestoreArrayF90(petsc_tmpv,v_ptr,mpi_ierr))
+
+                ! solve linear system matrix-free on block (i,i)
                 PetscCallA(KSPSolve(ksp, petsc_tmpv, petsc_sol, mpi_ierr))
 
-                ! copy PETSc to the same tmp vector block
+                ! copy PETSc vector to solution vector block
+                ! update same tmp vector
                 PetscCallA(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
                 tmp(row+1:row+Np) =  v_ptr
                 PetscCallA(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
             enddo
 
-            ! sum
+            ! sum initial condition contributions
             un_loc(ie_loc,:) = tmp + u0_loc(ie_loc,:) + time_step*v0_loc(ie_loc,:)
 
         end do elem_loop
 
-        deallocate(v0_loc)
-
         if (IsSave_output .eqv. .true.) then
-            if (mpi_id==0) print *, '---   AFTER FIRST ITERATION   ---'
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
             call POST_PROCESS_MATRIX_FREE(PolyMesh, un_loc, u, gathered_sizes, displacements)
             call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
@@ -572,23 +575,56 @@ program Lymph3D
         num_dt = num_dt + 1
         t = t + time_step
 
-        !! STOP
-        call STOP_LYMPH3D
+        tmatrix = 0.0
+        tsolve = 0.0
+        tstiffness = 0.0
+        tvector = 0.0
+        tsset = 0.0
 
         ! loop start
         do while (t <= stop_time)
             if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
-            do ie_loc = 1,PolyMesh%num_elem_loc
-                !n_neigh = 4
-                !n_neigh = size(PolyMesh%Elem_loc(i)%neigh_el(:,2), 1)
-                call TIME_STEP_MATRIX_FREE(PolyMesh%Elem_loc(i)%neigh_el(:,2), n_neigh, Np, time_step, t, K_loc(ie_loc,:,:,:), massa(ie_loc,:), rhs_loc(ie_loc,:), u0_loc(ie_loc,:), un_loc, usol_loc(ie_loc,:))
-            end do
+            
+            call TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0_loc, un_loc, v0_loc)
+            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+            ! update solution
+            u0_loc = un_loc
+            un_loc = v0_loc
+
+                ! SAVE SOLUTION
+            if ( (IsSave_output .eqv. .true.) .and. (mod(num_dt, num_dt_mon) == 0) ) then
+                call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+                call POST_PROCESS_MATRIX_FREE(PolyMesh, un_loc, u, gathered_sizes, displacements)
+                call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
+            endif
+
+            ! update time
+            num_dt = num_dt + 1
+            t = t + time_step
         end do
 
+        call calc_time(time_hour, time_min, time_sec, int(tstiffness))
+        print *, 'tstiff  = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+        call calc_time(time_hour, time_min, time_sec, int(tsolve))
+        print *, 'tsolve  = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+        call calc_time(time_hour, time_min, time_sec, int(tmatrix))
+        print *, 'tmatrix = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+        call calc_time(time_hour, time_min, time_sec, int(tvector))
+        print *, 'tvector = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+        call calc_time(time_hour, time_min, time_sec, int(tsset))
+        print *, 'tsset   = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-        ! update solutions
-        u0_loc(i,:) = un_loc(i,:)
-        un_loc(i,:) = usol_loc(i,:) !! wrong, cannot update unless loop is over
+
+        if (IsSave_output .eqv. .true.) then
+            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+            call POST_PROCESS_MATRIX_FREE(PolyMesh, un_loc, u, gathered_sizes, displacements)
+            call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
+        endif
+
+        !! STOP
+        call STOP_LYMPH3D
 
     ! ----------------------------- PETSc -------------------------------------
     else
@@ -602,15 +638,6 @@ program Lymph3D
 
         else
             if(mpi_id == 0) print *, "                   TIME LOOP START                   "
-            ! initialization for time problem
-            t = 0.0
-            num_dt = 1 !!! compute number of iteration if start not t=0?
-            !time_step = 0.001
-            IsSave_output = .true.
-            num_dt_mon = 50
-            !stop_time = SQRT2/4.0 + 9.0*SQRT2 ! 10 peaks
-            !stop_time = SQRT2/4.0 + 2.0*SQRT2
-            stop_time = 0.01
 
             if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", 0, " Time: ", t
 
@@ -764,7 +791,7 @@ program Lymph3D
         deallocate(gathered_sizes)
     endif
 
-    call PVD_SETUP(num_dt_mon, 0, num_dt)
+    !call PVD_SETUP(num_dt_mon, 0, num_dt)
 
     ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'petsc_sol',viewer,mpi_ierr))
     ! PetscCallA(VecView(petsc_sol,viewer,mpi_ierr))
