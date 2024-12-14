@@ -27,19 +27,19 @@ subroutine MESH_CORRECTION(PolyMesh,mpi_np,mpi_id)
         ! see subroutine find_poly in Poly_global.f90
         index=FIND_TET_IN_POLY(PolyMesh%elem_in_poly_loc,ipoly,PolyMesh%num_elem_loc)
         if (index(1) == 0) then
-            missing(j)=ipoly;
+            missing(j)=ipoly
             !print *,'MISSING',ipoly
-            j=j+1;
+            j=j+1
         end if
     end do
-    len_missing=j-1;
-    Kend=Kend-len_missing;
-    !K_new=Kend;
+    len_missing=j-1
+    Kend=Kend-len_missing
+    !K_new=Kend
     !print *,'IN QUANTITY',len_missing
 
     ! Take the indices of tetrahedras contained in a given polyhedron
     ! and assign them to the polyhedra which does not contain any tetrahedra
-    i=Kbeg;
+    i=Kbeg
     do while(len_missing>0)
       index=FIND_TET_IN_POLY(PolyMesh%elem_in_poly_loc,i,PolyMesh%num_elem)
       print *, "index: ", index
@@ -54,10 +54,10 @@ subroutine MESH_CORRECTION(PolyMesh,mpi_np,mpi_id)
             !print *,'local',ie_loc
             PolyMesh%elem_in_poly_loc(ie_loc)=missing(len_missing)
             !end do
-            len_missing=len_missing-1;
+            len_missing=len_missing-1
           endif
       endif
-      i=i+1;
+      i=i+1
     end do
 
     PolyMesh%num_poly_loc=maxval(PolyMesh%elem_in_poly_loc)

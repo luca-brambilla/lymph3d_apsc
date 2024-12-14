@@ -138,15 +138,15 @@ subroutine allocate_Mesh_Structure(PolyMesh)
     endif
     if (PolyMesh%num_hex > 0) then
         allocate (PolyMesh%con_hex(PolyMesh%num_hex,9))
-        PolyMesh%con_hex = 0;
+        PolyMesh%con_hex = 0
     endif
     if (PolyMesh%num_tet > 0) then
         allocate (PolyMesh%con_tet(PolyMesh%num_tet,5))
-        PolyMesh%con_tet = 0;
+        PolyMesh%con_tet = 0
     endif
     if (PolyMesh%num_prysm > 0) then
         allocate (PolyMesh%con_prysm(PolyMesh%num_prysm,6))
-        PolyMesh%con_prysm = 0;
+        PolyMesh%con_prysm = 0
     endif
 
     !write(*,*) PolyMesh%num_hex, PolyMesh%num_tet, PolyMesh%num_prysm, PolyMesh%con_tet
@@ -249,7 +249,7 @@ subroutine print_Local_Mesh_Structure_VTK(PolyMesh)
         !write(50,*) PolyMesh%elem_in_poly(i)
     enddo
 
-    close(50);
+    close(50)
 
 end subroutine print_Local_Mesh_Structure_VTK
 

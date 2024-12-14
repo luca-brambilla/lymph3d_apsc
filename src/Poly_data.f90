@@ -247,8 +247,9 @@ module Poly_data
                     PolyData%tag_mat(PolyData%nmat))
 
         ! Quality factors for damping
-        allocate(PolyData%QS(PolyData%nmat), PolyData%QP(PolyData%nmat));
-        PolyData%QS = 0.d0; PolyData%QP = 0.d0;
+        allocate(PolyData%QS(PolyData%nmat), PolyData%QP(PolyData%nmat))
+        PolyData%QS = 0.d0
+        PolyData%QP = 0.d0;
 
 
         ! non linear material
@@ -347,7 +348,7 @@ module Poly_data
 
 
         if (PolyData%n_case == 0) &
-            allocate(PolyData%tag_case(1)); PolyData%tag_case(1) = 0;
+            allocate(PolyData%tag_case(1)); PolyData%tag_case(1) = 0
 
         ! Not honoring enhanced
         if (PolyData%nmat_nhe > 0) &

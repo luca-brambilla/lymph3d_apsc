@@ -74,7 +74,7 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     call set_properties(alpha, theta, c)
 
     ! total degree of the basis functions
-    p = PolyMesh%Elem_loc(1)%Degree;
+    p = PolyMesh%Elem_loc(1)%Degree
     Npoly = PolyMesh%num_poly
 
     ! Computation of Gauss-Legendre quadrature nodes and weights over the reference square and cube

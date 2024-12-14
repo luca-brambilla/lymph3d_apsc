@@ -50,7 +50,7 @@ subroutine READ_INPUT_FILES(PolyData,PolyMesh)
         write(*,'(A,A20)') 'Header File: ', head_file
     endif
 
-    inquire(file=head_file,exist=IS_filefound);
+    inquire(file=head_file,exist=IS_filefound)
     if(IS_filefound .eqv. .false.) then
         write(*,*) 'File ', head_file, ' is missing!'
         call EXIT(EXIT_MISSING_FILE)
@@ -96,7 +96,7 @@ subroutine READ_INPUT_FILES(PolyData,PolyMesh)
         write(*,'(A,A20)')'Material File    : ',mate_file
     endif
 
-    inquire(file=mate_file,exist=IS_filefound);
+    inquire(file=mate_file,exist=IS_filefound)
     if(IS_filefound .eqv. .false.) call EXIT(EXIT_MISSING_FILE)
 
 
@@ -122,7 +122,7 @@ subroutine READ_INPUT_FILES(PolyData,PolyMesh)
     if (mpi_id==0)  write(*,'(A)') '-------------------Reading Grid File-------------------'
     if (mpi_id==0)  write(*,'(A,A35)') 'Grid File : ',grid_file
 
-    inquire(file=grid_file,exist=IS_filefound);
+    inquire(file=grid_file,exist=IS_filefound)
     if(IS_filefound .eqv. .false.) call EXIT(EXIT_MISSING_FILE)
 
 

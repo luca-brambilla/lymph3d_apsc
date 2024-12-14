@@ -189,7 +189,7 @@ module Poly_default_codes
     ! Default values
     integer(kind=4), parameter :: damping_type_default = 1
 
-    real(kind=8), parameter :: start_time_default = 0.d0;
+    real(kind=8), parameter :: start_time_default = 0.d0
 
     !!! INCONSISTENT CAPITALIZATION
     logical, parameter :: IS_mon_lst_default = .false.
@@ -370,7 +370,7 @@ subroutine calc_time(time_h, time_m, time_s, time_in_seconds)
     integer(kind=4), intent(in)  :: time_in_seconds !< total duration in seconds
     real(kind=8)                 :: rem_min
 
-    time_h  = int(floor(real(time_in_seconds)/3600));
+    time_h  = int(floor(real(time_in_seconds)/3600))
     rem_min = mod(time_in_seconds,3600)
     time_m  = int(floor(rem_min/60))
     time_s  = mod(mod(time_in_seconds,3600),60)

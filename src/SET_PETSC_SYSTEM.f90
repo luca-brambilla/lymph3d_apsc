@@ -33,7 +33,7 @@ module SET_PETSC_SYSTEM
         integer(kind=4) :: global_dof, local_dof
         integer (kind=4) :: nrows
 
-        nrows = 3000; ! 1000
+        nrows = 3000 ! 1000
         if (global_dof <= 3000 ) nrows = global_dof
         ! nrows = global_dof / mpi_np / 100
 

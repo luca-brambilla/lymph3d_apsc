@@ -684,7 +684,7 @@ end subroutine READ_HEADER
 
 
      if(PolyData%fmax == 0.d0) then
-         PolyData%fmax = 3.d0;
+         PolyData%fmax = 3.d0
          if (mpi_id == 0) write(*,'(A)') 'ATTENTION: FMAX not defined!'
          if (mpi_id == 0) write(*,'(A)') 'FMAX assumed = 3'
      endif
@@ -693,13 +693,13 @@ end subroutine READ_HEADER
      if (damping_type == 1) then
          do im = 1, PolyData%nmat
              if(PolyData%QS(im) == 0.d0) then
-                PolyData%prop_mat(im,4) = 0.d0;
+                PolyData%prop_mat(im,4) = 0.d0
              else
                 PolyData%prop_mat(im,4) = PI*(PolyData%fmax)/PolyData%QS(im)
              endif
          enddo
       else
-         PolyData%prop_mat(:,4) = 0.d0;
+         PolyData%prop_mat(:,4) = 0.d0
       endif
 
      end subroutine READ_MATEFILE
@@ -728,13 +728,13 @@ subroutine READ_DIME_MESHFILE(filemesh, PolyData, PolyMesh)
    type(Data_Structure), intent(in)  :: PolyData
    type(Mesh_Structure), intent(out) :: PolyMesh
 
-   PolyMesh%num_hex   = 0;
-   PolyMesh%num_tet   = 0;
-   PolyMesh%num_prysm = 0;
-   PolyMesh%num_quad = 0;
-   PolyMesh%num_tria = 0;
-   PolyMesh%num_node = 0;
-   PolyMesh%num_poly = 0;
+   PolyMesh%num_hex   = 0
+   PolyMesh%num_tet   = 0
+   PolyMesh%num_prysm = 0
+   PolyMesh%num_quad = 0
+   PolyMesh%num_tria = 0
+   PolyMesh%num_node = 0
+   PolyMesh%num_poly = 0
 
 
    open(40,file=filemesh)
@@ -1021,7 +1021,7 @@ subroutine READ_MESHFILE(filemesh,PolyData,PolyMesh)
 
          !if (control /= 0) then
          if (check_poly /= 0) then
-            !check_poly=1;
+            !check_poly=1
             ipoly = ipoly + 1
             PolyMesh%elem_in_poly(ipoly) = mat_code
             !write(*,*) PolyMesh%con_tet(itetra,:)
