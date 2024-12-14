@@ -69,10 +69,12 @@ subroutine SET_PETSC_MASS_MATRIX_FREE(ne_loc, Np, M)
 
     do ie_loc=1,ne_loc
         do i=1,DIM
-            PetscCall(MatCreate(PETSC_COMM_SELF, M(ie_loc,i)%data, mpi_ierr))
-            PetscCall(MatSetSizes(M(ie_loc,i)%data, Np, Np, Np, Np, mpi_ierr))
-            PetscCall(MatSetFromOptions(M(ie_loc,i)%data, mpi_ierr))
-            PetscCall(MatSetUp(M(ie_loc,i)%data, mpi_ierr))
+            PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, Np, Np, PETSC_NULL_SCALAR_ARRAY, M(ie_loc,i)%data, mpi_ierr))
+
+            ! PetscCall(MatCreate(PETSC_COMM_SELF, M(ie_loc,i)%data, mpi_ierr))
+            ! PetscCall(MatSetSizes(M(ie_loc,i)%data, Np, Np, Np, Np, mpi_ierr))
+            ! PetscCall(MatSetFromOptions(M(ie_loc,i)%data, mpi_ierr))
+            ! PetscCall(MatSetUp(M(ie_loc,i)%data, mpi_ierr))
         enddo
     enddo
 
@@ -183,7 +185,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     call set_properties(alpha, theta, c)
 
     ! total degree of the basis functions
-    p = PolyMesh%Elem_loc(1)%Degree;
+    p = PolyMesh%Elem_loc(1)%Degree
     Npoly = PolyMesh%num_poly
 
     ! Computation of Gauss-Legendre quadrature nodes and weights over the reference square and cube
@@ -331,11 +333,11 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
             enddo
 
             ! Finalize each PETSc matrix assembly
-            PetscCall(MatAssemblyBegin(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
-            PetscCall(MatAssemblyEnd(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
+            ! PetscCall(MatAssemblyBegin(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
+            ! PetscCall(MatAssemblyEnd(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
 
-            PetscCall(MatAssemblyBegin(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
-            PetscCall(MatAssemblyEnd(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
+            ! PetscCall(MatAssemblyBegin(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
+            ! PetscCall(MatAssemblyEnd(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
         enddo
 
         ! current element E+
@@ -578,7 +580,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
     call set_properties(alpha, theta, c)
 
     ! total degree of the basis functions
-    p = PolyMesh%Elem_loc(1)%Degree;
+    p = PolyMesh%Elem_loc(1)%Degree
     Npoly = PolyMesh%num_poly
 
     ! Computation of Gauss-Legendre quadrature nodes and weights over the reference square and cube
@@ -845,6 +847,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     integer(kind=4) :: row
 
     real(kind=8), dimension(:), pointer :: v_ptr
+    real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
 
 
     ! logical, intent(in) :: IsTime_dependent
@@ -874,13 +877,13 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     ! only local to process
 
     ! 1 block of element local mass matrix out of 3 (1 dimension)
-    PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
-    PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
-    PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
-    PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr))
-
-    PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-    PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+    ! PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
+    ! PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
+    ! PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
+    ! PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr))
+    ! PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+    ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+    PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, Np, Np, PETSC_NULL_SCALAR_ARRAY, petsc_m_tmp, mpi_ierr))
 
     ! 1 block of element local vectors out of 3 (1 dimension)
     PetscCall(VecCreate(PETSC_COMM_SELF, petsc_exact, mpi_ierr))
@@ -962,9 +965,15 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
             !! COPY MATRIX OR SET KSP EACH TIME? OR PASS KSP VECTOR/MATRIX DIRECTLY?
             ! copy block (i,i) of mass matrix
-            PetscCall(MatCopy(massa_modale(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
-            PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-            PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+            ! PetscCall(MatCopy(massa_modale(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
+            ! PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+            ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+
+            PetscCall(MatDenseGetArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+            m2_ptr = m1_ptr
+            PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
 
             ! copy vector block to PETSc
             PetscCall(VecGetArrayF90(petsc_exact,v_ptr,mpi_ierr))
@@ -1150,6 +1159,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
 
     !> partial result for contribution from stiffness and forcing term
     real(kind=8), dimension(:), pointer :: v_ptr
+    real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
 
     real(kind=8) :: dt2
     integer(kind=4) :: i
@@ -1161,13 +1171,13 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
     dt2 = time_step*time_step
 
     ! 1 block of element local mass matrix out of 3
-    PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
-    PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
-    PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
-    PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr))
-
-    PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-    PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+    ! PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
+    ! PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
+    ! PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
+    ! PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr))
+    ! PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+    ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+    PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, Np, Np, PETSC_NULL_SCALAR_ARRAY, petsc_m_tmp, mpi_ierr))
 
     ! 1 block of element local vectors out of 3
     PetscCall(VecCreate(PETSC_COMM_SELF, petsc_sol, mpi_ierr))
@@ -1228,9 +1238,14 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             t1 = MPI_WTIME()
 
             ! copy block (i,i) of mass matrix
-            PetscCall(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp, DIFFERENT_NONZERO_PATTERN, mpi_ierr))
-            PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-            PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+            ! PetscCall(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp, DIFFERENT_NONZERO_PATTERN, mpi_ierr))
+            ! PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+            ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+            PetscCall(MatDenseGetArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+            m2_ptr = m1_ptr
+            PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
 
             t2 = MPI_WTIME()
             tmatrix = tmatrix + t2 - t1
@@ -1238,7 +1253,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
 
             !----
             t1 = MPI_WTIME()
-            call SOLVER_SETTINGS(massa(ie_loc,i)%data, ksp, pc)
+            !call SOLVER_SETTINGS(massa(ie_loc,i)%data, ksp, pc)
             t2 = MPI_WTIME()
             tsset = tsset + t2 - t1
             !----

@@ -113,6 +113,7 @@ program Lymph3D
     integer(kind=4) :: E1, E2, iface, ie_neigh_loc
     logical :: is_E2_local
     real(kind=8), dimension(:), pointer :: v_ptr
+    real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
     
     ! read parameter
     ! iarg = getarg(1,arg)
@@ -309,13 +310,15 @@ program Lymph3D
 
         ! create local matrix to each process for matrix vector multiplication
         ! mass matrix-free temporary matrix
-        PetscCallA(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
-        PetscCallA(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
-        PetscCallA(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
-        PetscCallA(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
 
-        PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-        PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+        PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, Np, Np, PETSC_NULL_SCALAR_ARRAY, petsc_m_tmp, mpi_ierr))
+
+        ! PetscCallA(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
+        ! PetscCallA(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
+        ! PetscCallA(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
+        ! PetscCallA(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
+        ! PetscCallA(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+        ! PetscCallA(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
 
     else
         call FLUSH
@@ -446,6 +449,7 @@ program Lymph3D
 
     !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
     stop_time = SQRT2 / 4.0 + 0.0 * SQRT2
+    stop_time = 0.1
 
     half_dt2 = 0.5*time_step*time_step
 
@@ -540,9 +544,15 @@ program Lymph3D
             do i=1,DIM
 
                 ! copy block (i,i) of mass matrix
-                PetscCallA(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
-                PetscCallA(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-                PetscCallA(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+                ! PetscCallA(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
+                ! PetscCallA(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+                ! PetscCallA(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+
+                PetscCall(MatDenseGetArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+                PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+                m2_ptr = m1_ptr
+                PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+                PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
 
                 ! copy vector block to PETSc
                 row = (i-1)*Np
@@ -605,15 +615,15 @@ program Lymph3D
         end do
 
         call calc_time(time_hour, time_min, time_sec, int(tstiffness))
-        print *, 'tstiff  = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+        print *, 'tstiff  = ', time_min,' m ' , time_sec,' s'
         call calc_time(time_hour, time_min, time_sec, int(tsolve))
-        print *, 'tsolve  = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+        print *, 'tsolve  = ', time_min,' m ' , time_sec,' s'
         call calc_time(time_hour, time_min, time_sec, int(tmatrix))
-        print *, 'tmatrix = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+        print *, 'tmatrix = ' , time_min,' m ' , time_sec,' s'
         call calc_time(time_hour, time_min, time_sec, int(tvector))
-        print *, 'tvector = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+        print *, 'tvector = ' , time_min,' m ' , time_sec,' s'
         call calc_time(time_hour, time_min, time_sec, int(tsset))
-        print *, 'tsset   = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
+        print *, 'tsset   = ' , time_min,' m ' , time_sec,' s'
 
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
