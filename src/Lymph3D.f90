@@ -102,15 +102,20 @@ program Lymph3D
     type(PetscMatStruct), dimension(:,:), allocatable:: massa_modale
     real(kind=8), dimension(:), allocatable :: tmp
     Mat :: petsc_m_tmp
-    PetscInt :: irow(1)
 
     !integer(kind=4) :: j,k,m,n,row,col
-    integer(kind=4) :: k, row
-    integer(kind=4) :: neighbor
+    integer(kind=4) :: j, row
 
     real(kind=8), dimension(:), allocatable :: prova_in, prova_out
     integer(kind=4) :: tmp_size, unit_print
     type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
+    
+    integer(kind=4) :: E1, E2, iface, ie_neigh_loc
+    logical :: is_E2_local
+    real(kind=8), dimension(:), pointer :: v_ptr
+    PetscScalar, dimension(:), allocatable :: val
+    PetscInt, dimension(:), allocatable :: irow
+    
     ! read parameter
     ! iarg = getarg(1,arg)
     ! open(unit=10, file=arg, status="new")
@@ -284,8 +289,8 @@ program Lymph3D
 
         n_neigh = PolyMesh%Elem_loc(1)%num_faces
         !! WASTE OF MEMORY... MAKE SCATTERED SIZE VECTOR?
-        allocate( K_loc(PolyMesh%num_elem_loc, n_neigh, DIM*Np, DIM*Np) )
-        allocate( A_dg_loc(PolyMesh%num_elem_loc, n_neigh, DIM*Np, DIM*Np) )
+        allocate( K_loc(PolyMesh%num_elem_loc, n_neigh+1, DIM*Np, DIM*Np) )
+        allocate( A_dg_loc(PolyMesh%num_elem_loc, n_neigh+1, DIM*Np, DIM*Np) )
         allocate( rhs_loc(PolyMesh%num_elem_loc, DIM*Np) )
 
         ! allocate the struct containing PETSc Mat for the mass data matrix-free form
@@ -295,10 +300,14 @@ program Lymph3D
         call SET_PETSC_MASS_MATRIX_FREE(PolyMesh%num_elem_loc, Np, massa_modale)
 
         ! create local vector to each proces for matrix vector multiplicaton
-        ! mass matrix-free temporary vector
+        ! mass matrix-free temporary vector and linear system solution
         PetscCallA(VecCreate(PETSC_COMM_SELF, petsc_tmpv, mpi_ierr))
         PetscCallA(VecSetSizes(petsc_tmpv, Np, Np, mpi_ierr))
         PetscCallA(VecSetFromOptions(petsc_tmpv, mpi_ierr))
+
+        PetscCallA(VecCreate(PETSC_COMM_SELF, petsc_sol, mpi_ierr))
+        PetscCallA(VecSetSizes(petsc_sol, Np, Np, mpi_ierr))
+        PetscCallA(VecSetFromOptions(petsc_sol, mpi_ierr))
 
         ! create local matrix to each process for matrix vector multiplication
         ! mass matrix-free temporary matrix
@@ -306,6 +315,9 @@ program Lymph3D
         PetscCallA(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
         PetscCallA(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
         PetscCallA(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
+
+        PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+        PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
 
     else
         call FLUSH
@@ -443,8 +455,11 @@ program Lymph3D
         if (mpi_id==0) print *, "Assemble initial conditions"
         ! initial conditions
         allocate(u0_loc(PolyMesh%num_poly_loc, DIM*Np))
+        allocate(un_loc(PolyMesh%num_poly_loc, DIM*Np))
         allocate(v0_loc(PolyMesh%num_poly_loc, DIM*Np))
         allocate(tmp(DIM*Np))
+        allocate(val(Np))
+        allocate(irow(Np))
 
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_displacement, u0_loc)
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_velocity, v0_loc)
@@ -469,10 +484,7 @@ program Lymph3D
 
         ! call SAVE_MATRIX_PETSC(massa(1,1)%data, Np, Np, 'massa.txt')
         ! call SAVE_MATRIX_PETSC(massa_modale(1,1)%data, Np, Np, 'massa_modale.txt')
-        if (mpi_id==0) call SAVE_MATRIX_F90(K_loc(1,:,:,:), DIM*Np, 'rigidezza.txt')
-
-        !! STOP
-        call STOP_LYMPH3D
+        ! if (mpi_id==0) call SAVE_MATRIX_F90(K_loc(1,:,:,:), DIM*Np, 'rigidezza.txt')
 
         ! u_1 = M^-1(dt^2/2 * f_0 - dt^2/2*A*u_0) + u0 + dt*v_0
         !! refactor matrices
@@ -480,35 +492,82 @@ program Lymph3D
 
         call FLUSH
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-        if (mpi_id==0) print *, '------------------- FIRST ITERATION ---------------------'
+        if(mpi_id == 0) print *, ""
+        if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
         call FLUSH
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-        do ie_loc = 1,PolyMesh%num_elem_loc
-            do k=1,n_neigh
-                neighbor = PolyMesh%Elem_loc(ie_loc)%neigh_el(2,k)
-                !! retrieve from global to local? get from col 4?
-                !! same processor ???
-                row = 1
-                tmp = tmp + matmul(K_loc(row,k,:,:),u0_loc(row,:))
-                tmp = tmp + half_dt2 * rhs_loc(row,:) * time_function(t)
+        !! computation on tetra or on poly??? solution dof on poly
 
-                do i=1,DIM
-                    ! mass in matrix-free
-                    ! copy vector to petsc
-                    irow(1)=1
-                    PetscCallA(VecSetValues(petsc_tmpv,Np,irow,tmp((i-1)*Np+1:i*Np),INSERT_VALUES,mpi_ierr))
-                    ! solve linear system
-                    PetscCallA(KSPSolve(ksp,petsc_tmpv,petsc_sol,mpi_ierr))
-                    ! copy to fortran vector
+        elem_loop: do ie_loc = 1,PolyMesh%num_elem_loc
+            E1 = ie_loc
+            tmp = 0.0
 
-                    ! sum
-                    un_loc(ie_loc,:) = tmp + u0_loc(ie_loc,:) + time_step*v0_loc(ie_loc,:)
-                enddo
-            end do
-        end do
+            ! E+ contribution
+            tmp = matmul(K_loc(E1,1,:,:), u0_loc(E1,:))
+
+            ! E- contributions
+            neigh_loop: do iface=1,n_neigh
+
+                is_E2_local = .false.
+                E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
+
+                ! if boundary face, no contribution in E-, Dirichlet contribution already in E+
+                if (E2 < 0) cycle neigh_loop
+
+                ! check if neighbor is in the same process
+                !! CHANGE GLOBAL NUMBERING IN LOCAL PROCESS FOR EXTRA TERMS IN EXCHANGE?
+                if (PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) == mpi_id) then
+                    is_E2_local = .true.
+                endif
+
+                ie_neigh_loc = PolyMesh%elem_glo2loc(E2)
+
+                tmp = tmp + matmul(K_loc(E1,iface+1,:,:), u0_loc(ie_neigh_loc,:))
+
+            end do neigh_loop
+
+            ! add forcing term and rescale
+            tmp = half_dt2 * ( tmp + rhs_loc(ie_loc,:) * time_function(t) )
+            
+            ! mass linear system in matrix-free
+            do i=1,DIM
+                ! copy tmp vector block to PETSc, numbering starts from 0
+                row = (i-1)*Np
+                irow = [(j, j=0, Np-1)]
+                val = tmp(row+1:row+Np)
+
+                PetscCallA(VecSetValues(petsc_tmpv, Np, irow, val, INSERT_VALUES, mpi_ierr))
+                PetscCallA(VecAssemblyBegin(petsc_tmpv,mpi_ierr))
+                PetscCallA(VecAssemblyEnd(petsc_tmpv,mpi_ierr))
+
+                ! copy block i of mass matrix
+                PetscCallA(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
+                PetscCallA(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+                PetscCallA(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+
+                ! solve linear system
+                PetscCallA(KSPSolve(ksp, petsc_tmpv, petsc_sol, mpi_ierr))
+
+                ! copy PETSc to the same tmp vector block
+                PetscCallA(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
+                tmp(row+1:row+Np) =  v_ptr
+                PetscCallA(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
+            enddo
+
+            ! sum
+            un_loc(ie_loc,:) = tmp + u0_loc(ie_loc,:) + time_step*v0_loc(ie_loc,:)
+
+        end do elem_loop
 
         deallocate(v0_loc)
+
+        if (IsSave_output .eqv. .true.) then
+            if (mpi_id==0) print *, '---   AFTER FIRST ITERATION   ---'
+            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+            call POST_PROCESS_MATRIX_FREE(PolyMesh, un_loc, u, gathered_sizes, displacements)
+            call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
+        endif
 
         num_dt = num_dt + 1
         t = t + time_step
