@@ -40,7 +40,7 @@ program Lymph3D
     Vec :: petsc_sol, petsc_rhs ! solution and rhs vectors for the algebraic system
     Vec :: petsc_uex, petsc_modal_coeff_uex ! modal (exact) solution and its coefficients
 
-    Vec :: petsc_tmpv, petsc_f ! temp vectors to store solution for sums
+    Vec :: petsc_v_tmp, petsc_f ! temp vectors to store solution for sums
     Vec :: petsc_u0, petsc_v0 ! initial condition read from data
 
     !PetscViewer viewer ! abstract PETSc object for displaying PETSc objects and their data
@@ -70,8 +70,6 @@ program Lymph3D
     integer(kind=4) :: num_dt = 1     ! number of iteration
     real(kind=8) :: t             ! time variable
 
-    real(kind=8) dt2 ! dt^2
-    real(kind=8) half_dt2 ! dt^2 / 2
     real(kind=8), parameter :: one = 1.0
 
 
@@ -300,9 +298,9 @@ program Lymph3D
 
         ! create local vector to each proces for matrix vector multiplicaton
         ! mass matrix-free temporary vector and linear system solution
-        PetscCallA(VecCreate(PETSC_COMM_SELF, petsc_tmpv, mpi_ierr))
-        PetscCallA(VecSetSizes(petsc_tmpv, Np, Np, mpi_ierr))
-        PetscCallA(VecSetFromOptions(petsc_tmpv, mpi_ierr))
+        PetscCallA(VecCreate(PETSC_COMM_SELF, petsc_v_tmp, mpi_ierr))
+        PetscCallA(VecSetSizes(petsc_v_tmp, Np, Np, mpi_ierr))
+        PetscCallA(VecSetFromOptions(petsc_v_tmp, mpi_ierr))
 
         PetscCallA(VecCreate(PETSC_COMM_SELF, petsc_sol, mpi_ierr))
         PetscCallA(VecSetSizes(petsc_sol, Np, Np, mpi_ierr))
@@ -333,7 +331,7 @@ program Lymph3D
         call SET_PETSC_VECTOR(petsc_sol, local_dof, global_dof)
         call SET_PETSC_VECTOR(petsc_uex, local_dof, global_dof)
 
-        call SET_PETSC_VECTOR(petsc_tmpv, local_dof, global_dof)
+        call SET_PETSC_VECTOR(petsc_v_tmp, local_dof, global_dof)
         call SET_PETSC_VECTOR(petsc_f, local_dof, global_dof)
         call SET_PETSC_VECTOR(petsc_u0, local_dof, global_dof)
         call SET_PETSC_VECTOR(petsc_v0, local_dof, global_dof)
@@ -448,10 +446,11 @@ program Lymph3D
     num_dt_mon = 20
 
     !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
-    stop_time = SQRT2 / 4.0 + 0.0 * SQRT2
-    stop_time = 0.1
-
-    half_dt2 = 0.5*time_step*time_step
+    stop_time = SQRT2 / 4.0 + 0.5 * SQRT2
+    !stop_time = 0.1
+    
+    dt2 = time_step*time_step
+    half_dt2 = 0.5*dt2
 
     ! --------------------- MATRIX FREE -----------------------
     if (IS_MatrixFree .eqv. .true.) then
@@ -509,72 +508,7 @@ program Lymph3D
 
         !! computation on tetra or on poly??? solution dof on poly
 
-        elem_loop: do ie_loc = 1,PolyMesh%num_elem_loc
-            E1 = ie_loc
-            tmp = 0.0
-
-            ! E+ contribution
-            tmp = matmul(K_loc(E1,1,:,:), u0_loc(E1,:))
-
-            ! E- contributions
-            neigh_loop: do iface=1,n_neigh
-
-                is_E2_local = .false.
-                E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
-
-                ! if boundary face, no contribution in E-, Dirichlet contribution already in E+
-                if (E2 < 0) cycle neigh_loop
-
-                ! check if neighbor is in the same process
-                !! CHANGE GLOBAL NUMBERING IN LOCAL PROCESS FOR EXTRA TERMS IN EXCHANGE?
-                if (PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) == mpi_id) then
-                    is_E2_local = .true.
-                endif
-
-                ie_neigh_loc = PolyMesh%elem_glo2loc(E2)
-
-                tmp = tmp + matmul(K_loc(E1,iface+1,:,:), u0_loc(ie_neigh_loc,:))
-
-            end do neigh_loop
-
-            ! add forcing term and rescale
-            tmp = half_dt2 * ( - tmp + rhs_loc(ie_loc,:) * time_function(t) )
-            
-            ! mass linear system in matrix-free
-            do i=1,DIM
-
-                ! copy block (i,i) of mass matrix
-                ! PetscCallA(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
-                ! PetscCallA(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-                ! PetscCallA(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-
-                PetscCall(MatDenseGetArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
-                PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
-                m2_ptr = m1_ptr
-                PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
-                PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
-
-                ! copy vector block to PETSc
-                row = (i-1)*Np
-
-                PetscCall(VecGetArrayF90(petsc_tmpv,v_ptr,mpi_ierr))
-                v_ptr = tmp(row+1:row+Np)
-                PetscCall(VecRestoreArrayF90(petsc_tmpv,v_ptr,mpi_ierr))
-
-                ! solve linear system matrix-free on block (i,i)
-                PetscCallA(KSPSolve(ksp, petsc_tmpv, petsc_sol, mpi_ierr))
-
-                ! copy PETSc vector to solution vector block
-                ! update same tmp vector
-                PetscCallA(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
-                tmp(row+1:row+Np) =  v_ptr
-                PetscCallA(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
-            enddo
-
-            ! sum initial condition contributions
-            un_loc(ie_loc,:) = tmp + u0_loc(ie_loc,:) + time_step*v0_loc(ie_loc,:)
-
-        end do elem_loop
+        call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0_loc, v0_loc, un_loc, petsc_m_tmp, petsc_v_tmp, petsc_sol)
 
         if (IsSave_output .eqv. .true.) then
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -681,10 +615,10 @@ program Lymph3D
                 enddo
                 close(unit=unit_print)
             endif
-            PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_tmpv, mpi_ierr))
-            PetscCallA(VecCopy(petsc_tmpv, petsc_u0, mpi_ierr))
-            PetscCallA(KSPSolve(ksp3, petsc_v0, petsc_tmpv, mpi_ierr))
-            PetscCallA(VecCopy(petsc_tmpv, petsc_v0, mpi_ierr))
+            PetscCallA(KSPSolve(ksp3, petsc_u0, petsc_v_tmp, mpi_ierr))
+            PetscCallA(VecCopy(petsc_v_tmp, petsc_u0, mpi_ierr))
+            PetscCallA(KSPSolve(ksp3, petsc_v0, petsc_v_tmp, mpi_ierr))
+            PetscCallA(VecCopy(petsc_v_tmp, petsc_v0, mpi_ierr))
 
             ! print to file
             ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_u0',viewer,mpi_ierr))
@@ -698,24 +632,21 @@ program Lymph3D
             if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
             ! Mu_1 = (M-dt^2/2*A)u_0 + dt*M*v_0 + dt^2/2 * f_0
 
-            dt2 = time_step * time_step
-            half_dt2 = 0.5 * dt2
-
-            ! petsc_tmpv = -0.5 dt^2 A u0
-            PetscCallA(MatMult(petsc_stiff, petsc_u0, petsc_tmpv, mpi_ierr))
-            PetscCallA(VecScale(petsc_tmpv, -half_dt2, mpi_ierr))
+            ! petsc_v_tmp = -0.5 dt^2 A u0
+            PetscCallA(MatMult(petsc_stiff, petsc_u0, petsc_v_tmp, mpi_ierr))
+            PetscCallA(VecScale(petsc_v_tmp, -half_dt2, mpi_ierr))
             ! petsc_f = M u0
             PetscCallA(MatMult(petsc_mass, petsc_u0, petsc_f, mpi_ierr))
             ! petsc_f = (M-dt^2/2*A)u_0
-            PetscCallA(VecAXPY(petsc_f, one, petsc_tmpv, mpi_ierr))
-            ! petsc_tmpv = M v0
-            PetscCallA(MatMult(petsc_mass, petsc_v0, petsc_tmpv, mpi_ierr))
+            PetscCallA(VecAXPY(petsc_f, one, petsc_v_tmp, mpi_ierr))
+            ! petsc_v_tmp = M v0
+            PetscCallA(MatMult(petsc_mass, petsc_v0, petsc_v_tmp, mpi_ierr))
             ! petsc_f = (M-dt^2/2*A)u_0 + dt*M*v_0
-            PetscCallA(VecAXPY(petsc_f, time_step, petsc_tmpv, mpi_ierr))
+            PetscCallA(VecAXPY(petsc_f, time_step, petsc_v_tmp, mpi_ierr))
 
-            ! petsc_tmpv = dt^2/2 * f_0(x)*f'_0(t)
-            ! PetscCallA(VecCopy(petsc_rhs, petsc_tmpv, mpi_ierr))
-            ! PetscCallA(VecScale(petsc_tmpv, half_dt2*time_function(time), mpi_ierr))
+            ! petsc_v_tmp = dt^2/2 * f_0(x)*f'_0(t)
+            ! PetscCallA(VecCopy(petsc_rhs, petsc_v_tmp, mpi_ierr))
+            ! PetscCallA(VecScale(petsc_v_tmp, half_dt2*time_function(time), mpi_ierr))
 
             !!! check if the same f'(t) applies for both forcing and BC
             ! petsc_f = [(M-dt^2/2*A)u_0 + dt*M*v_0] + dt^2/2 * f_0(x)*f'_0(t)
@@ -744,18 +675,18 @@ program Lymph3D
                 !!! petsc_sol -> u_n
                 !!! at the end write on petsc_sol for u_{n+1}
 
-                ! petsc_tmpv = dt^2 A u_n
-                PetscCallA(MatMult(petsc_stiff, petsc_sol, petsc_tmpv, mpi_ierr))
-                PetscCallA(VecScale(petsc_tmpv, -dt2, mpi_ierr))
+                ! petsc_v_tmp = dt^2 A u_n
+                PetscCallA(MatMult(petsc_stiff, petsc_sol, petsc_v_tmp, mpi_ierr))
+                PetscCallA(VecScale(petsc_v_tmp, -dt2, mpi_ierr))
                 ! petsc_f = 2M u_n
                 PetscCallA(MatMult(petsc_mass, petsc_sol, petsc_f, mpi_ierr))
                 PetscCallA(VecScale(petsc_f, 2.0*one, mpi_ierr))
                 ! petsc_f = (2M-dt^2*A)u_n
-                PetscCallA(VecAXPY(petsc_f, one, petsc_tmpv, mpi_ierr))
-                ! petsc_tmpv = M u_{n-1}
-                PetscCallA(MatMult(petsc_mass, petsc_u0, petsc_tmpv, mpi_ierr))
+                PetscCallA(VecAXPY(petsc_f, one, petsc_v_tmp, mpi_ierr))
+                ! petsc_v_tmp = M u_{n-1}
+                PetscCallA(MatMult(petsc_mass, petsc_u0, petsc_v_tmp, mpi_ierr))
                 ! petsc_f = (M-dt^2/2*A)u_n - M*u_{n-1}
-                PetscCallA(VecAXPY(petsc_f, -one, petsc_tmpv, mpi_ierr))
+                PetscCallA(VecAXPY(petsc_f, -one, petsc_v_tmp, mpi_ierr))
 
                 ! Compute new RHS - keep initial RHS, muliply by time function
                 !!! check if the same f'(t) applies for both forcing and BC
@@ -984,7 +915,7 @@ program Lymph3D
         !!! DEALLOCATE NEW OBJECTS
         PetscCallA(MatDestroy(petsc_mass_modal, mpi_ierr))
         PetscCallA(VecDestroy(petsc_f, mpi_ierr))
-        PetscCallA(VecDestroy(petsc_tmpv,mpi_ierr))
+        PetscCallA(VecDestroy(petsc_v_tmp,mpi_ierr))
         PetscCallA(VecDestroy(petsc_u0,mpi_ierr))
         PetscCallA(VecDestroy(petsc_v0,mpi_ierr))
     endif

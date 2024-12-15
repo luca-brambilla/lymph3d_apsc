@@ -178,7 +178,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: K_loc
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: A_dg_loc
 
-    integer(kind=4) :: row, col
+    integer(kind=4) :: row, col, iface_neigh, iface_E1
 
     dt2 = time_step * time_step
     ! set the properties of the method (see problem_data_and_properties.f90)
@@ -463,7 +463,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                             row = (i-1)*Np + m
                             do n=1,Np
                                 col = (j-1)*Np + n
-                                K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_E1(i,j,m,n) - I_E1(j,i,n,m) + S_E1(i,j,m,n)
+                                !K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_E1(i,j,m,n) - I_E1(j,i,n,m) + S_E1(i,j,m,n)
+                                K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + S_E1(i,j,m,n)
                             enddo
                         enddo
                     enddo
@@ -473,20 +474,61 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                 ! Add neighbor face contribution E- (S_E2 to stiffness and DG - I_E2 to stiffness)
                 ! leave matrix K_loc portion 0.0 if not Dirichlet
                 ! E- contribution in position iface+1 since position 1 is for E+
-                if (E2 /= -1) then
+
+                ! if Dirichlet
+                if (E2 == -1) then
+
                     do i=1,DIM
                         do j=1,DIM
                             do m=1,Np
                                 row = (i-1)*Np + m
                                 do n=1,Np
                                     col = (j-1)*Np + n
-                                    K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) + theta*I_E2(i,j,m,n) - I_E2(j,i,n,m) + S_E2(i,j,m,n)
+                                    !K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) + theta*I_E2(i,j,m,n) - I_E2(j,i,n,m) + S_E2(i,j,m,n)
+
+                                    ! E+
+                                    K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_E1(i,j,m,n) - I_E1(j,i,n,m)
                                 enddo
                             enddo
                         enddo
                     enddo
                     !internal_neigh(ie_loc,neigh_count) = E2
                     ! neigh_count = neigh_count + 1
+
+                ! if internal face
+                else
+
+                    ! find E+ face number on element E- for I^T contribution
+                    do iface_E1=1,PolyMesh%Elem_loc(E2)%num_faces
+                        iface_neigh = PolyMesh%Elem_loc(E2)%neigh_el(iface_E1,2)
+                        if (iface_neigh == E1) exit
+                    enddo
+
+                    if (iface_neigh /= E1) then
+                        print *, "E+ face not found on element E-"
+                        stop
+                    endif
+
+                    do i=1,DIM
+                        do j=1,DIM
+                            do m=1,Np
+                                row = (i-1)*Np + m
+                                do n=1,Np
+                                    col = (j-1)*Np + n
+
+                                    ! E+ on E+ -> theta*I - I^T
+                                    K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_E1(i,j,m,n) - I_E1(j,i,n,m)
+
+                                    ! E- on E+ -> theta*I + S
+                                    K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) + theta*I_E2(i,j,m,n) + S_E2(i,j,m,n)
+
+                                    ! E+ on E- -> -I^T
+                                    K_loc(E2,iface_E1+1,row,col) = K_loc(E2,iface_E1+1,row,col) - I_E2(j,i,n,m)
+                                enddo
+                            enddo
+                        enddo
+                    enddo
+
                 endif
 
             endif
@@ -1112,6 +1154,128 @@ subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, u_loc, u_glo, gathered_sizes, disp
 end subroutine POST_PROCESS_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
+subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0_loc, v0_loc, un_loc, petsc_m_tmp, petsc_v_tmp, petsc_sol)
+
+    use Poly_global
+
+    implicit none
+
+    type(Mesh_Structure), intent(in) :: PolyMesh
+
+    !> current time
+    real(kind=8), intent(in) :: t
+    !> degrees of freedom for local polynomial basis
+    integer(kind=4), intent(in) :: Np
+    !> mass matrix for E+
+    !real(kind=8), dimension(DIM, DIM, Np, Np) :: M_loc_el
+    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc,DIM), intent(in) :: massa
+
+    type(tMat), intent(in) :: petsc_m_tmp !! PASS AS ARGUMENT? AVOID MULTIPLE SETUP?
+    ! PETSc Solver context
+    type(tKSP), intent(in) :: ksp  ! Krylov solver context
+    PC :: pc    ! Preconditioner object for the solver
+
+    !> stiffness matrix with contributions only from element E+ and neighbors E-
+    real(kind=8), dimension(:,:,:,:), intent(in) :: K_loc
+    !> forcing term vector on E+
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(in) :: rhs_loc
+    !> IC displacement
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(in) :: u0_loc
+    !> IC velocity
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(in) :: v0_loc
+    !> solution of first timestep for u^{(1)}
+    real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(out) :: un_loc
+
+    real(kind=8), dimension(DIM*Np) :: tmp
+    integer(kind=4) :: ie_loc, E1, E2, iface, ie_neigh_loc, n_neigh
+    logical :: is_E2_local
+
+    type(tVec), intent(in) :: petsc_sol
+    type(tVec), intent(in) :: petsc_v_tmp
+
+    !> partial result for contribution from stiffness and forcing term
+    real(kind=8), dimension(:), pointer :: v_ptr
+    real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
+
+    integer(kind=4) :: i
+    integer(kind=4) :: row
+
+    n_neigh = PolyMesh%Elem_loc(1)%num_faces
+
+    elem_loop: do ie_loc = 1,PolyMesh%num_elem_loc
+        E1 = ie_loc
+        tmp = 0.0
+
+        ! E+ contribution
+        tmp = matmul(K_loc(E1,1,:,:), u0_loc(E1,:))
+
+        ! E- contributions
+        neigh_loop: do iface=1,n_neigh
+
+            is_E2_local = .false.
+            E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
+            !print *, 'E1:', E1,'E2:', E2
+
+            ! if boundary face, no contribution in E-, Dirichlet contribution already in E+
+            if (E2 < 0) then
+                !print *, '-- cycle --'
+                cycle neigh_loop
+            endif
+
+            ! check if neighbor is in the same process
+            !! CHANGE GLOBAL NUMBERING IN LOCAL PROCESS FOR EXTRA TERMS IN EXCHANGE?
+            if (PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) == mpi_id) then
+                is_E2_local = .true.
+            endif
+
+            ie_neigh_loc = PolyMesh%elem_glo2loc(E2)
+
+            tmp = tmp + matmul(K_loc(E1,iface+1,:,:), u0_loc(ie_neigh_loc,:))
+
+        end do neigh_loop
+
+        ! add forcing term and rescale
+        tmp = half_dt2 * ( - tmp + rhs_loc(ie_loc,:) * time_function(t) )
+        
+        ! mass linear system in matrix-free
+        do i=1,DIM
+
+            ! copy block (i,i) of mass matrix
+            ! PetscCallA(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
+            ! PetscCallA(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+            ! PetscCallA(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+
+            PetscCall(MatDenseGetArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+            m2_ptr = m1_ptr
+            PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+
+            ! copy vector block to PETSc
+            row = (i-1)*Np
+
+            PetscCall(VecGetArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
+            v_ptr = tmp(row+1:row+Np)
+            PetscCall(VecRestoreArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
+
+            ! solve linear system matrix-free on block (i,i)
+            PetscCallA(KSPSolve(ksp, petsc_v_tmp, petsc_sol, mpi_ierr))
+
+            ! copy PETSc vector to solution vector block
+            ! update same tmp vector
+            PetscCallA(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
+            tmp(row+1:row+Np) =  v_ptr
+            PetscCallA(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
+        enddo
+
+        ! sum initial condition contributions
+        un_loc(ie_loc,:) = tmp + u0_loc(ie_loc,:) + time_step*v0_loc(ie_loc,:)
+
+    end do elem_loop
+
+end subroutine FIRST_TIME_STEP_MATRIX_FREE
+
+!> @brief solver for matrix free considering only one element with time dependence
 subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0_loc, un_loc, usol_loc)
 
     !TODO consider different Np
@@ -1161,14 +1325,12 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
     real(kind=8), dimension(:), pointer :: v_ptr
     real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
 
-    real(kind=8) :: dt2
     integer(kind=4) :: i
     integer(kind=4) :: row
 
     real(kind=8) :: t1,t2
 
     ! u_loc = M_loc^-1 * ( - dt2 * K_loc*un_loc  + dt2*rhs_loc*time_function(t) ) +  2*un_loc - u0_loc
-    dt2 = time_step*time_step
 
     ! 1 block of element local mass matrix out of 3
     ! PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
@@ -1201,7 +1363,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
         t1 = MPI_WTIME()
 
         ! E+ contribution
-        tmp = matmul(K_loc(E1,1,:,:), u0_loc(E1,:))
+        tmp = matmul(K_loc(E1,1,:,:), un_loc(E1,:))
 
         ! E- contributions
         neigh_loop: do iface=1,n_neigh
@@ -1220,7 +1382,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
 
             ie_neigh_loc = PolyMesh%elem_glo2loc(E2)
 
-            tmp = tmp + matmul(K_loc(E1,iface+1,:,:), u0_loc(ie_neigh_loc,:))
+            tmp = tmp + matmul(K_loc(E1,iface+1,:,:), un_loc(ie_neigh_loc,:))
 
         end do neigh_loop
 
@@ -1287,7 +1449,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             ! copy PETSc vector to solution vector block
             ! update same tmp vector
             PetscCall(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
-            tmp(row+1:row+Np) =  v_ptr
+            usol_loc(ie_loc, row+1:row+Np) =  v_ptr
             PetscCall(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
 
             t2 = MPI_WTIME()
@@ -1296,7 +1458,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
         enddo
 
         ! sum initial condition contributions
-        usol_loc(ie_loc,:) = tmp + 2.0*un_loc(ie_loc,:) - u0_loc(ie_loc,:)
+        usol_loc(ie_loc,:) = usol_loc(ie_loc,:) + 2.0*un_loc(ie_loc,:) - u0_loc(ie_loc,:)
 
     end do elem_loop
 

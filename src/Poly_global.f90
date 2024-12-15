@@ -49,6 +49,8 @@ module Poly_global
     !> number of timestep for restart !!
     integer(kind=4)     :: num_dt_restart
 
+    real(kind=8) :: half_dt2, dt2
+
     !dampung type: 1) Q frequency proportional/ 2) Q frequency constant
     !> damping type
     integer(kind=4) :: damping_type
