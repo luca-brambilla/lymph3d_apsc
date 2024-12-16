@@ -108,11 +108,14 @@ program Lymph3D
     integer(kind=4) :: tmp_size, unit_print
     type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
     
-    integer(kind=4) :: E1, E2, iface, ie_neigh_loc
+    integer(kind=4) :: E1, E2, iface, ie_neigh_loc, j
     logical :: is_E2_local
     real(kind=8), dimension(:), pointer :: v_ptr
     real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
     
+    real(kind=8), dimension(:), allocatable :: x, b
+    real(kind=8), dimension(:,:), allocatable :: A, R
+
     ! read parameter
     ! iarg = getarg(1,arg)
     ! open(unit=10, file=arg, status="new")
@@ -196,6 +199,34 @@ program Lymph3D
     call FLUSH
 
     Np = PolyMesh%Elem_loc(1)%NDof_elem
+
+    allocate(A(Np,Np), x(Np), b(Np))
+
+    ! Initialize random seed
+    call random_seed()
+    ! Generate a symmetric random matrix
+    do i = 1, Np
+       do j = i, Np
+          call random_number(A(i, j))
+          A(j, i) = A(i, j)  ! Symmetric property
+       end do
+    end do
+    ! Add a value to the diagonal to make it diagonally dominant
+    do i = 1, Np
+       A(i, i) = A(i, i) + Np  ! Increase diagonal for positive definiteness
+    end do
+
+    x = 1.0
+    b = matmul(A, x)
+
+    print *, 'factor matrix'
+    R = cholesky(A, Np)
+    print *, 'solve system'
+    x = solve_LU(transpose(R),R,b,Np)
+
+    print *, x
+
+    call STOP_LYMPH3D
 
     tmp_size = sum(PolyMesh%num_elem_inter_comm(mpi_id+1,:))
     allocate(prova_in(PolyMesh%num_elem_loc*DIM*Np))
