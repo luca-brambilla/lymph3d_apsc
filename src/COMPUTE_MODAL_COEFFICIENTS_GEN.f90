@@ -1,3 +1,6 @@
+
+!> Compute the integral on a given function
+!> \f[ \int_\Omega \textbf{g} (\textbf{x}) \cdot \boldsymbol{\varphi} (\textbf{x})\f]
 subroutine COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff, f_analytic)
 
 #include<petsc/finclude/petscksp.h>

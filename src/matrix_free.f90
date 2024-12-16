@@ -16,6 +16,7 @@ module matrix_free
     use vet_mat_operations
     use mesh_partition_and_mpi_files
 
+    use Poly_global
     use global_parameters
 
     implicit none
@@ -890,7 +891,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
     real(kind=8), dimension(:), pointer :: v_ptr
     real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
-
+    real(kind=8), dimension(Np,Np) :: R, RT
 
     ! logical, intent(in) :: IsTime_dependent
     ! real(kind=8), intent(in), optional :: time
@@ -914,6 +915,8 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
     allocate(phi(Np,nq3))
     allocate(dphi(3,Np,nq3))
+
+    allocate(v_ptr(Np))
 
     ! use PETSc to compute linear system
     ! only local to process
@@ -1005,31 +1008,40 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
         ! PetscCall(VecZeroEntries(petsc_mass_modal(), mpi_ierr))
         do i=1,DIM
 
+            row = (i-1)*Np
+
             !! COPY MATRIX OR SET KSP EACH TIME? OR PASS KSP VECTOR/MATRIX DIRECTLY?
             ! copy block (i,i) of mass matrix
             ! PetscCall(MatCopy(massa_modale(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
             ! PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
             ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
 
+            ! PETSc copy pointer
             PetscCall(MatDenseGetArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
-            PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
-            m2_ptr = m1_ptr
-            PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
-            PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+            ! PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+            ! m2_ptr = m1_ptr
+            ! PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            ! PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
 
             ! copy vector block to PETSc
-            PetscCall(VecGetArrayF90(petsc_exact,v_ptr,mpi_ierr))
+            ! PetscCall(VecGetArrayF90(petsc_exact,v_ptr,mpi_ierr))
             v_ptr = uex_integral(ie_loc,i,:)
-            PetscCall(VecRestoreArrayF90(petsc_exact,v_ptr,mpi_ierr))
+            ! PetscCall(VecRestoreArrayF90(petsc_exact,v_ptr,mpi_ierr))
 
             ! solve linear system matrix-free on block (i,i)
-            PetscCall(KSPSolve(ksp, petsc_exact, petsc_modal_coeff, mpi_ierr))
+            ! PetscCall(KSPSolve(ksp, petsc_exact, petsc_modal_coeff, mpi_ierr))
+            R = cholesky(m1_ptr,Np)
+            RT = transpose(R)
+            modal_coeff(ie_loc,row+1:row+Np) = solve_LU(RT, R, v_ptr, Np)
 
             ! copy PETSc vector to solution vector block
-            row = (i-1)*Np
-            PetscCall(VecGetArrayReadF90(petsc_modal_coeff,v_ptr,mpi_ierr))
-            modal_coeff(ie_loc,row+1:row+Np) =  v_ptr
-            PetscCall(VecRestoreArrayF90(petsc_modal_coeff,v_ptr,mpi_ierr))
+            ! row = (i-1)*Np
+            ! PetscCall(VecGetArrayReadF90(petsc_modal_coeff,v_ptr,mpi_ierr))
+            ! modal_coeff(ie_loc,row+1:row+Np) =  v_ptr
+            ! PetscCall(VecRestoreArrayF90(petsc_modal_coeff,v_ptr,mpi_ierr))
+
+            PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
+
 
         enddo
 
@@ -1051,6 +1063,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
     deallocate(blist)
 
     deallocate(uex_integral)
+    deallocate(v_ptr)
 
 end subroutine COMPUTE_MODAL_COEFFICIENTS_FREE
 
@@ -1155,8 +1168,6 @@ end subroutine POST_PROCESS_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
 subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0_loc, v0_loc, un_loc, petsc_m_tmp, petsc_v_tmp, petsc_sol)
-
-    use Poly_global
 
     implicit none
 
@@ -1284,8 +1295,6 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
     !TODO create a list of neighbors or pass ie_loc
     !TODO check format for solutions, pass whole or pass sections - update in place or outside subroutine? un gets lost?
 
-    use Poly_global
-
     implicit none
 
     type(Mesh_Structure), intent(in) :: PolyMesh
@@ -1325,6 +1334,8 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
     real(kind=8), dimension(:), pointer :: v_ptr
     real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
 
+    real(kind=8), dimension(Np,Np) :: R, RT
+
     integer(kind=4) :: i
     integer(kind=4) :: row
 
@@ -1349,6 +1360,8 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
     PetscCall(VecCreate(PETSC_COMM_SELF, petsc_v_tmp, mpi_ierr))
     PetscCall(VecSetSizes(petsc_v_tmp, Np, Np, mpi_ierr))
     PetscCall(VecSetFromOptions(petsc_v_tmp, mpi_ierr))
+
+    allocate(v_ptr(Np))
 
     ! linear system solver
     call SOLVER_SETTINGS(petsc_m_tmp,ksp,pc)
@@ -1396,6 +1409,8 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
         ! mass linear system in matrix-free
         do i=1,DIM
 
+            row = (i-1)*Np
+
             !----
             t1 = MPI_WTIME()
 
@@ -1404,10 +1419,10 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             ! PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
             ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
             PetscCall(MatDenseGetArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
-            PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
-            m2_ptr = m1_ptr
-            PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
-            PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+            ! PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+            ! m2_ptr = m1_ptr
+            ! PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            ! PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
 
             t2 = MPI_WTIME()
             tmatrix = tmatrix + t2 - t1
@@ -1421,14 +1436,12 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             !----
 
             ! copy vector block to PETSc
-            row = (i-1)*Np
-
             !----
             t1 = MPI_WTIME()
 
-            PetscCall(VecGetArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
+            ! PetscCall(VecGetArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
             v_ptr = tmp(row+1:row+Np)
-            PetscCall(VecRestoreArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
+            ! PetscCall(VecRestoreArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
 
             t2 = MPI_WTIME()
             tvector = tvector + t2 - t1
@@ -1438,7 +1451,10 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             t1 = MPI_WTIME()
 
             ! solve linear system matrix-free on block (i,i)
-            PetscCall(KSPSolve(ksp, petsc_v_tmp, petsc_sol, mpi_ierr))
+            ! PetscCall(KSPSolve(ksp, petsc_v_tmp, petsc_sol, mpi_ierr))
+            R = cholesky(m1_ptr,Np)
+            RT = transpose(R)
+            usol_loc(ie_loc, row+1:row+Np) = solve_LU(RT, R, v_ptr, Np)
 
             t2 = MPI_WTIME()
             tsolve = tsolve + t2 - t1
@@ -1448,13 +1464,16 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             t1 = MPI_WTIME()
             ! copy PETSc vector to solution vector block
             ! update same tmp vector
-            PetscCall(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
-            usol_loc(ie_loc, row+1:row+Np) =  v_ptr
-            PetscCall(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
+            ! PetscCall(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
+            ! usol_loc(ie_loc, row+1:row+Np) =  v_ptr
+            ! PetscCall(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
 
             t2 = MPI_WTIME()
             tvector = tvector + t2 - t1
             !----
+
+            PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+
         enddo
 
         ! sum initial condition contributions
@@ -1466,46 +1485,47 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
     PetscCall(VecDestroy(petsc_sol, mpi_ierr))
     PetscCall(VecDestroy(petsc_v_tmp, mpi_ierr))
 
+    deallocate(v_ptr)
+
 end subroutine TIME_STEP_MATRIX_FREE
 
-! subroutine COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, uh_loc, uex_loc, err_L2_mpi)
+subroutine COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, massa_modale, uh_loc, uex_loc, err_L2_loc)
 
-!     !TODO make parallel
-!     implicit none
+    !TODO make parallel
+    implicit none
 
-!     type(Mesh_Structure), intent(in) :: PolyMesh
-!     integer(kind=4), intent(in) :: Np
-!     real(kind=8), dimension(PolyMesh%num_elem_loc,3,3,Np,Np), intent(in) :: M_modal_loc
-!     real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uh_loc
-!     real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uex_loc
-!     real(kind=8), intent(out) :: err_L2_mpi = 0.0
+    type(Mesh_Structure), intent(in) :: PolyMesh
+    integer(kind=4), intent(in) :: Np
+    type(PetscMatStruct), dimension(:,:), intent(in) :: massa_modale
+    real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uh_loc
+    real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uex_loc
+    real(kind=8), intent(out) :: err_L2_loc
+    real(kind=8), dimension(:,:), pointer :: m_ptr
 
-!     real(kind=8), dimension(3,Np) :: L2_tmp
-!     real(kind=8), dimension(Np) :: du
-!     integer(kind=4) :: i,m,n,ie_loc
+    real(kind=8) :: L2_tmp
 
-!     do ie_loc=1,PolyMesh%num_elem_loc
+    real(kind=8), dimension(Np) :: du, tmp
+    integer(kind=4) :: i,ie_loc
 
-!         du = 0.0
-!         L2_tmp = 0.0
-!         do i=1,3
-!             ! compute local difference du only once per section i
-!             do n=1,Np
-!                 du(n) = uh_loc(ie_loc,i,n) - uex_loc(ie_loc,i,n)
-!             enddo
+    err_L2_loc = 0.0
 
-!             do m=1,Np
-!                 ! Compute each contribution of quadratic form err_L2 = sum M_mn * du_m * du_n
-!                 do n=1,Np
-!                     L2_tmp = L2_tmp + M_modal_loc(ie_loc,i,i,m,n) * du(n) * du(m)
-!                 enddo
-!             enddo
-!         enddo
+    do ie_loc=1,PolyMesh%num_elem_loc
 
-!         err_L2_mpi = err_L2_mpi + L2_tmp
-!     enddo
+        do i=1,3
 
-! end subroutine COMPUTE_ERROR_L2_MATRIX_FREE
+            du = uh_loc(ie_loc,i,:) - uex_loc(ie_loc,i,:)
+
+            PetscCall(MatDenseGetArrayF90(massa_modale(ie_loc,i)%data, m_ptr, mpi_ierr))
+            tmp = matmul(m_ptr, du)
+            PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m_ptr, mpi_ierr))
+
+            L2_tmp = dot_product(du, tmp)
+            err_L2_loc = err_L2_loc + L2_tmp
+
+        enddo
+    enddo
+
+end subroutine COMPUTE_ERROR_L2_MATRIX_FREE
 
 ! subroutine COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, sides, A_dg_loc, uh_loc, uex_loc, err_DG_mpi)
 

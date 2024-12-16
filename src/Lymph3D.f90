@@ -80,7 +80,6 @@ program Lymph3D
     real(kind=8), dimension(:,:), allocatable :: v0_loc
     real(kind=8), dimension(:,:), allocatable :: u0_loc
     real(kind=8), dimension(:,:), allocatable :: un_loc
-    real(kind=8), dimension(:,:), allocatable :: usol_loc
     real(kind=8), dimension(:,:), allocatable :: rhs_loc
 
 
@@ -114,7 +113,7 @@ program Lymph3D
     real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
     
     real(kind=8), dimension(:), allocatable :: x, b
-    real(kind=8), dimension(:,:), allocatable :: A, R
+    real(kind=8), dimension(:,:), allocatable :: A, R, RT
 
     ! read parameter
     ! iarg = getarg(1,arg)
@@ -200,7 +199,7 @@ program Lymph3D
 
     Np = PolyMesh%Elem_loc(1)%NDof_elem
 
-    allocate(A(Np,Np), x(Np), b(Np))
+    allocate(A(Np,Np), x(Np), b(Np), R(Np,Np), RT(Np,Np))
 
     ! Initialize random seed
     call random_seed()
@@ -221,12 +220,11 @@ program Lymph3D
 
     print *, 'factor matrix'
     R = cholesky(A, Np)
+    RT = transpose(R)
     print *, 'solve system'
-    x = solve_LU(transpose(R),R,b,Np)
+    x = solve_LU(RT,R,b,Np)
 
     print *, x
-
-    call STOP_LYMPH3D
 
     tmp_size = sum(PolyMesh%num_elem_inter_comm(mpi_id+1,:))
     allocate(prova_in(PolyMesh%num_elem_loc*DIM*Np))
@@ -599,7 +597,7 @@ program Lymph3D
         endif
 
         !! STOP
-        call STOP_LYMPH3D
+        ! call STOP_LYMPH3D
 
     ! ----------------------------- PETSc -------------------------------------
     else
@@ -836,6 +834,18 @@ program Lymph3D
 
     if (IS_MatrixFree .eqv. .true.) then
         print *, 'matrix-free exact solution'
+
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, uex, u0_loc)
+
+        ! check time dependence
+        if (IsTime_dependent .eqv. .true.) then
+            !! WHAT TIME IS THE CORRECT?
+            !t=t-time_step
+            if (mpi_id == 0) print *, 'Scale modal solution by time function at t = ', t
+            u0_loc = u0_loc * time_function(t)
+        endif
+
+
     else
         print *, 'Computing modal coefficients...'
         call COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex)
@@ -885,6 +895,8 @@ program Lymph3D
 
     if (IS_MatrixFree .eqv. .true.) then
         print *, 'matrix free solver'
+        call COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, massa_modale, un_loc, u0_loc, err_L2_mpi)
+
     else
         if(mpi_id == 0) print *,'Computing the errors...'
 
@@ -921,7 +933,7 @@ program Lymph3D
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
     if (mpi_id == 0) print *, 'GRID SIZE: ', hmax
-    if (mpi_id == 0) call WRITE_ERRORS(p, err_DG, err_L2, hmax, PolyMesh, IsPoly)
+    !if (mpi_id == 0) call WRITE_ERRORS(p, err_DG, err_L2, hmax, PolyMesh, IsPoly)
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     DEALLOCATING PETSC MATRICES AND VECTORS
@@ -929,7 +941,7 @@ program Lymph3D
     if (IS_MatrixFree .eqv. .true.) then
         print *, 'matrix free destroy vector and matrices'
 
-        deallocate(M_loc, M_modal_loc, u0_loc, un_loc, usol_loc, rhs_loc)
+        deallocate(u0_loc, un_loc, v0_loc, rhs_loc)
 
         do i=1,PolyMesh%num_elem_loc
             !deallocate(K_loc(i)%values, A_dg_loc(i)%values, internal_neigh(i)%values)
