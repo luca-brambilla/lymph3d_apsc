@@ -104,7 +104,7 @@ end subroutine SET_PETSC_VECTOR_MATRIX_FREE
 !> The stiffness and dg matrices for the element E+ are rectangular and contain
 !> the contributions also from neighboring elements E-.
 !> mass matrix is directly in PETSc for later to solve linear systems.
-subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_loc, massa, massa_modale, max_faces)
+subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, max_faces)
 
     !TODO variable number of sides, do not count boundaries
     !TODO polytopal elements, face contribution to same matrices
@@ -115,10 +115,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     type(Mesh_Structure), intent(inout) :: PolyMesh !< Mesh
     type(Data_Structure), intent(in) :: PolyData    !< Data
     integer(kind=4), intent(in) :: Np               !< number of degrees of freedom of each element
-    integer(kind=4), intent(in) :: global_dof       !< Number of global dofs
+    integer(kind=4), intent(in) :: num_elem_loc       !< Number of global dofs
 
-    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa
-    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa_modale
+    !type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa
+    !type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa_modale
     PetscScalar :: val(1)
     PetscInt :: irow(1), jcol(1)
 
@@ -167,10 +167,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
     ! each local has a matrix
     ! local square
-    !real(kind=8), dimension(:, :, :, :, :), allocatable, intent(out) :: M_loc
     real(kind=8), dimension(DIM, DIM, Np, Np) :: mass_loc
-    !real(kind=8), dimension(:, :, :, :, :), allocatable, intent(out) :: M_modal_loc
-    ! real(kind=8), dimension(:,PolyMesh%num_elem_loc,3,3,Np,Np), allocatable, intent(out) :: K_loc
+
+    real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: M_loc
+    real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: M_modal_loc
 
     ! process local matrices, rectangular for each element
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: K_loc
@@ -313,12 +313,14 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                     val(1)  = mass_loc(i,i,m,n)
 
                     if (abs(val(1)) >= TOL) then
-                        PetscCall(MatSetValues(massa_modale(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
-                        val(1) = val(1)*rho
-                        PetscCall(MatSetValues(massa(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
+                        !PetscCall(MatSetValues(massa_modale(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
+                        !val(1) = val(1)*rho
+                        !PetscCall(MatSetValues(massa(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
                     end if
 
                 enddo
+                M_modal_loc(ie_loc,i,:,:) = mass_loc(i,i,:,:)
+                M_loc(ie_loc,i,:,:) = mass_loc(i,i,:,:)*rho
             enddo
 
             ! Finalize each PETSc matrix assembly
@@ -562,14 +564,14 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 end subroutine MAKE_MATRICES_FREE
 
 !> @brief Compute the RHS vector for each element.
-subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
+subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc)
 
     implicit none
 
     type(Mesh_Structure), intent(inout) :: PolyMesh !< Mesh
     type(Data_Structure), intent(in) :: PolyData    !< Data
     integer(kind=4), intent(in) :: Np               !< number of degrees of freedom of each element
-    integer(kind=4), intent(in) :: global_dof       !< Number of global dofs
+    integer(kind=4), intent(in) :: num_elem_loc       !< Number of global dofs
 
     real(kind=8) :: present = 0.0
     real(kind=8) :: tmp = 0.0
@@ -846,7 +848,7 @@ end subroutine MAKE_RHS_FREE
 
 !> Matrix-free context, start from nodal solution and get modal solution coefficients.
 !> Data is scattered already, performed in series by each processor, local PETSc definition of vectors and matrix to use solver.
-subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analytic, modal_coeff)
+subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analytic, modal_coeff)
 
     implicit none
 
@@ -858,8 +860,9 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
         end function f_analytic
     end interface
 
-    !real(kind=8), dimension(:,:,:,:,:), intent(in) :: M_modal_loc
-    type(PetscMatStruct), dimension(:,:), intent(in):: massa_modale
+    !type(PetscMatStruct), dimension(:,:), intent(in):: massa_modale
+    real(kind=8), dimension(:,:,:,:), intent(in) :: R_M_modal_loc
+
 
     Mat :: petsc_m_tmp     ! temporary matrix for linear systems
     Vec :: petsc_exact
@@ -1023,7 +1026,8 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
             ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
 
             ! PETSc copy pointer
-            PetscCall(MatDenseGetArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            !PetscCall(MatDenseGetArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
+
             ! PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
             ! m2_ptr = m1_ptr
             ! PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
@@ -1036,7 +1040,10 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
 
             ! solve linear system matrix-free on block (i,i)
             ! PetscCall(KSPSolve(ksp, petsc_exact, petsc_modal_coeff, mpi_ierr))
-            R = cholesky(m1_ptr,Np)
+            
+            !R = cholesky(m1_ptr,Np)
+            !R = cholesky(M_modal_loc(ie_loc,i,:,:),Np)
+            R = R_M_modal_loc(ie_loc,i,:,:)
             RT = transpose(R)
             modal_coeff(ie_loc,row+1:row+Np) = solve_LU(RT, R, v_ptr, Np)
 
@@ -1046,7 +1053,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, f_analyti
             ! modal_coeff(ie_loc,row+1:row+Np) =  v_ptr
             ! PetscCall(VecRestoreArrayF90(petsc_modal_coeff,v_ptr,mpi_ierr))
 
-            PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            !PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
 
 
         enddo
@@ -1175,7 +1182,7 @@ subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, u_loc, u_glo, gathered_sizes, disp
 end subroutine POST_PROCESS_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
-subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0_loc, v0_loc, un_loc, petsc_m_tmp, petsc_v_tmp, petsc_sol)
+subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, ksp, rhs_loc, u0_loc, v0_loc, un_loc, petsc_m_tmp, petsc_v_tmp, petsc_sol)
 
     implicit none
 
@@ -1187,12 +1194,14 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_l
     integer(kind=4), intent(in) :: Np
     !> mass matrix for E+
     !real(kind=8), dimension(DIM, DIM, Np, Np) :: M_loc_el
-    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc,DIM), intent(in) :: massa
+    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc,DIM) :: massa
 
     type(tMat), intent(in) :: petsc_m_tmp !! PASS AS ARGUMENT? AVOID MULTIPLE SETUP?
     ! PETSc Solver context
     type(tKSP), intent(in) :: ksp  ! Krylov solver context
     PC :: pc    ! Preconditioner object for the solver
+
+    real(kind=8), dimension(:,:,:,:), intent(in) :: R_M_loc
 
     !> stiffness matrix with contributions only from element E+ and neighbors E-
     real(kind=8), dimension(:,:,:,:), intent(in) :: K_loc
@@ -1216,10 +1225,14 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_l
     real(kind=8), dimension(:), pointer :: v_ptr
     real(kind=8), dimension(:,:), pointer :: m1_ptr, m2_ptr
 
+    real(kind=8), dimension(Np,Np) :: R, RT
+
     integer(kind=4) :: i
     integer(kind=4) :: row
 
     n_neigh = PolyMesh%Elem_loc(1)%num_faces
+
+    allocate(v_ptr(Np))
 
     elem_loop: do ie_loc = 1,PolyMesh%num_elem_loc
         E1 = ie_loc
@@ -1260,31 +1273,37 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_l
         do i=1,DIM
 
             ! copy block (i,i) of mass matrix
-            ! PetscCallA(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
-            ! PetscCallA(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-            ! PetscCallA(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
 
-            PetscCall(MatDenseGetArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
-            PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
-            m2_ptr = m1_ptr
-            PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
-            PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+            ! PetscCall(MatDenseGetArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            ! PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
+            ! m2_ptr = m1_ptr
+            ! PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            ! PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
 
             ! copy vector block to PETSc
-            row = (i-1)*Np
 
-            PetscCall(VecGetArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
+            ! row = (i-1)*Np
+            ! PetscCall(VecGetArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
             v_ptr = tmp(row+1:row+Np)
-            PetscCall(VecRestoreArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
+            ! PetscCall(VecRestoreArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
+
+            !! FACTOR ONLY ONCE - PASS R
+            !R = cholesky(M_loc(ie_loc,i,:,:),Np)
+            R = R_M_loc(ie_loc,i,:,:)
+            RT = transpose(R)
+            tmp(row+1:row+Np) = solve_LU(RT, R, v_ptr, Np)
+            
 
             ! solve linear system matrix-free on block (i,i)
-            PetscCallA(KSPSolve(ksp, petsc_v_tmp, petsc_sol, mpi_ierr))
+
+            !PetscCallA(KSPSolve(ksp, petsc_v_tmp, petsc_sol, mpi_ierr))
 
             ! copy PETSc vector to solution vector block
             ! update same tmp vector
-            PetscCallA(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
-            tmp(row+1:row+Np) =  v_ptr
-            PetscCallA(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
+
+            !PetscCallA(VecGetArrayReadF90(petsc_sol,v_ptr,mpi_ierr))
+            !tmp(row+1:row+Np) =  v_ptr
+            !PetscCallA(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
         enddo
 
         ! sum initial condition contributions
@@ -1292,10 +1311,12 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_l
 
     end do elem_loop
 
+    deallocate(v_ptr)
+
 end subroutine FIRST_TIME_STEP_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
-subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0_loc, un_loc, usol_loc)
+subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, ksp, rhs_loc, u0_loc, un_loc, usol_loc)
 
     !TODO consider different Np
     !TODO compute inverse of mass matrix only once ?
@@ -1313,7 +1334,9 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
     integer(kind=4), intent(in) :: Np
     !> mass matrix for E+
     !real(kind=8), dimension(DIM, DIM, Np, Np) :: M_loc_el
-    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc,DIM), intent(in) :: massa
+    type(PetscMatStruct), dimension(PolyMesh%num_elem_loc,DIM) :: massa
+
+    real(kind=8), dimension(:,:,:,:), intent(in) :: R_M_loc
 
     type(tMat) :: petsc_m_tmp !! PASS AS ARGUMENT? AVOID MULTIPLE SETUP?
     ! PETSc Solver context
@@ -1426,7 +1449,9 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             ! PetscCall(MatCopy(massa(ie_loc,i)%data, petsc_m_tmp, DIFFERENT_NONZERO_PATTERN, mpi_ierr))
             ! PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
             ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-            PetscCall(MatDenseGetArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+
+            !PetscCall(MatDenseGetArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+
             ! PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
             ! m2_ptr = m1_ptr
             ! PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
@@ -1460,7 +1485,8 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
 
             ! solve linear system matrix-free on block (i,i)
             ! PetscCall(KSPSolve(ksp, petsc_v_tmp, petsc_sol, mpi_ierr))
-            R = cholesky(m1_ptr,Np)
+            !R = cholesky(M_loc(ie_loc,i,:,:),Np)
+            R = R_M_loc(ie_loc,i,:,:)
             RT = transpose(R)
             usol_loc(ie_loc, row+1:row+Np) = solve_LU(RT, R, v_ptr, Np)
 
@@ -1480,7 +1506,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             tp_copy_vector = tp_copy_vector + t2 - t1
             !----
 
-            PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
+            !PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
 
         enddo
 
@@ -1499,14 +1525,15 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
 
 end subroutine TIME_STEP_MATRIX_FREE
 
-subroutine COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, massa_modale, uh_loc, uex_loc, err_L2_loc)
+subroutine COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, uh_loc, uex_loc, err_L2_loc)
 
     !TODO make parallel
     implicit none
 
     type(Mesh_Structure), intent(in) :: PolyMesh
     integer(kind=4), intent(in) :: Np
-    type(PetscMatStruct), dimension(:,:), intent(in) :: massa_modale
+    !type(PetscMatStruct), dimension(:,:) :: massa_modale
+    real(kind=8), dimension(:,:,:,:), intent(in):: M_modal_loc
     real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uh_loc
     real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uex_loc
     real(kind=8), intent(out) :: err_L2_loc
@@ -1525,9 +1552,9 @@ subroutine COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, massa_modale, uh_loc, uex_
 
             du = uh_loc(ie_loc,i,:) - uex_loc(ie_loc,i,:)
 
-            PetscCall(MatDenseGetArrayF90(massa_modale(ie_loc,i)%data, m_ptr, mpi_ierr))
-            tmp = matmul(m_ptr, du)
-            PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m_ptr, mpi_ierr))
+            !PetscCall(MatDenseGetArrayF90(massa_modale(ie_loc,i)%data, m_ptr, mpi_ierr))
+            tmp = matmul(M_modal_loc(ie_loc,i,:,:), du)
+            !PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m_ptr, mpi_ierr))
 
             L2_tmp = dot_product(du, tmp)
             err_L2_loc = err_L2_loc + L2_tmp

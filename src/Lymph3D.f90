@@ -74,8 +74,7 @@ program Lymph3D
 
 
     ! each local has a matrix
-    real(kind=8), dimension(:,:,:), allocatable :: M_loc
-    real(kind=8), dimension(:,:,:), allocatable :: M_modal_loc
+
     ! real(kind=8), dimension(:,PolyMesh%num_elem_loc,DIM,DIM,Np,Np), allocatable, intent(out) :: K_loc
     real(kind=8), dimension(:,:), allocatable :: v0_loc
     real(kind=8), dimension(:,:), allocatable :: u0_loc
@@ -85,9 +84,12 @@ program Lymph3D
     real(kind=8), dimension(:,:), allocatable :: un_mpi
 
 
-
+    real(kind=8), dimension(:,:,:,:), allocatable :: M_loc
+    real(kind=8), dimension(:,:,:,:), allocatable :: M_modal_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: K_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: A_dg_loc
+    real(kind=8), dimension(:,:,:,:), allocatable :: R_M_loc
+    real(kind=8), dimension(:,:,:,:), allocatable :: R_M_modal_loc
 
     ! type(KRowArray), dimension(:), allocatable :: K_loc
     ! type(KRowArray), dimension(:), allocatable :: A_dg_loc
@@ -316,7 +318,13 @@ program Lymph3D
         !! WASTE OF MEMORY... MAKE SCATTERED SIZE VECTOR?
         allocate( K_loc(PolyMesh%num_elem_loc, n_neigh+1, DIM*Np, DIM*Np) )
         allocate( A_dg_loc(PolyMesh%num_elem_loc, n_neigh+1, DIM*Np, DIM*Np) )
+
+        allocate( M_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
+        allocate( M_modal_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
         allocate( rhs_loc(PolyMesh%num_elem_loc, DIM*Np) )
+
+        allocate( R_M_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
+        allocate( R_M_modal_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
 
         ! allocate the struct containing PETSc Mat for the mass data matrix-free form
         allocate(massa(PolyMesh%num_elem_loc,DIM))
@@ -379,7 +387,14 @@ program Lymph3D
         print *, 'assemble matrix-free matrices'
 
         ! make all matrices
-        call MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_loc, massa, massa_modale, n_neigh)
+        call MAKE_MATRICES_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, n_neigh)
+
+        do ie_loc=1,PolyMesh%num_elem_loc
+            do i=1,DIM
+                R_M_loc(ie_loc,i,:,:) = cholesky(M_loc(ie_loc,i,:,:),Np)
+                R_M_modal_loc(ie_loc,i,:,:) = cholesky(M_modal_loc(ie_loc,i,:,:),Np)
+            enddo
+        enddo
 
     else
         print *, 'ASSEMBLE PETSC MATRICES'
@@ -414,7 +429,7 @@ program Lymph3D
     if (IS_MatrixFree .eqv. .true.) then
 
         print *, 'assemble matrix-free RHS'
-        call MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
+        call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_loc)
 
     else
         print *, 'ASSEMBLE RHS'
@@ -499,8 +514,8 @@ program Lymph3D
 
         !allocate(un_mpi(PolyMesh%num_elem_inter_vec(mpi_id+1), DIM*Np))
 
-        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_displacement, u0_loc)
-        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, ic_velocity, v0_loc)
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_displacement, u0_loc)
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_velocity, v0_loc)
 
         ! SAVE IC
         if (IsSave_output .eqv. .true.) then
@@ -521,7 +536,7 @@ program Lymph3D
             ! if (mpi_id==0) call SAVE_VECTOR(u,Np,'v0_post.txt')
 
         endif
-
+        
         ! call SAVE_MATRIX_PETSC(massa(1,1)%data, Np, Np, 'massa.txt')
         ! call SAVE_MATRIX_PETSC(massa_modale(1,1)%data, Np, Np, 'massa_modale.txt')
         ! if (mpi_id==0) call SAVE_MATRIX_F90(K_loc(1,:,:,:), DIM*Np, 'rigidezza.txt')
@@ -539,7 +554,7 @@ program Lymph3D
 
         !! computation on tetra or on poly??? solution dof on poly
 
-        call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0_loc, v0_loc, un_loc, petsc_m_tmp, petsc_v_tmp, petsc_sol)
+        call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, ksp, rhs_loc, u0_loc, v0_loc, un_loc, petsc_m_tmp, petsc_v_tmp, petsc_sol)
 
         ! SAVE FIRST ITERATION
         if (IsSave_output .eqv. .true.) then
@@ -558,7 +573,7 @@ program Lymph3D
             if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
             
             ! v0_loc is used for u^{n+1}
-            call TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0_loc, un_loc, v0_loc)
+            call TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, ksp, rhs_loc, u0_loc, un_loc, v0_loc)
 
             ! update solution
             u0_loc = un_loc
@@ -768,7 +783,7 @@ program Lymph3D
         print *, 'matrix-free exact solution'
 
         t1 = MPI_WTIME()
-        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, massa_modale, uex, u0_loc)
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex, u0_loc)
 
         ! check time dependence
         if (IsTime_dependent .eqv. .true.) then
@@ -831,7 +846,7 @@ program Lymph3D
     t1 = MPI_WTIME()
     if (IS_MatrixFree .eqv. .true.) then
         print *, 'matrix free solver'
-        call COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, massa_modale, un_loc, u0_loc, err_L2)
+        call COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, un_loc, u0_loc, err_L2)
 
     else
         if(mpi_id == 0) print *,'Computing the errors...'
