@@ -97,6 +97,7 @@ module Poly_data
         real(kind=8), dimension(:), allocatable :: QP
 
         ! Real arrays with two-dimensional allocatable arrays
+        !> row material ID - column 1 density, 2 lambda, 3 mu
         real(kind=8), dimension(:,:), allocatable :: prop_mat
         real(kind=8), dimension(:,:), allocatable :: val_mat_nle
         real(kind=8), dimension(:,:), allocatable :: val_diri_el

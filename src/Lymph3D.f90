@@ -100,11 +100,7 @@ program Lymph3D
 
     ! IsTime_dependent = .false.
 
-    type(PetscMatStruct), dimension(:,:), allocatable:: massa
-    type(PetscMatStruct), dimension(:,:), allocatable:: massa_modale
-    Mat :: petsc_m_tmp
-
-    integer(kind=4) :: j !,k,m,n,row,col
+    !integer(kind=4) :: j !,k,m,n,row,col
 
     real(kind=8), dimension(:), allocatable :: prova_in, prova_out
     integer(kind=4) :: tmp_size, unit_print
@@ -112,8 +108,8 @@ program Lymph3D
 
     real(kind=8) :: t1, t2
 
-    integer(kind=4) :: num_inter_loc, col, col_mpi, istart, iestart
-    integer(kind=4) :: E1, E2, ipoly_glob, ipoly_loc, ie_glob, iface, ipoly2_glob, ipoly2_loc
+    integer(kind=4) :: num_inter_loc!, col, col_mpi, istart, iestart
+
     ! read parameter
     ! iarg = getarg(1,arg)
     ! open(unit=10, file=arg, status="new")
@@ -290,7 +286,7 @@ program Lymph3D
         ! PolyData%prop_mat(mat_id,1) = 2400
         ! PolyData%prop_mat(mat_id,2) = E*nu / ((1+nu)*(1-2*nu))
         ! PolyData%prop_mat(mat_id,3) = E / (2 * (1+nu))
-        PolyData%prop_mat(mat_id,1) = 1
+        PolyData%prop_mat(mat_id,1) = 10
         PolyData%prop_mat(mat_id,2) = 1
         PolyData%prop_mat(mat_id,3) = 1
     enddo
@@ -326,33 +322,11 @@ program Lymph3D
         allocate( R_M_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
         allocate( R_M_modal_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
 
-        ! allocate the struct containing PETSc Mat for the mass data matrix-free form
-        allocate(massa(PolyMesh%num_elem_loc,DIM))
-        allocate(massa_modale(PolyMesh%num_elem_loc,DIM))
-        call SET_PETSC_MASS_MATRIX_FREE(PolyMesh%num_elem_loc, Np, massa)
-        call SET_PETSC_MASS_MATRIX_FREE(PolyMesh%num_elem_loc, Np, massa_modale)
-
-        ! create local vector to each proces for matrix vector multiplicaton
-        ! mass matrix-free temporary vector and linear system solution
-        PetscCallA(VecCreate(PETSC_COMM_SELF, petsc_v_tmp, mpi_ierr))
-        PetscCallA(VecSetSizes(petsc_v_tmp, Np, Np, mpi_ierr))
-        PetscCallA(VecSetFromOptions(petsc_v_tmp, mpi_ierr))
-
-        PetscCallA(VecCreate(PETSC_COMM_SELF, petsc_sol, mpi_ierr))
-        PetscCallA(VecSetSizes(petsc_sol, Np, Np, mpi_ierr))
-        PetscCallA(VecSetFromOptions(petsc_sol, mpi_ierr))
-
-        ! create local matrix to each process for matrix vector multiplication
-        ! mass matrix-free temporary matrix
-
-        PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, Np, Np, PETSC_NULL_SCALAR_ARRAY, petsc_m_tmp, mpi_ierr))
-
-        ! PetscCallA(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
-        ! PetscCallA(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
-        ! PetscCallA(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
-        ! PetscCallA(MatSetUp(petsc_m_tmp, mpi_ierr)) !! what?
-        ! PetscCallA(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-        ! PetscCallA(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
+        ! initial conditions
+        allocate(u0_loc(PolyMesh%num_poly_loc, DIM*Np))
+        allocate(un_loc(PolyMesh%num_poly_loc, DIM*Np))
+        allocate(v0_loc(PolyMesh%num_poly_loc, DIM*Np))
+        !allocate(un_mpi(PolyMesh%num_elem_inter_vec(mpi_id+1), DIM*Np))
 
     else
         call FLUSH
@@ -449,8 +423,6 @@ program Lymph3D
 
         print *, 'SET LOCAL matrix-free solvers'
 
-        PetscCallA(KSPCreate(PETSC_COMM_SELF, ksp, mpi_ierr))
-        call SOLVER_SETTINGS(petsc_m_tmp, ksp, pc)
     else
         print *, 'SETTING SOLVERS'
 
@@ -507,12 +479,6 @@ program Lymph3D
         if(mpi_id == 0) write(*,'(A,I10,A,F10.5)') "Iteration: ", 0, " Time: ", t
 
         if (mpi_id==0) print *, "Assemble initial conditions"
-        ! initial conditions
-        allocate(u0_loc(PolyMesh%num_poly_loc, DIM*Np))
-        allocate(un_loc(PolyMesh%num_poly_loc, DIM*Np))
-        allocate(v0_loc(PolyMesh%num_poly_loc, DIM*Np))
-
-        !allocate(un_mpi(PolyMesh%num_elem_inter_vec(mpi_id+1), DIM*Np))
 
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_displacement, u0_loc)
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_velocity, v0_loc)
@@ -554,7 +520,7 @@ program Lymph3D
 
         !! computation on tetra or on poly??? solution dof on poly
 
-        call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, ksp, rhs_loc, u0_loc, v0_loc, un_loc, petsc_m_tmp, petsc_v_tmp, petsc_sol)
+        call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_loc, v0_loc, un_loc)
 
         ! SAVE FIRST ITERATION
         if (IsSave_output .eqv. .true.) then
@@ -573,7 +539,7 @@ program Lymph3D
             if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
             
             ! v0_loc is used for u^{n+1}
-            call TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, ksp, rhs_loc, u0_loc, un_loc, v0_loc)
+            call TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_loc, un_loc, v0_loc)
 
             ! update solution
             u0_loc = un_loc
@@ -659,7 +625,6 @@ program Lymph3D
             ! PetscCallA(VecView(petsc_v0,viewer,mpi_ierr))
             ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
-            if(mpi_id == 0) print *, ""
             if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
             ! Mu_1 = (M-dt^2/2*A)u_0 + dt*M*v_0 + dt^2/2 * f_0
 
