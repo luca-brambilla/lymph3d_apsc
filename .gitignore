@@ -69,3 +69,4 @@ setup_host.sh
 run_sims.sh
 tmp.md
 .gitignore
+.vscode

@@ -83,7 +83,20 @@ module Poly_global
     !> time of end of simulation
     real(kind=8)    :: finish
 
-    real(kind=8)    :: tmatrix, tsolve, tstiffness, tvector, tsset
+    ! Time profiling
+    real(kind=8)    :: tp_copy_matrix = 0.d0
+    real(kind=8)    :: tp_linear_system = 0.d0
+    real(kind=8)    :: tp_KU = 0.d0
+    real(kind=8)    :: tp_copy_vector = 0.d0
+    real(kind=8)    :: tp_system_setup = 0.d0
+    real(kind=8)    :: tp_setup_K = 0.d0
+    real(kind=8)    :: tp_setup_M = 0.d0
+    real(kind=8)    :: tp_setup_RHS = 0.d0
+    real(kind=8)    :: tp_partition = 0.d0
+    real(kind=8)    :: tp_export = 0.d0
+    real(kind=8)    :: tp_exact = 0.d0
+    real(kind=8)    :: tp_error = 0.d0
+
 
     !file found
     !> logical variable to identify if file was found
@@ -295,14 +308,14 @@ module local_search
         integer(kind=4), intent(inout) :: n_el      !< number of elements
         integer(kind=4), intent(inout), dimension(n_el) :: v    !< input vector
         integer(kind=4), intent(in) :: ie       !< ID of global element
-        integer(kind=4), intent(out) :: ie_loc  !< ID of local element
+        integer(kind=4), intent(out) :: ie_loc  !< ID of local element - 0 if not found on the process
         integer(kind=4) :: i
 
         ie_loc = 0
         do i = 1, n_el
             if (v(i) == ie) then
-            ie_loc = i
-            return
+                ie_loc = i
+                return
             endif
         enddo
 
@@ -398,39 +411,3 @@ module global_parameters
     real(kind=8), parameter :: TOL = 1.0d-40            !< tolerance for small numbers
 
 end module global_parameters
-
-!> Stop the simulation and print the duration
-subroutine STOP_LYMPH3D
-
-    use Poly_setup_MPI
-    use Poly_global
-
-    implicit none
-
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-    finish = MPI_WTIME()
-    call calc_time(time_hour, time_min, time_sec, int(finish-start))
-
-    if (mpi_id == 0) then
-        write(*,'(A)')'--------------- SIMULATION WAS STOPPED ----------------'
-        write(*,'(A)')
-        if (IS_MatrixFree .eqv. .true.) then
-            write(*,'(A)')'Matrix free'
-        else
-            write(*,'(A)')'PETSc full'
-        endif
-        write(*,'(A)')
-        write(*,'(A)')'-------------------------------------------------------'
-        write(*,'(A,I2,A,I2,A,I2,A)') &
-                'Set-up time = ', time_hour,' h ' , time_min,' m ' , time_sec,' s'
-        write(*,'(A)')'-------------------------------------------------------'
-        write(*,'(A)')
-    endif
-
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-    call PetscFinalize(mpi_ierr)
-    call MPI_FINALIZE(mpi_ierr)
-    stop
-
-end subroutine STOP_LYMPH3D

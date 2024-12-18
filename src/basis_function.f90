@@ -514,8 +514,8 @@ module basis_function
         real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk    !< tranformation
         real(kind=8), dimension(4,nq2), intent(in) :: nodtria2  !<
         real(kind=8), dimension(4,4,4), intent(in) :: node_maps !< map nodes from reference to physical tetrahedron
-        real(kind=8), dimension(Np,nq2,2), intent(out) :: phi_b !< evaluation of basis function on the 2D boundary
-        real(kind=8), dimension(3,Np,nq2,2), intent(out) :: grad_b !< evaluation of basis function gradient on the 2D boundary
+        real(kind=8), dimension(Np,nq2,2), intent(out) :: phi_b !< evaluation of basis function on the 2D boundary - (:,:,1) for E+ and (:,:,2) for E-
+        real(kind=8), dimension(DIM,Np,nq2,2), intent(out) :: grad_b !< evaluation of basis function gradient on the 2D boundary - (:,:,:,1) for E+ and (:,:,:,2) for E-
 
         real(kind=8), dimension(3,nq2) :: pt
         real(kind=8), dimension(3,4) :: temp
