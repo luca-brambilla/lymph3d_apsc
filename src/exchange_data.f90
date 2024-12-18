@@ -97,7 +97,7 @@ end subroutine MPI_EXCHANGE_DEALLOCATE
 
 !> Each process sends and receive a different amount of data from all other processes
 !> All-to-all implementation with asyncronous send and receive
-subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_data)
+subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, un_mpi, send_data, recv_data)
 
     use mpi
     use Poly_setup_mpi
@@ -109,6 +109,7 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
     type(Mesh_Structure), intent(in) :: PolyMesh !< mesh
     real(kind=8), dimension(:), intent(in) :: input_sol   !< full input solution
     real(kind=8), dimension(:), intent(out) :: output_sol !< output solution containing interface data only
+    real(kind=8), dimension(:,:), intent(inout) :: un_mpi
 
 
     integer(kind=4) :: id_send
@@ -119,6 +120,8 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
 
     type(ScatteredArray), dimension(mpi_np, mpi_np), intent(inout) :: send_data, recv_data
     integer, allocatable :: requests(:), statuses(:,:)  ! For tracking operations
+
+    integer(kind=4) :: iestart, istart, col, col_mpi, num_inter_loc,j
 
     allocate(requests(2 * mpi_np), statuses(2 * mpi_np, MPI_STATUS_SIZE))
 
@@ -159,7 +162,7 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
                 ! all-to-all asyncronous communication
                 call MPI_ISEND(send_data(id_recv,id_send)%data, n_dof, MPI_DOUBLE_PRECISION, id_recv-1, 0, MPI_COMM_WORLD, requests(ireq), mpi_ierr)
 
-                ireq = ireq + 2 ! request for send and request for receive
+                ireq = ireq + 2 ! request for send and request for receive - send
             end if
         end do
     end do
@@ -184,7 +187,7 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
                 ! all-to-all asyncronous communication
                 call MPI_IRECV(recv_data(id_recv,id_send)%data, n_dof, MPI_DOUBLE_PRECISION, id_send-1, 0, MPI_COMM_WORLD, requests(ireq), mpi_ierr)
 
-                ireq = ireq + 2 ! request for send and request for receive
+                ireq = ireq + 2 ! request for send and request for receive - receive
 
                 !call flush
                 !print *, 'receiving - send: ', id_send-1, 'receive: ', id_recv-1, '- sum:', row_recv, ' - data:', PolyMesh%num_elem_inter_comm(id_recv, 1:id_send-1)
@@ -196,6 +199,26 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
 
     call MPI_WAITALL(ireq-2, requests, statuses, mpi_ierr)
     !print *, '$$$$$$$$$$$$ END RECEIVING DATA $$$$$$$$$$$$', mpi_id
+
+    istart = 0
+    iestart = 0
+    do i = 1,mpi_np
+        ! number of received element data per process
+        num_inter_loc = PolyMesh%num_elem_inter_comm(mpi_id+1,i)
+        if (num_inter_loc == 0) cycle
+
+        do ie_loc=1,num_inter_loc
+            do j=1,DIM
+                col = (j-1)*Np
+                col_mpi = istart + (j-1)*Np*num_inter_loc
+                un_mpi(iestart+ie_loc, col+1:col+Np) = output_sol(col_mpi+1:col_mpi+Np)
+            enddo
+            istart = istart + Np
+        enddo
+        ! new position for new process
+        iestart = iestart + num_inter_loc
+        istart = Np*num_inter_loc*DIM
+    enddo
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 

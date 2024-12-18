@@ -40,8 +40,11 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
    integer(kind=4) :: dummy, i, npoly,npoly_loc
    integer(kind=4),dimension(:,:),allocatable :: con_tet_loc
 
+   real(kind=8) :: t1, t2
    !write(*,*) PolyMesh%num_elem, PolyMesh%num_node
    !read(*,*)
+
+   t1 = MPI_WTIME()
 
    allocate(PolyMesh%part_elem(PolyMesh%num_elem))
    PolyMesh%part_elem = mpi_id
@@ -174,6 +177,9 @@ subroutine MAKE_PARTITION_AND_MPI_FILES(PolyData,PolyMesh,npoly)
 
    if (mpi_id == 0) PRINT *,'WRITE INTERFACE INFO'
    call WRITE_INTERFACE_INFO(folder_mpi, PolyMesh)
+
+   t2 = MPI_WTIME()
+   tp_partition = tp_partition + t2 - t1
 
 end subroutine MAKE_PARTITION_AND_MPI_FILES
 
@@ -2906,6 +2912,8 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
    mpi_file_interface = mpi_file(1:len_trim(mpi_file)) // '/' // mpi_file_interface
    open(unit_int,file=mpi_file_interface)
 
+   allocate(PolyMesh%num_elem_inter_vec(mpi_np))
+
    ! loop over faces of each element
    ! count local number of interfaces first, then save later
    num_inter_loc = 0
@@ -2928,6 +2936,10 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
    ! find total number of interfaces and allocate memory for global data
    call MPI_ALLREDUCE(num_inter_loc, PolyMesh%num_elem_inter, 1, MPI_INTEGER,  &
                          MPI_SUM, MPI_COMM_WORLD, mpi_ierr)
+   ! fill vector with number of interface elements to send and receive
+   call MPI_ALLGATHER(num_inter_loc, 1, MPI_INTEGER, PolyMesh%num_elem_inter_vec, &
+   1, MPI_INTEGER, MPI_COMM_WORLD, mpi_ierr)
+
    if (mpi_id==0) print *, 'total number of interfaces for comm:', PolyMesh%num_elem_inter
 
    ! allocate after knowing the total number of interfaces
@@ -3019,6 +3031,9 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
       do i = 1, mpi_np  ! Loop over rows
          print *, PolyMesh%num_elem_inter_comm(i, :)
       end do
+
+      print *, "num_elem_inter_vec:"
+      print *, PolyMesh%num_elem_inter_vec
 
       print *, "inter_disp row-by-row:"
       do i = 1, mpi_np  ! Loop over rows

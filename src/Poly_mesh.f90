@@ -40,8 +40,9 @@ module Poly_mesh
     !> Properties of each polyhedron
     type Polyhedron
 
-        integer(kind=4),dimension(:),allocatable :: tet_in_poly     !< Number of tetrahedra contained in the polyhedron
-        integer(kind=4) :: num_tet_in_poly      !< Global indexes of the tetrahedra contained in the polyhedron
+        integer(kind=4),dimension(:),allocatable :: tet_in_poly !< Global indexes of the tetrahedra contained in the polyhedron
+        integer(kind=4) :: num_tet_in_poly   !< Number of tetrahedra contained in the polyhedron
+
         real(kind=8), dimension(3,2) :: b_box   !< Coordinates of two diametrically opposite points of the bounding box of the polyhedron
         real(kind=8) :: hk  !< Diameter of the polyhedron
         real(kind=8), dimension(:,:,:), allocatable :: neigh_bbox !< Coordinates of two diametrically opposite points of the bounding box of the neighbouring polyhedra
@@ -89,6 +90,7 @@ module Poly_mesh
         !! change names num_elem_inter_comm and num_elem_inter
         integer(kind=4), dimension(:,:), allocatable :: num_elem_inter_comm !< Matrix containing the number of interface elements per process for send and receive communication
         integer(kind=4) :: num_elem_inter !< Total number of interface elements
+        integer(kind=4), dimension(:), allocatable :: num_elem_inter_vec
         integer(kind=4), dimension(:,:), allocatable :: inter_disp !< indices for elem_inter setting the initial position for data of each process
         integer(kind=4), dimension(:), allocatable :: elem_inter_glo !< interface element global ID per process. IDs stored by receive process, then for each stored by send process.
         integer(kind=4), dimension(:), allocatable :: elem_inter_loc !< interface element local ID per process. IDs stored by receive process, then for each stored by send process.
