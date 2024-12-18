@@ -18,6 +18,7 @@ module matrix_free
 
     use Poly_global
     use global_parameters
+    use utilities
 
     implicit none
 
@@ -121,10 +122,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     PetscScalar :: val(1)
     PetscInt :: irow(1), jcol(1)
 
-    real(kind=8) :: present = 0.0
-
-    real(kind=8) :: dt2
-
     integer(kind=4) :: nq3, nq2, p
     real(kind=8) :: theta, alpha, c
 
@@ -166,7 +163,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     integer(kind=4), intent(out) :: max_faces !< maximum number of polygon faces
 
     real(kind=8), dimension(DIM, DIM, Np, Np) :: V_loc
-    real(kind=8), dimension(DIM, DIM, Np, Np) :: S_E1, I_E1, I_E2, S_E2
+    real(kind=8), dimension(DIM, DIM, Np, Np) :: S_E1, I_E1, S_E2, I_E2, IT_E2
 
     ! each local has a matrix
     ! local square
@@ -181,7 +178,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
 
     integer(kind=4) :: row, col, iface_neigh, iface_E1
 
-    dt2 = time_step * time_step
+    real(kind=8) :: t1, t2
+
     ! set the properties of the method (see problem_data_and_properties.f90)
     call set_properties(alpha, theta, c)
 
@@ -215,14 +213,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
     allocate(dphi(3,Np,nq3))
     allocate(phi_b(Np,nq2,2))
     allocate(grad_b(3,Np,nq2,2))
-
-    ! assign 0 to density for static case
-    if (IsTime_dependent .eqv. .true.) then
-        print *,'RHS with additional dynamic component'
-        present = 1.0
-    else
-        print *,'RHS with only static component'
-    endif
 
     ! loop over elements to find the maximum number of polygonal faces
     !! IS ALL SPLIT IN POLYGONS OR TETRAHEDRA???
@@ -303,13 +293,11 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
         ! (see basis_functions.f90)
         call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
 
-        ! computation of the local stiffness matrix V_loc (see assemble_element.f90)
-        call MAKE_STIFFNESS_VOLUME(Np, Jdet, weitet3, nq3, lambda, mu, dphi, V_loc)
-
         ! computation of the local mass matrix M_loc (see assemble_element.f90)
         !!! i only need true mass matrix
         !call MAKE_MASS_VOLUME(Np, Jdet, weitet3, nq3, phi, rho, M_loc(ie_loc,:,:,:,:))
 
+        t1 = MPI_WTIME()
         ! for petsc
         call MAKE_MASS_VOLUME(Np, Jdet, weitet3, nq3, phi, 1.0d0, mass_loc)
 
@@ -340,6 +328,13 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
             ! PetscCall(MatAssemblyBegin(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
             ! PetscCall(MatAssemblyEnd(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
         enddo
+        t2 = MPI_WTIME()
+        tp_setup_M = tp_setup_M + t2 - t1
+
+        t1 = MPI_WTIME()
+
+        ! computation of the local stiffness matrix V_loc (see assemble_element.f90)
+        call MAKE_STIFFNESS_VOLUME(Np, Jdet, weitet3, nq3, lambda, mu, dphi, V_loc)
 
         ! current element E+
         E1 = ie_loc
@@ -423,8 +418,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                         PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist, Np, Fk, node_maps, nodtria2, nq2)
 
                     call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly), nn, &
-                                        PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_E1,I_E1,I_E2,S_E2)
+                                        PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_E1,I_E1,S_E2,I_E2,IT_E2)
 
+                ! polyhedra on the same process
                 else
 
                     ! check if iface is not a boundary face
@@ -435,7 +431,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                                 PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(ipoly2_loc)%hk,nn, &
-                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_E1,I_E1,I_E2,S_E2)
+                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_E1,I_E1,S_E2,I_E2,IT_E2)
 
                     else
 
@@ -443,7 +439,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                                 PolyMesh%Poly(1)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_STIFFNESS_FACE(alpha,p,Np,E2,PolyMesh%Poly(ipoly_loc)%hk, PolyMesh%Poly(1)%hk, nn, &
-                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_E1,I_E1,I_E2,S_E2)
+                                                PolyMesh%Elem_loc(E1)%area(iface),weitria2,nq2,lambda,mu,phi_b,grad_b,S_E1,I_E1,S_E2,I_E2,IT_E2)
 
                     endif
 
@@ -464,7 +460,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                             row = (i-1)*Np + m
                             do n=1,Np
                                 col = (j-1)*Np + n
-                                !K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_E1(i,j,m,n) - I_E1(j,i,n,m) + S_E1(i,j,m,n)
                                 K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + S_E1(i,j,m,n)
                             enddo
                         enddo
@@ -485,9 +480,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                 row = (i-1)*Np + m
                                 do n=1,Np
                                     col = (j-1)*Np + n
-                                    !K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) + theta*I_E2(i,j,m,n) - I_E2(j,i,n,m) + S_E2(i,j,m,n)
 
-                                    ! E+
+                                    ! E+ on E+ -> theta*I - I^T
                                     K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_E1(i,j,m,n) - I_E1(j,i,n,m)
                                 enddo
                             enddo
@@ -520,11 +514,13 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
                                     ! E+ on E+ -> theta*I - I^T
                                     K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + theta*I_E1(i,j,m,n) - I_E1(j,i,n,m)
 
-                                    ! E- on E+ -> theta*I + S
+                                    ! E+ on E- -> theta*I + S
                                     K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) + theta*I_E2(i,j,m,n) + S_E2(i,j,m,n)
 
-                                    ! E+ on E- -> -I^T
-                                    K_loc(E2,iface_E1+1,row,col) = K_loc(E2,iface_E1+1,row,col) - I_E2(j,i,n,m)
+                                    ! E- on E+ -> -I^T
+                                    K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) - IT_E2(i,j,m,n)
+
+                                    !K_loc(E2,iface_E1+1,row,col) = K_loc(E2,iface_E1+1,row,col) - I_E2(j,i,n,m)
                                 enddo
                             enddo
                         enddo
@@ -536,6 +532,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, global_dof, Np, K_loc, A_dg_lo
             !neigh_count = neigh_count + 1
 
         enddo face_loop
+
+        t2 = MPI_WTIME()
+        tp_setup_K = tp_setup_K + t2 - t1
+
     enddo elem_loop
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -619,6 +619,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
     real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(inout) :: rhs_loc
 
     integer(kind=4) :: row
+    real(kind=8) :: t1, t2
 
     call set_properties(alpha, theta, c)
 
@@ -706,6 +707,8 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
         ! evaluation of the basis functions and their partial derivatives at the 3D quadrature nodes for a given polyhedral element contained in b_box
         ! (see basis_functions.f90)
         call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
+
+        t1 = MPI_WTIME()
 
         call MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_loc_tmp(ie_loc,:,:), rho*present)
 
@@ -821,6 +824,9 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, global_dof, Np, rhs_loc)
 
         enddo face_loop
 
+        t2 = MPI_WTIME()
+        tp_setup_RHS = tp_setup_RHS + t2 - t1
+    
     enddo elem_loop
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -1126,6 +1132,8 @@ subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, u_loc, u_glo, gathered_sizes, disp
     integer(kind=4), dimension(:), intent(in) :: gathered_sizes, displacements
     integer(kind=4) :: Np, i, jcol_glo, jcol_tmp, Npoly, Npoly_loc
 
+    call LYMPH3D_BARRIER
+
     ! assuming same degree everywhere
     Np = PolyMesh%Elem_loc(1)%NDof_elem ! ndof local per dimension (for 3D we need 3*Np)
     Npoly = PolyMesh%num_poly
@@ -1400,7 +1408,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
         end do neigh_loop
 
         t2 = MPI_WTIME()
-        tstiffness = tstiffness + t2 - t1
+        tp_KU = tp_KU + t2 - t1
         !----
 
         ! add forcing term and rescale
@@ -1425,14 +1433,14 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             ! PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
 
             t2 = MPI_WTIME()
-            tmatrix = tmatrix + t2 - t1
+            tp_copy_matrix = tp_copy_matrix + t2 - t1
             !----
 
             !----
             t1 = MPI_WTIME()
             !call SOLVER_SETTINGS(massa(ie_loc,i)%data, ksp, pc)
             t2 = MPI_WTIME()
-            tsset = tsset + t2 - t1
+            tp_system_setup = tp_system_setup + t2 - t1
             !----
 
             ! copy vector block to PETSc
@@ -1444,7 +1452,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             ! PetscCall(VecRestoreArrayF90(petsc_v_tmp,v_ptr,mpi_ierr))
 
             t2 = MPI_WTIME()
-            tvector = tvector + t2 - t1
+            tp_copy_vector = tp_copy_vector + t2 - t1
             !----
 
             !----
@@ -1457,7 +1465,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             usol_loc(ie_loc, row+1:row+Np) = solve_LU(RT, R, v_ptr, Np)
 
             t2 = MPI_WTIME()
-            tsolve = tsolve + t2 - t1
+            tp_linear_system = tp_linear_system + t2 - t1
             !----
 
             !----
@@ -1469,7 +1477,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
             ! PetscCall(VecRestoreArrayF90(petsc_sol,v_ptr,mpi_ierr))
 
             t2 = MPI_WTIME()
-            tvector = tvector + t2 - t1
+            tp_copy_vector = tp_copy_vector + t2 - t1
             !----
 
             PetscCall(MatDenseRestoreArrayF90(massa(ie_loc,i)%data, m1_ptr, mpi_ierr))
@@ -1486,6 +1494,8 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, massa, ksp, rhs_loc, u0
     PetscCall(VecDestroy(petsc_v_tmp, mpi_ierr))
 
     deallocate(v_ptr)
+
+    call LYMPH3D_BARRIER
 
 end subroutine TIME_STEP_MATRIX_FREE
 

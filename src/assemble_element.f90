@@ -312,11 +312,13 @@ end subroutine MAKE_RHS_FACE
 !> components
 !> \f[ [S_{K+}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+):(\boldsymbol{\varphi}_{i,K}^+ \textbf{n}^+ ) + \sum_{F\in F_h^D|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+):(\boldsymbol{\varphi}_{i,K}^+ \textbf{n}^+) \f]
 !> \f[ [S_{K-}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+):( \boldsymbol{\varphi}_{i,K}^- \textbf{n}^-) \f]
-!> \f[ [I_{K+}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) + \sum_{F\in F_h^D|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
+!> \f[ [I_{K+}]_{ij} = [I_{K+}]^T_{ij} = \sum_{F\in F_h^I|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) + \sum_{F\in F_h^D|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
 !> \f[ [I_{K-}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F ( \boldsymbol{\varphi}_{j,K}^- \textbf{n}^- ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
+!>
+!> \f[ [I_{K-}]^T_{ij} = \sum_{F\in F_h^I|_{K} } \int_F ( \boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^-) \f]
 
 subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2, nq2, lambda, mu, &
-                            phi_b, grad_b, S_E1, I_E1, I_E2, S_E2)
+                            phi_b, grad_b, S_E1, I_E1, S_E2, I_E2, IT_E2)
 
     ! theta and alpha are provided by the subroutine set_properties in problem_data_and_properties.f90
     ! phi_b and grad_b are provided by the subroutine basis_boundary in basis_functions.f90
@@ -337,12 +339,13 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
     real(kind=8), dimension(DIM), intent(in) :: normal      !< normal vector
     real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b  !< basis on the boundary
     real(kind=8), dimension(3,Np,nq2,2), intent(in) :: grad_b   !< basis gradient on the boundary
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E1    !< element stiffness matrix stabilization S, E+ contribution
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E1         !< element stiffness matrix interior flux I, E+ contribution
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E2        !< element stiffness matrix interior flux I, E- contribution
-    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E2        !< element stiffness matrix stabilization S, E- contribution
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E1    !< element stiffness matrix stabilization S, E+ on E+ contribution
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E1         !< element stiffness matrix interior flux I, E+ on E1 contribution
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: I_E2        !< element stiffness matrix interior flux I, E+ on E- contribution
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out), optional :: IT_E2        !< element stiffness matrix interior flux I, E- on E+ contribution
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E2        !< element stiffness matrix stabilization S, E+ on E- contribution
 
-    real(kind=8), dimension(DIM,DIM,Np,Np) :: temp, temp1, temp2
+    real(kind=8), dimension(DIM,DIM,Np,Np) :: temp, temp1, temp2, temp3
     real(kind=8), dimension(2) :: val
     real(kind=8) :: sigma, D_bar
     integer(kind=4) :: q, i, j, m, n
@@ -362,6 +365,7 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
     S_E1 = 0.0
     I_E1 = 0.0
     I_E2 = 0.0
+    IT_E2 = 0.0
     S_E2 = 0.0
 
     ! check if the actual face is not a Neumann boundary face
@@ -370,8 +374,9 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
         temp = 0.0
 
         ! loop on 2D quadrature nodes
-        do q = 1,nq2
+        nquad_loop: do q = 1,nq2
 
+            ! compute S_E1
             do m=1,Np
                 do n=1,Np
 
@@ -398,7 +403,8 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
             if (E2 == -1) then
 
                 temp = 0.0
-
+                
+                ! compute I_E1
                 do m=1,Np
                     do n=1,Np
 
@@ -424,15 +430,19 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
                     enddo
                 enddo
 
+            ! internal face - not a boundary
             else
 
                 temp = 0.0
-                temp2 = 0.0
                 temp1 = 0.0
+                temp2 = 0.0
+                temp3 = 0.0
 
+                ! compute I_E1, I_E2, IT_E2, S_E2
                 do m=1,Np
                     do n=1,Np
 
+                        ! compute I_E1
                         temp(1,1,m,n) = (lambda + 2*mu)*grad_b(1,m,q,1)*phi_b(n,q,1)*normal(1) + &
                                         mu*grad_b(2,m,q,1)*phi_b(n,q,1)*normal(2) + mu*grad_b(3,m,q,1)*phi_b(n,q,1)*normal(3)
                         temp(2,2,m,n) = (lambda + 2*mu)*grad_b(2,m,q,1)*phi_b(n,q,1)*normal(2) + &
@@ -451,6 +461,7 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
                             enddo
                         enddo
 
+                        ! compute I_E2
                         temp1(1,1,m,n) = (lambda + 2*mu)*grad_b(1,m,q,1)*phi_b(n,q,2)*normal(1) + &
                                         mu*grad_b(2,m,q,1)*phi_b(n,q,2)*normal(2) + mu*grad_b(3,m,q,1)*phi_b(n,q,2)*normal(3)
                         temp1(2,2,m,n) = (lambda + 2*mu)*grad_b(2,m,q,1)*phi_b(n,q,2)*normal(2) + &
@@ -469,19 +480,38 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
                             enddo
                         enddo
 
-                        temp2(1,1,m,n) = phi_b(m,q,1)*phi_b(n,q,2) * (abs(normal(1))**2 + 0.5*abs(normal(2))**2 + 0.5*abs(normal(3))**2)
-                        temp2(2,2,m,n) = phi_b(m,q,1)*phi_b(n,q,2) * (abs(normal(2))**2 + 0.5*abs(normal(1))**2 + 0.5*abs(normal(3))**2)
-                        temp2(3,3,m,n) = phi_b(m,q,1)*phi_b(n,q,2) * (abs(normal(3))**2 + 0.5*abs(normal(1))**2 + 0.5*abs(normal(2))**2)
+                        ! compute IT_E2
+                        temp2(1,1,m,n) = (lambda + 2*mu)*grad_b(1,m,q,2)*phi_b(n,q,1)*normal(1) + &
+                                        mu*grad_b(2,m,q,2)*phi_b(n,q,1)*normal(2) + mu*grad_b(3,m,q,2)*phi_b(n,q,1)*normal(3)
+                        temp2(2,2,m,n) = (lambda + 2*mu)*grad_b(2,m,q,2)*phi_b(n,q,1)*normal(2) + &
+                                        mu*grad_b(1,m,q,2)*phi_b(n,q,1)*normal(1) + mu*grad_b(3,m,q,2)*phi_b(n,q,1)*normal(3)
+                        temp2(3,3,m,n) = (lambda + 2*mu)*grad_b(3,m,q,2)*phi_b(n,q,1)*normal(3) + &
+                                        mu*grad_b(2,m,q,2)*phi_b(n,q,1)*normal(2) + mu*grad_b(1,m,q,2)*phi_b(n,q,1)*normal(1)
                         do i=1,2
                             do j=i+1,3
-                                temp2(i,j,m,n) = 0.5*phi_b(m,q,1)*phi_b(n,q,2)*normal(i)*normal(j)
-                                temp2(j,i,m,n) = 0.5*phi_b(m,q,1)*phi_b(n,q,2)*normal(i)*normal(j)
+                                temp2(i,j,m,n) = lambda*grad_b(i,m,q,2)*phi_b(n,q,1)*normal(j) + mu*grad_b(j,m,q,2)*phi_b(n,q,1)*normal(i)
+                                temp2(j,i,m,n) = lambda*grad_b(j,m,q,2)*phi_b(n,q,1)*normal(i) + mu*grad_b(i,m,q,2)*phi_b(n,q,1)*normal(j)
+                            enddo
+                        enddo
+                        do i=1,DIM
+                            do j=1,DIM
+                                IT_E2(i,j,n,m) = IT_E2(i,j,n,m) + 0.5*weitria2(q)*area*temp2(i,j,m,n)
                             enddo
                         enddo
 
+                        ! compute S_E2
+                        temp3(1,1,m,n) = phi_b(m,q,1)*phi_b(n,q,2) * (abs(normal(1))**2 + 0.5*abs(normal(2))**2 + 0.5*abs(normal(3))**2)
+                        temp3(2,2,m,n) = phi_b(m,q,1)*phi_b(n,q,2) * (abs(normal(2))**2 + 0.5*abs(normal(1))**2 + 0.5*abs(normal(3))**2)
+                        temp3(3,3,m,n) = phi_b(m,q,1)*phi_b(n,q,2) * (abs(normal(3))**2 + 0.5*abs(normal(1))**2 + 0.5*abs(normal(2))**2)
+                        do i=1,2
+                            do j=i+1,3
+                                temp3(i,j,m,n) = 0.5*phi_b(m,q,1)*phi_b(n,q,2)*normal(i)*normal(j)
+                                temp3(j,i,m,n) = 0.5*phi_b(m,q,1)*phi_b(n,q,2)*normal(i)*normal(j)
+                            enddo
+                        enddo
                         do i=1,DIM
                             do j=1,DIM
-                                S_E2(i,j,m,n) = S_E2(i,j,m,n) - sigma*weitria2(q)*temp2(i,j,m,n)*area
+                                S_E2(i,j,m,n) = S_E2(i,j,m,n) - sigma*weitria2(q)*temp3(i,j,m,n)*area
                             enddo
                         enddo
 
@@ -490,13 +520,14 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
 
             endif
 
-        enddo
+        enddo nquad_loop
 
     endif
 
 end subroutine MAKE_STIFFNESS_FACE
 
 !> @brief Assemble the local vector term vec_loc approximating the integral on the tetrahedron
+!> @param[in] f_analytic custom function
 subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_analytic)
 
     ! phi is provided by the subroutine basis in basis_function.f90
@@ -504,22 +535,28 @@ subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_
     ! nq3 is provided by the subroutine quadrature in basis_function.f90
     ! Fk and Jdet are provided by the subroutine jacobians in Poly_ref_mappings.f90
 
-    ! pass function as argument
+    !> Interface for the user-provided custom function.
     interface
+        !> This function operates on a point in the parameter space and 
+        !> returns a corresponding result vector.
+        !>
+        !> \param point  A real-valued array of size `DIM`, representing the input point.
+        !> \return res   A real-valued array of size `DIM`, representing the computed result.
         function f_analytic(point) result(res)
             use global_parameters
             real(kind=8), dimension(DIM) :: point, res
         end function f_analytic
     end interface
 
-    integer(kind=4), intent(in) :: nq3
-    integer(kind=4), intent(in) :: Np
-    real(kind=8), intent(in) :: Jdet
-    real(kind=8), dimension(4,nq3), intent(in) :: nodtet3
+
+    integer(kind=4), intent(in) :: nq3  !< number of 3D quadrature nodes
+    integer(kind=4), intent(in) :: Np   !< number of element dof per dimension
+    real(kind=8), intent(in) :: Jdet    !< transormation determinant
+    real(kind=8), dimension(4,nq3), intent(in) :: nodtet3 !< tetrahedron quadrature nodes
     real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
-    real(kind=8), dimension(Np,nq3), intent(in) :: phi
+    real(kind=8), dimension(Np,nq3), intent(in) :: phi    !< basis function derivative evaluations
     real(kind=8), dimension(DIM,DIM+1), intent(in) :: Fk !< coefficients for map from reference to physical tetrahedron
-    real(kind=8), dimension(DIM,Np), intent(out) :: vec_loc
+    real(kind=8), dimension(DIM,Np), intent(out) :: vec_loc !<integral over tetrahedron
 
     integer(kind=4) :: q, i, j, k, m
     real(kind=8), dimension(DIM) :: points, eval
