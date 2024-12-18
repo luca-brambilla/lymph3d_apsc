@@ -349,6 +349,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
                 do m = 1,Np
                     do n = 1,Np
                         K_loc(ie_loc, 1, row+m, col+n) = V_loc(i,j,m,n)
+                        A_dg_loc(ie_loc, 1, row+m, col+n) = V_loc(i,j,m,n)
                     end do
                 end do
             end do
@@ -365,6 +366,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
             S_E1 = 0.0
             I_E2 = 0.0
             S_E2 = 0.0
+            IT_E2 = 0.0
 
             ! find the neighbouring tetrahedron E2 sharing the face iface with E1
             ! E2 is element E-
@@ -455,7 +457,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
             ! If not Neumann boundary
             if(E2 /= -2) then
 
-                ! Add E+ contribution (S_E1 and I_E1) to stiffness and DG
+                ! Add E+ contribution S_E1 to stiffness and DG
                 do i=1,DIM
                     do j=1,DIM
                         do m=1,Np
@@ -463,6 +465,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
                             do n=1,Np
                                 col = (j-1)*Np + n
                                 K_loc(ie_loc,1,row,col) = K_loc(ie_loc,1,row,col) + S_E1(i,j,m,n)
+                                A_dg_loc(ie_loc,1,row,col) = A_dg_loc(ie_loc,1,row,col) + S_E1(i,j,m,n)
                             enddo
                         enddo
                     enddo
@@ -519,10 +522,11 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
                                     ! E+ on E- -> theta*I + S
                                     K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) + theta*I_E2(i,j,m,n) + S_E2(i,j,m,n)
 
+                                    A_dg_loc(ie_loc,iface+1,row,col) = A_dg_loc(ie_loc,iface+1,row,col) + S_E2(i,j,m,n)
+
                                     ! E- on E+ -> -I^T
                                     K_loc(ie_loc,iface+1,row,col) = K_loc(ie_loc,iface+1,row,col) - IT_E2(i,j,m,n)
 
-                                    !K_loc(E2,iface_E1+1,row,col) = K_loc(E2,iface_E1+1,row,col) - I_E2(j,i,n,m)
                                 enddo
                             enddo
                         enddo
@@ -863,22 +867,10 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
     !type(PetscMatStruct), dimension(:,:), intent(in):: massa_modale
     real(kind=8), dimension(:,:,:,:), intent(in) :: R_M_modal_loc
 
-
-    Mat :: petsc_m_tmp     ! temporary matrix for linear systems
-    Vec :: petsc_exact
-    Vec :: petsc_modal_coeff
-    !PetscScalar :: val(1)
-    !PetscInt :: irow(1)
-    !PetscInt :: jcol(1)
-
-    ! PETSc Solver context
-    KSP :: ksp  ! Krylov solver context
-    PC :: pc    ! Preconditioner object for the solver
-
     type(Mesh_Structure) :: PolyMesh
     integer(kind=4) :: p, Np
     integer(kind=4) :: nq3, nq2, Npoly
-    integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, i, m!, beg
+    integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, i, m
     integer(kind=4) :: ipoly_loc, ipoly_glob
     integer(kind=4), dimension(:,:), allocatable :: blist
     real(kind=8) :: Jdet
@@ -895,10 +887,9 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
     real(kind=8), dimension(DIM) :: eval
 
     integer(kind=4) :: q, ii, jj
-    !integer(kind=4) :: j,n,k
     integer(kind=4) :: row
 
-    real(kind=8), dimension(:), pointer :: v_ptr
+    real(kind=8), dimension(Np) :: v_ptr
     real(kind=8), dimension(Np,Np) :: R, RT
 
     ! logical, intent(in) :: IsTime_dependent
@@ -923,33 +914,6 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
 
     allocate(phi(Np,nq3))
     allocate(dphi(3,Np,nq3))
-
-    allocate(v_ptr(Np))
-
-    ! use PETSc to compute linear system
-    ! only local to process
-
-    ! 1 block of element local mass matrix out of 3 (1 dimension)
-    ! PetscCall(MatCreate(PETSC_COMM_SELF, petsc_m_tmp, mpi_ierr))
-    ! PetscCall(MatSetSizes(petsc_m_tmp, Np, Np, Np, Np, mpi_ierr))
-    ! PetscCall(MatSetFromOptions(petsc_m_tmp, mpi_ierr))
-    ! PetscCall(MatSetUp(petsc_m_tmp, mpi_ierr))
-    ! PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-    ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-    PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, Np, Np, PETSC_NULL_SCALAR_ARRAY, petsc_m_tmp, mpi_ierr))
-
-    ! 1 block of element local vectors out of 3 (1 dimension)
-    PetscCall(VecCreate(PETSC_COMM_SELF, petsc_exact, mpi_ierr))
-    PetscCall(VecSetSizes(petsc_exact, Np, Np, mpi_ierr))
-    PetscCall(VecSetFromOptions(petsc_exact, mpi_ierr))
-
-    PetscCall(VecCreate(PETSC_COMM_SELF, petsc_modal_coeff, mpi_ierr))
-    PetscCall(VecSetSizes(petsc_modal_coeff, Np, Np, mpi_ierr))
-    PetscCall(VecSetFromOptions(petsc_modal_coeff, mpi_ierr))
-
-    ! linear system solver
-    PetscCall(KSPCreate(PETSC_COMM_SELF, ksp, mpi_ierr))
-    call SOLVER_SETTINGS(petsc_m_tmp,ksp,pc)
 
     ! solution initializations
     allocate(uex_integral(PolyMesh%num_poly_loc, DIM, Np))
@@ -1009,51 +973,18 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
             end do
         end do
 
-        ! copy mass matrix and exact solution into PETSc structures
-        ! insert new values for each loop on element
-        !PetscCall(MatZeroEntries(petsc_m_tmp, mpi_ierr))
-
-        ! PetscCall(VecZeroEntries(petsc_mass_modal(), mpi_ierr))
         do i=1,DIM
 
             row = (i-1)*Np
 
-            !! COPY MATRIX OR SET KSP EACH TIME? OR PASS KSP VECTOR/MATRIX DIRECTLY?
-            ! copy block (i,i) of mass matrix
-            ! PetscCall(MatCopy(massa_modale(ie_loc,i)%data, petsc_m_tmp,DIFFERENT_NONZERO_PATTERN, mpi_ierr))
-            ! PetscCall(MatAssemblyBegin(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-            ! PetscCall(MatAssemblyEnd(petsc_m_tmp,MAT_FINAL_ASSEMBLY,mpi_ierr))
-
-            ! PETSc copy pointer
-            !PetscCall(MatDenseGetArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
-
-            ! PetscCall(MatDenseGetArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
-            ! m2_ptr = m1_ptr
-            ! PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
-            ! PetscCall(MatDenseRestoreArrayF90(petsc_m_tmp, m2_ptr, mpi_ierr))
-
-            ! copy vector block to PETSc
-            ! PetscCall(VecGetArrayF90(petsc_exact,v_ptr,mpi_ierr))
+            ! copy vector
             v_ptr = uex_integral(ie_loc,i,:)
-            ! PetscCall(VecRestoreArrayF90(petsc_exact,v_ptr,mpi_ierr))
 
             ! solve linear system matrix-free on block (i,i)
-            ! PetscCall(KSPSolve(ksp, petsc_exact, petsc_modal_coeff, mpi_ierr))
-            
-            !R = cholesky(m1_ptr,Np)
-            !R = cholesky(M_modal_loc(ie_loc,i,:,:),Np)
+
             R = R_M_modal_loc(ie_loc,i,:,:)
             RT = transpose(R)
             modal_coeff(ie_loc,row+1:row+Np) = solve_LU(RT, R, v_ptr, Np)
-
-            ! copy PETSc vector to solution vector block
-            ! row = (i-1)*Np
-            ! PetscCall(VecGetArrayReadF90(petsc_modal_coeff,v_ptr,mpi_ierr))
-            ! modal_coeff(ie_loc,row+1:row+Np) =  v_ptr
-            ! PetscCall(VecRestoreArrayF90(petsc_modal_coeff,v_ptr,mpi_ierr))
-
-            !PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m1_ptr, mpi_ierr))
-
 
         enddo
 
@@ -1063,10 +994,6 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
 
     if (mpi_id==0) print *, 'Done with computing modal coefficients'
 
-    PetscCall(MatDestroy(petsc_m_tmp, mpi_ierr))
-    PetscCall(VecDestroy(petsc_exact, mpi_ierr))
-    PetscCall(VecDestroy(petsc_modal_coeff, mpi_ierr))
-
     deallocate(phi)
     deallocate(dphi)
 
@@ -1075,7 +1002,6 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
     deallocate(blist)
 
     deallocate(uex_integral)
-    deallocate(v_ptr)
 
 end subroutine COMPUTE_MODAL_COEFFICIENTS_FREE
 
@@ -1407,117 +1333,85 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_lo
 
 end subroutine TIME_STEP_MATRIX_FREE
 
+!> Compute L2 error in matrix-free framework
 subroutine COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, uh_loc, uex_loc, err_L2_loc)
 
     !TODO make parallel
     implicit none
 
-    type(Mesh_Structure), intent(in) :: PolyMesh
-    integer(kind=4), intent(in) :: Np
-    !type(PetscMatStruct), dimension(:,:) :: massa_modale
-    real(kind=8), dimension(:,:,:,:), intent(in):: M_modal_loc
-    real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uh_loc
-    real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uex_loc
-    real(kind=8), intent(out) :: err_L2_loc
+    type(Mesh_Structure), intent(in) :: PolyMesh    !< mesh
+    integer(kind=4), intent(in) :: Np               !< number of element dofs per direction
+    real(kind=8), dimension(:,:,:,:), intent(in):: M_modal_loc  !< modal mass matrix
+    real(kind=8), dimension(PolyMesh%num_elem_loc,DIM*Np), intent(in) :: uh_loc !< computed solution
+    real(kind=8), dimension(PolyMesh%num_elem_loc,DIM*Np), intent(in) :: uex_loc    !< exact solution
+    real(kind=8), intent(out) :: err_L2_loc     !< process local sum of element L2 errors
 
-    real(kind=8) :: L2_tmp
+    real(kind=8) :: err_L2_el
 
     real(kind=8), dimension(Np) :: du, tmp
-    integer(kind=4) :: i,ie_loc
+    integer(kind=4) :: i,ie_loc,row
 
     err_L2_loc = 0.0
 
     do ie_loc=1,PolyMesh%num_elem_loc
-
         do i=1,3
-
-            du = uh_loc(ie_loc,i,:) - uex_loc(ie_loc,i,:)
-
-            !PetscCall(MatDenseGetArrayF90(massa_modale(ie_loc,i)%data, m_ptr, mpi_ierr))
+            row = (i-1)*Np
+            du = uh_loc(ie_loc,row+1:row+Np) - uex_loc(ie_loc,row+1:row+Np)
             tmp = matmul(M_modal_loc(ie_loc,i,:,:), du)
-            !PetscCall(MatDenseRestoreArrayF90(massa_modale(ie_loc,i)%data, m_ptr, mpi_ierr))
 
-            L2_tmp = dot_product(du, tmp)
-            err_L2_loc = err_L2_loc + L2_tmp
+            err_L2_el = dot_product(du, tmp)
+            err_L2_loc = err_L2_loc + err_L2_el
 
         enddo
     enddo
 
 end subroutine COMPUTE_ERROR_L2_MATRIX_FREE
 
-! subroutine COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, sides, A_dg_loc, uh_loc, uex_loc, err_DG_mpi)
+!> Compute DG error in matrix-free framework
+subroutine COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, uh_loc, uex_loc, err_DG_loc)
 
-!     !TODO make parallel
-!     !TODO sides different for each row for A
-!     implicit none
+    !! CHECK
+    !TODO make parallel
+    implicit none
 
-!     type(Mesh_Structure), intent(in) :: PolyMesh
-!     integer(kind=4), intent(in) :: Np
-!     integer(kind=4), intent(in) :: sides
-!     type(KRowArray), dimension(PolyMesh%num_elem_loc), intent(in) :: A_dg_loc
-!     real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uh_loc
-!     real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np), intent(in) :: uex_loc
-!     real(kind=8), intent(out) :: err_DG_mpi = 0.0
+    type(Mesh_Structure), intent(in) :: PolyMesh    !< mesh
+    integer(kind=4), intent(in) :: Np       !< number of element dofs per direction
+    real(kind=8), dimension(:,:,:,:), intent(in):: A_dg_loc !< local DG matrix
+    real(kind=8), dimension(PolyMesh%num_elem_loc,DIM*Np), intent(in) :: uh_loc !< computed solution
+    real(kind=8), dimension(PolyMesh%num_elem_loc,DIM*Np), intent(in) :: uex_loc !< exact solution
+    real(kind=8), intent(out) :: err_DG_loc !< process local sum of element DG errors
 
-!     real(kind=8), dimension(3,Np) :: DG_tmp
-!     real(kind=8), dimension(PolyMesh%num_elem_loc,3,Np) :: du
-!     real(kind=8), dimension(Np) :: du_long
-!     integer(kind=4) :: k,i,j,m,n,ie_loc
-!     real(kind=8), dimension(sides,3,3,Np,Np) :: A_loc
+    real(kind=8) :: err_DG_el
 
-!     E1 = ie_loc
-!     E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
+    real(kind=8), dimension(DIM*Np) :: du, tmp, du_neigh
+    integer(kind=4) :: ie_loc,n_neigh,iface,E2,ie_neigh_loc
 
-!     ! compute du only once
-!     do ie_loc=1,PolyMesh%num_elem_loc
-!         do i=1,3
-!             do m=1,Np
-!                 du(ie_loc,i,m) = uh_loc(ie_loc,i,m) - uex_loc(ie_loc,i,m)
-!             enddo
-!         enddo
-!     enddo
+    err_DG_loc = 0.0
+    n_neigh = PolyMesh%Elem_loc(1)%num_faces
 
-!     !!! HOW TO FIND A(k) corresponding to u for right neighbor????
-!     do ie_loc=1,PolyMesh%num_elem_loc
+    do ie_loc=1,PolyMesh%num_elem_loc
 
-!         E1 = ie_loc
+        du = uh_loc(ie_loc,:) - uex_loc(ie_loc,:)
+        ! E+ contribution
+        tmp = matmul(A_DG_loc(ie_loc,1,:,:), du)
 
-!         A_loc = A_dg_loc(ie_loc)
-!         ! loop over the sides contibutions
-!         do k=1,sides
-!             !! AM I CONSIDERING CONTRIBUTION OF E1 TOO?
-!             ! find global element numbering for neighbor to access u
-!             E2 = PolyMesh%Elem_loc(E1)%neigh_el(k,2)
+        ! E- contributions
+        neigh_loop: do iface=1,n_neigh
 
-!             du = 0.0
-!             DG_tmp = 0.0
+            E2 = PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,2)
+            if (E2 < 0) cycle neigh_loop
 
-!             ! loop over columns
-!             do j=1,3
+            ie_neigh_loc = PolyMesh%elem_glo2loc(E2)
+            du_neigh = uh_loc(ie_neigh_loc,:) - uex_loc(ie_neigh_loc,:)
+            tmp = tmp + matmul(A_DG_loc(ie_loc,iface+1,:,:), du_neigh)
 
-!                 ! compute local difference du_long only once per column j
-!                 ! do n=1,Np
-!                 !     du_long(n) = uh_loc(ie_loc,j,n) - uex_loc(ie_loc,j,n)
-!                 ! enddo
+        enddo neigh_loop
 
-!                 ! loop over rows
-!                 do i=1,3
-!                     do m=1,Np
-!                         ! Compute each contribution of quadratic form err_DG = sum A_mn * du_n * du_m
-!                         !! BETTER TO MAKE SCALAR PRODUCT AFTER?
-!                         !! MULTIPLY MANY TIMES BY du(m)
-!                         do n=1,Np
-!                             DG_tmp = DG_tmp + A_dg_loc(k,i,j,m,n) * du(E2,j,n) * du(E1,i,m)
-!                         enddo
-!                     enddo
-!                 enddo
+        err_DG_el = dot_product(du, tmp)
+        err_DG_loc = err_DG_loc + err_DG_el
 
-!             enddo
-!         enddo
+    enddo
 
-!         err_DG_mpi = err_DG_mpi + DG_tmp
-!     enddo
-
-! end subroutine COMPUTE_ERROR_DG_MATRIX_FREE
+end subroutine COMPUTE_ERROR_DG_MATRIX_FREE
 
 end module matrix_free

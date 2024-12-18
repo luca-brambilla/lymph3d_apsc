@@ -664,7 +664,6 @@ program Lymph3D
             ! Mu_{n+1) = F_n = (2M-dt^2*A)u_n - Mu_{n-1} + dt^2 * f_n
             do while (t <= stop_time)
 
-                if(mpi_id == 0) print *, ""
                 if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
 
                 !!! petsc_u0 -> u_{n-1}
@@ -748,6 +747,7 @@ program Lymph3D
         print *, 'matrix-free exact solution'
 
         t1 = MPI_WTIME()
+        ! u0_loc for exact solution
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex, u0_loc)
 
         ! check time dependence
@@ -811,8 +811,9 @@ program Lymph3D
     t1 = MPI_WTIME()
     if (IS_MatrixFree .eqv. .true.) then
         print *, 'matrix free solver'
+        ! u0_loc for exact solution
         call COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, un_loc, u0_loc, err_L2)
-
+        call COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, un_loc, u0_loc, err_DG)
     else
         if(mpi_id == 0) print *,'Computing the errors...'
 
