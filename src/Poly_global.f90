@@ -331,6 +331,7 @@ module find_poly
 
     contains
 
+    !! INDEX IS AN INTRINSIC FUNCTION...
     !> @brief Function to find a tetrahedron in polyhedron
     function FIND_TET_IN_POLY(array,val,N)result(index)
         integer(kind=4) :: N    !<

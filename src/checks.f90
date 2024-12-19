@@ -1,8 +1,10 @@
 module checks
 
+    use mpi
     use Poly_setup_mpi
     use Poly_fail_codes
     use Poly_exit_codes
+    use utilities
 
     implicit none
 
@@ -19,15 +21,18 @@ module checks
 
         real(kind=8) :: speed !< speed
 
-        speed = 1
+        speed = 1.0d0
 
-        if (dt > h_max/speed) then
-            if(mpi_id==0) print *, "!-------- FAIL CFL CONDITION --------!"
-            if (IS_failCFL .eqv. .true.) then
+        if (mpi_id==0) then
 
-                call PetscFinalize(mpi_ierr)
-                call MPI_FINALIZE(mpi_ierr)
-                call EXIT(EXIT_CFL)
+            if (dt > h_max/speed) then
+                print *, "!-------- FAIL CFL CONDITION --------!"
+                if (IS_failCFL .eqv. .true.) then
+                    call LYMPH3D_BARRIER
+                    call PetscFinalize(mpi_ierr)
+                    call MPI_FINALIZE(mpi_ierr)
+                    call EXIT(EXIT_CFL)
+                endif
             endif
 
         endif

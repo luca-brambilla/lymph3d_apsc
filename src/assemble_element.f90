@@ -38,12 +38,12 @@ subroutine MAKE_STIFFNESS_VOLUME(Np, Jdet, weitet3, nq3, lambda, mu, dphi, stiff
     integer(kind=4) :: q, i, j, m, n
     real(kind=8), dimension(DIM,DIM,Np,Np) :: temp
 
-    stiff_tet_vol = 0.0
+    stiff_tet_vol = 0.0d0
 
     ! loop on 3D quadrature points
     do q = 1,nq3
 
-        temp = 0.0
+        temp = 0.0d0
 
         do m=1,Np
             do n=1,Np
@@ -93,7 +93,7 @@ subroutine MAKE_MASS_VOLUME(Np, Jdet, weitet3, nq3, phi, rho, mass_tet_vol)
 
     integer(kind=4) :: q, i, m, n
 
-    mass_tet_vol = 0.0
+    mass_tet_vol = 0.0d0
 
     ! loop on 3D quadrature points
     do q = 1,nq3
@@ -137,7 +137,7 @@ subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi,
     integer(kind=4) :: q, i, j, k, m
     real(kind=8), dimension(DIM) :: points, forc_term
 
-    rhs_tet_vol = 0.0
+    rhs_tet_vol = 0.0d0
 
     ! time dependence
     ! loop on 3D quadrature nodes
@@ -147,7 +147,7 @@ subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi,
 
             ! map the quadrature nodes from the reference tetrahedron to the physical tetrahedron
             do j=1,DIM
-                points(j)=0.0
+                points(j)=0.0d0
                 do k=1,4
                     points(j) = points(j) + Fk(j,k)*nodtet3(k,q)
                 end do
@@ -221,13 +221,13 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
         sigma = alpha*(p**2) / minval(val) * D_bar
     end if
 
-    rhs_tet_face = 0.0
+    rhs_tet_face = 0.0d0
 
     ! loop on 2D quadrature nodes
     do q = 1,nq2
 
-        temp = 0.0
-        temp2 = 0.0
+        temp = 0.0d0
+        temp2 = 0.0d0
 
         ! if the condition is satisfied, then e is a Dirichlet boundary face
         if (E2 == -1) then
@@ -236,7 +236,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
 
                 ! map from the 2D quadrature nodes to the 3D points of the physical tetrahedron
                 do j=1,DIM
-                    points(j) = 0.0
+                    points(j) = 0.0d0
                     do k=1,4
                         do t=1,4
                             points(j) = points(j) + Fk(j,k)*node_maps(k,t,e)*nodtria2(t,q)
@@ -283,7 +283,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
 
                 ! map from the 2D quadrature nodes to the 3D points of the physical tetrahedron
                 do j=1,DIM
-                    points(j) = 0.0
+                    points(j) = 0.0d0
                     do k=1,4
                         do t=1,4
                             points(j) = points(j) + Fk(j,k)*node_maps(k,t,e)*nodtria2(t,q)
@@ -362,16 +362,16 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
         sigma = alpha*(p**2) / minval(val) * D_bar
     end if
 
-    S_E1 = 0.0
-    I_E1 = 0.0
-    I_E2 = 0.0
-    IT_E2 = 0.0
-    S_E2 = 0.0
+    S_E1 = 0.0d0
+    I_E1 = 0.0d0
+    I_E2 = 0.0d0
+    IT_E2 = 0.0d0
+    S_E2 = 0.0d0
 
     ! check if the actual face is not a Neumann boundary face
     if(E2 /= -2) then
 
-        temp = 0.0
+        temp = 0.0d0
 
         ! loop on 2D quadrature nodes
         nquad_loop: do q = 1,nq2
@@ -402,7 +402,7 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
             ! if the condition is satisfied, then e is a Dirichlet boundary face
             if (E2 == -1) then
 
-                temp = 0.0
+                temp = 0.0d0
                 
                 ! compute I_E1
                 do m=1,Np
@@ -433,10 +433,10 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
             ! internal face - not a boundary
             else
 
-                temp = 0.0
-                temp1 = 0.0
-                temp2 = 0.0
-                temp3 = 0.0
+                temp = 0.0d0
+                temp1 = 0.0d0
+                temp2 = 0.0d0
+                temp3 = 0.0d0
 
                 ! compute I_E1, I_E2, IT_E2, S_E2
                 do m=1,Np
@@ -562,7 +562,7 @@ subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_
     integer(kind=4) :: q, i, j, k, m
     real(kind=8), dimension(DIM) :: points, eval
 
-    vec_loc = 0.0
+    vec_loc = 0.0d0
 
     ! loop on 3D quadrature nodes
     do q = 1,nq3
@@ -571,7 +571,7 @@ subroutine MAKE_VECTOR_TET(Np, Fk, Jdet, nodtet3, weitet3, nq3, phi, vec_loc, f_
 
             ! map the quadrature nodes from the reference tetrahedron to the physical tetrahedron
             do j=1,DIM
-                points(j)=0.0
+                points(j)=0.0d0
                 do k=1,4
                     points(j) = points(j) + Fk(j,k)*nodtet3(k,q)
                 end do
