@@ -119,8 +119,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
 
     !type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa
     !type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa_modale
-    PetscScalar :: val(1)
-    PetscInt :: irow(1), jcol(1)
 
     integer(kind=4) :: nq3, nq2, p
     real(kind=8) :: theta, alpha, c
@@ -176,7 +174,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: K_loc
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: A_dg_loc
 
-    integer(kind=4) :: row, col, iface_neigh, iface_E1
+    integer(kind=4) :: row, col
 
     real(kind=8) :: t1, t2
 
@@ -226,8 +224,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
     ! internal_neigh = 0
 
     ! initialize output once
-    K_loc = 0.0
-    A_dg_loc = 0.0
+    K_loc = 0.0d0
+    A_dg_loc = 0.0d0
 
     ! loop on the tetrahedra
     elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
@@ -255,8 +253,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
         ! A_dg_loc(ie_loc)%values = 0.0
 
         ! initialization of V_loc
-        V_loc = 0.0
-        mass_loc = 0.0
+        V_loc = 0.0d0
+        mass_loc = 0.0d0
 
         mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
         ! take correct density only for dynamic case
@@ -304,31 +302,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
         ! PETSc populate matrix
         ! insert the values of M_loc in the 3 blocks of the mass matrix
         do i=1,DIM
-            do m=1,Np
-                do n=1,Np
 
-                    ! PETSc numbering starts from 0
-                    irow(1) = m-1
-                    jcol(1) = n-1
-                    val(1)  = mass_loc(i,i,m,n)
-
-                    if (abs(val(1)) >= TOL) then
-                        !PetscCall(MatSetValues(massa_modale(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
-                        !val(1) = val(1)*rho
-                        !PetscCall(MatSetValues(massa(ie_loc,i)%data, 1, irow, 1, jcol, val, INSERT_VALUES, mpi_ierr))
-                    end if
-
-                enddo
-                M_modal_loc(ie_loc,i,:,:) = mass_loc(i,i,:,:)
-                M_loc(ie_loc,i,:,:) = mass_loc(i,i,:,:)*rho
-            enddo
-
-            ! Finalize each PETSc matrix assembly
-            ! PetscCall(MatAssemblyBegin(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
-            ! PetscCall(MatAssemblyEnd(massa_modale(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
-
-            ! PetscCall(MatAssemblyBegin(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
-            ! PetscCall(MatAssemblyEnd(massa(ie_loc,i)%data, MAT_FINAL_ASSEMBLY, mpi_ierr))
+            M_modal_loc(ie_loc,i,:,:) = mass_loc(i,i,:,:)
+            M_loc(ie_loc,i,:,:) = mass_loc(i,i,:,:)*rho
+        
         enddo
         t2 = MPI_WTIME()
         tp_setup_M = tp_setup_M + t2 - t1
@@ -362,11 +339,11 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
             face_flag(iface) = 0
 
             ! initialization of the face matrices I_E1, S_E1, I_E2 and S_E2
-            I_E1 = 0.0
-            S_E1 = 0.0
-            I_E2 = 0.0
-            S_E2 = 0.0
-            IT_E2 = 0.0
+            I_E1 = 0.0d0
+            S_E1 = 0.0d0
+            I_E2 = 0.0d0
+            S_E2 = 0.0d0
+            IT_E2 = 0.0d0
 
             ! find the neighbouring tetrahedron E2 sharing the face iface with E1
             ! E2 is element E-
@@ -498,17 +475,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
                 ! if internal face
                 else
 
-                    ! find E+ face number on element E- for I^T contribution
-                    do iface_E1=1,PolyMesh%Elem_loc(E2)%num_faces
-                        iface_neigh = PolyMesh%Elem_loc(E2)%neigh_el(iface_E1,2)
-                        if (iface_neigh == E1) exit
-                    enddo
-
-                    if (iface_neigh /= E1) then
-                        print *, "E+ face not found on element E-"
-                        stop
-                    endif
-
                     do i=1,DIM
                         do j=1,DIM
                             do m=1,Np
@@ -577,8 +543,8 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc)
     integer(kind=4), intent(in) :: Np               !< number of degrees of freedom of each element
     integer(kind=4), intent(in) :: num_elem_loc       !< Number of global dofs
 
-    real(kind=8) :: present = 0.0
-    real(kind=8) :: tmp = 0.0
+    real(kind=8) :: present = 0.0d0
+    real(kind=8) :: tmp = 0.0d0
 
     integer(kind=4) :: nq3, nq2, p
     real(kind=8) :: theta, alpha, c
@@ -669,13 +635,13 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc)
     endif
 
     ! initialize output once
-    rhs_loc = 0.0
+    rhs_loc = 0.0d0
 
     ! loop on the tetrahedra
     elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
 
         ! initialization of the rhs term on the volume rhs_tet_loc
-        rhs_tet_loc = 0.0
+        rhs_tet_loc = 0.0d0
 
         ! current element E+
         E1 = ie_loc
@@ -730,7 +696,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc)
             face_flag(iface) = 0
 
             ! initialization of the face rhs term rhs_face_bd_loc
-            rhs_face_bd_loc = 0.0
+            rhs_face_bd_loc = 0.0d0
 
             ! find the neighbouring tetrahedron E2 sharing the face iface with E1
             ! E2 is element E-
@@ -819,7 +785,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc)
                         do m=1,Np
                             row = (i-1)*Np + m
                             tmp = rhs_face_bd_loc(i,m)
-                            if (tmp .ne. 0.0) then
+                            if (tmp .ne. 0.0d0) then
                                 rhs_loc(ie_loc,row) = rhs_loc(ie_loc,row) + tmp
                             endif
                         enddo
@@ -918,8 +884,8 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
     ! solution initializations
     allocate(uex_integral(PolyMesh%num_poly_loc, DIM, Np))
     allocate(modal_coeff(PolyMesh%num_poly_loc, DIM*Np))
-    uex_integral = 0.0
-    modal_coeff = 0.0
+    uex_integral = 0.0d0
+    modal_coeff = 0.0d0
 
     ! loop on the tetrahedra
     elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
@@ -958,7 +924,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
             do m=1,Np
 
                 do ii=1,DIM
-                    points(ii)=0.0
+                    points(ii)=0.0d0
                     do jj=1,4
                         points(ii)=points(ii)+Fk(ii,jj)*nodtet3(jj,q)
                     enddo
@@ -989,6 +955,10 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
         enddo
 
     enddo elem_loop
+
+    if (maxval(abs(modal_coeff)) < TOL) then
+        !modal_coeff = 0.0d0
+    endif
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
@@ -1107,7 +1077,7 @@ subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, u_loc, u_glo, gathered_sizes, disp
 end subroutine POST_PROCESS_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
-subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_loc, v0_loc, un_loc)
+subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_loc, u0_mpi, v0_loc, un_loc)
 
     implicit none
 
@@ -1130,6 +1100,8 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc,
     real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(in) :: v0_loc
     !> solution of first timestep for u^{(1)}
     real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(out) :: un_loc
+    !> IC displacement from other processes
+    real(kind=8), dimension(PolyMesh%num_elem_inter_vec(mpi_id+1), DIM*Np), intent(in) :: u0_mpi
 
     real(kind=8), dimension(DIM*Np) :: tmp
     integer(kind=4) :: ie_loc, E1, E2, iface, ie_neigh_loc, n_neigh
@@ -1141,16 +1113,19 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc,
 
     real(kind=8), dimension(Np,Np) :: R, RT
 
-    integer(kind=4) :: i
+    integer(kind=4) :: i, istart, iend
     integer(kind=4) :: row
+
+    real(kind=8) :: factor
 
     n_neigh = PolyMesh%Elem_loc(1)%num_faces
 
     !allocate(v_ptr(Np))
+    factor = 1.0d16
 
     elem_loop: do ie_loc = 1,PolyMesh%num_elem_loc
         E1 = ie_loc
-        tmp = 0.0
+        tmp = 0.0d0
 
         ! E+ contribution
         tmp = matmul(K_loc(E1,1,:,:), u0_loc(E1,:))
@@ -1165,6 +1140,7 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc,
             ! if boundary face, no contribution in E-, Dirichlet contribution already in E+
             if (E2 < 0) then
                 !print *, '-- cycle --'
+                if (mpi_id==0) print *, 'mpi_id:', mpi_id, ' ie_loc:', ie_loc, ' E2:', E2, ' - BOUNDARY'
                 cycle neigh_loop
             endif
 
@@ -1174,11 +1150,35 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc,
                 is_E2_local = .true.
             endif
 
-            ie_neigh_loc = PolyMesh%elem_glo2loc(E2)
+            ! use u0_loc directly
+            if (is_E2_local) then
+                print *, 'mpi_id:', mpi_id, ' ie_loc:', ie_loc, ' E2:', E2, ' - LOCAL'
+                ie_neigh_loc = PolyMesh%elem_glo2loc(E2)
+                tmp = tmp + matmul(K_loc(E1,iface+1,:,:), u0_loc(ie_neigh_loc,:))
 
-            tmp = tmp + matmul(K_loc(E1,iface+1,:,:), u0_loc(ie_neigh_loc,:))
+            ! find index in u_mpi, given the global index of E-
+            else
+                ! start and end index on u_mpi
+                istart = PolyMesh%inter_disp(mpi_id+1,1)+1
+                iend = istart + PolyMesh%num_elem_inter_vec(mpi_id+1)
+
+                ! finds first occurrence
+                do i = istart, iend
+                    if (PolyMesh%elem_inter_glo(i) == E2) then
+                        ie_neigh_loc = i
+                        exit
+                    endif
+                enddo
+
+                print *, 'mpi_id:', mpi_id, ' ie_loc:', ie_loc, ' E2:', E2, ' at', ie_neigh_loc
+                tmp = tmp + matmul(K_loc(E1,iface+1,:,:), u0_mpi(ie_neigh_loc,:))
+            endif
 
         end do neigh_loop
+
+        print *, 'mpi_id:', mpi_id, ' ---- end neigh loop', ie_loc, '----'
+
+        cycle
 
         ! add forcing term and rescale
         tmp = half_dt2 * ( - tmp + rhs_loc(ie_loc,:) * time_function(t) )
@@ -1198,6 +1198,8 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc,
         un_loc(ie_loc,:) = tmp + u0_loc(ie_loc,:) + time_step*v0_loc(ie_loc,:)
 
     end do elem_loop
+
+    print *, mpi_id, '------------- end element loop --------------'
 
     !deallocate(v_ptr)
 
@@ -1257,7 +1259,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_lo
 
     elem_loop: do ie_loc = 1,PolyMesh%num_elem_loc
         E1 = ie_loc
-        tmp = 0.0
+        tmp = 0.0d0
 
         !----
         t1 = MPI_WTIME()
@@ -1351,7 +1353,7 @@ subroutine COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, uh_loc, uex_l
     real(kind=8), dimension(Np) :: du, tmp
     integer(kind=4) :: i,ie_loc,row
 
-    err_L2_loc = 0.0
+    err_L2_loc = 0.0d0
 
     do ie_loc=1,PolyMesh%num_elem_loc
         do i=1,3
@@ -1385,7 +1387,7 @@ subroutine COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, uh_loc, uex_loc,
     real(kind=8), dimension(DIM*Np) :: du, tmp, du_neigh
     integer(kind=4) :: ie_loc,n_neigh,iface,E2,ie_neigh_loc
 
-    err_DG_loc = 0.0
+    err_DG_loc = 0.0d0
     n_neigh = PolyMesh%Elem_loc(1)%num_faces
 
     do ie_loc=1,PolyMesh%num_elem_loc

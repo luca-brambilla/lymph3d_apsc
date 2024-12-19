@@ -97,7 +97,7 @@ end subroutine MPI_EXCHANGE_DEALLOCATE
 
 !> Each process sends and receive a different amount of data from all other processes
 !> All-to-all implementation with asyncronous send and receive
-subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, un_mpi, send_data, recv_data)
+subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_data)
 
     use mpi
     use Poly_setup_mpi
@@ -107,15 +107,13 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, un_mpi, send_data, 
     implicit none
 
     type(Mesh_Structure), intent(in) :: PolyMesh !< mesh
-    real(kind=8), dimension(:), intent(in) :: input_sol   !< full input solution
-    real(kind=8), dimension(:), intent(out) :: output_sol !< output solution containing interface data only
-    real(kind=8), dimension(:,:), intent(inout) :: un_mpi
-
+    real(kind=8), dimension(:,:), intent(in) :: input_sol   !< full input solution
+    real(kind=8), dimension(:,:), intent(out) :: output_sol !< output solution containing interface data only
 
     integer(kind=4) :: id_send
     integer(kind=4) :: id_recv
     integer(kind=4) :: n_elem, n_dof
-    integer(kind=4) :: Np, ie_loc, ie_glob, k, i, ireq
+    integer(kind=4) :: Np, ie_loc, ie_glob, k, i, ireq, ie_send_loc, ie_recv_loc, el_sum
     integer(kind=4) :: row_sol, row_send, row_recv
 
     type(ScatteredArray), dimension(mpi_np, mpi_np), intent(inout) :: send_data, recv_data
@@ -129,96 +127,70 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, un_mpi, send_data, 
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    ! send
+    ! send start request index
     ireq=1
     do id_recv=1,mpi_np
         do id_send=1,mpi_np
-            ! multiply by number of dof per element and dimension 3D
+
             n_elem = PolyMesh%num_elem_inter_comm(id_recv,id_send)
-            n_dof = n_elem * Np * DIM
             ! check if data needs to be sent
             if (n_elem /= 0 .and. mpi_id == id_send-1 .and. id_recv/=id_send) then
 
-                ! fill the send buffer with correct dofs
-                do i=1,DIM
-                    do k=1,n_elem
-                        ! get global index
-                        ie_glob = PolyMesh%elem_inter_glo(PolyMesh%inter_disp(id_recv,id_send)+k)
-                        ! find local index
-                        ie_loc = PolyMesh%elem_glo2loc(ie_glob)
-                        ! ie_glob = PolyMesh%elem_inter_loc(PolyMesh%inter_disp(id_recv,id_send)+k)
+                ! prepare send buffer
+                do k=1,n_elem
+                    ! get global index
+                    ie_glob = PolyMesh%elem_inter_glo(PolyMesh%inter_disp(id_recv,id_send)+k)
+                    ! find local index
+                    ie_send_loc = PolyMesh%elem_glo2loc(ie_glob)
 
-                        ! insert in buffer
-                        row_send = (i-1)*n_elem*Np + (k-1)*Np
-                        row_sol = (i-1)*PolyMesh%num_elem_loc*Np + (ie_loc-1)*Np
-                        send_data(id_recv,id_send)%data(row_send+1:row_send+Np) = input_sol(row_sol+1:row_sol+Np)
-                    enddo
+                    ! insert in buffer
+                    row_send = (k-1)*Np*DIM
+                    send_data(id_recv,id_send)%data(row_send+1:row_send+DIM*Np) = input_sol(ie_send_loc,:)
                 enddo
 
-                !call flush
-                !print *, 'id', mpi_id, 'n_dof', n_dof, 'data send', send_data(id_recv,id_send)%data
-                !print *, 'sending   - send: ', id_send-1, 'receive: ', id_recv-1, 'n_dof', n_dof
+                ! multiply by number of dof per element and dimension 3D
+                n_dof = n_elem * Np * DIM
 
                 ! all-to-all asyncronous communication
                 call MPI_ISEND(send_data(id_recv,id_send)%data, n_dof, MPI_DOUBLE_PRECISION, id_recv-1, 0, MPI_COMM_WORLD, requests(ireq), mpi_ierr)
 
-                ireq = ireq + 2 ! request for send and request for receive - send
+                ! update request for send
+                ireq = ireq + 2
             end if
         end do
     end do
 
-    !call FLUSH
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-    !print *, '$$$$$$$$$$$ END SENDING DATA $$$$$$$$$$$$'
 
-    ! receive
-    ireq = 2
+    ! receive start request index
+    ireq = 0
     do id_recv=1,mpi_np
         do id_send=1,mpi_np
-            !call FLUSH
-            ! multiply by number of dof per element and dimension 3D
             n_elem = PolyMesh%num_elem_inter_comm(id_recv,id_send)
-            n_dof = n_elem * Np * DIM
+            ! check if data needs to be received
             if (n_elem /= 0 .and. mpi_id == id_recv-1 .and. id_recv/=id_send) then
-                row_recv = sum(PolyMesh%num_elem_inter_comm(id_recv,1:id_send-1))*DIM*Np
-                !print *, PolyMesh%num_elem_inter_comm(id_recv, 1:id_send)
-                !print *, 'sum:', row_recv/(DIM*Np)
 
+                ! update request for receive
+                ireq = ireq + 2
+
+                ! multiply by number of dof per element and dimension 3D
+                n_dof = n_elem * Np * DIM
                 ! all-to-all asyncronous communication
                 call MPI_IRECV(recv_data(id_recv,id_send)%data, n_dof, MPI_DOUBLE_PRECISION, id_send-1, 0, MPI_COMM_WORLD, requests(ireq), mpi_ierr)
 
-                ireq = ireq + 2 ! request for send and request for receive - receive
+                ! save receive buffer in local output solution
+                el_sum = sum(PolyMesh%num_elem_inter_comm(id_recv,1:id_send-1))
+                do k=1,n_elem
+                    ie_recv_loc = el_sum + k
+                    row_recv = (k-1)*Np*DIM
+                    output_sol(ie_recv_loc,:) = recv_data(id_recv,id_send)%data(row_recv+1:row_recv+DIM*Np)
+                enddo
 
-                !call flush
-                !print *, 'receiving - send: ', id_send-1, 'receive: ', id_recv-1, '- sum:', row_recv, ' - data:', PolyMesh%num_elem_inter_comm(id_recv, 1:id_send-1)
-                ! print *, 'data receive', recv_data(id_recv,id_send)%data
-                output_sol(row_recv+1:row_recv+n_dof) = recv_data(id_recv,id_send)%data
             end if
         end do
     end do
 
-    call MPI_WAITALL(ireq-2, requests, statuses, mpi_ierr)
-    !print *, '$$$$$$$$$$$$ END RECEIVING DATA $$$$$$$$$$$$', mpi_id
-
-    istart = 0
-    iestart = 0
-    do i = 1,mpi_np
-        ! number of received element data per process
-        num_inter_loc = PolyMesh%num_elem_inter_comm(mpi_id+1,i)
-        if (num_inter_loc == 0) cycle
-
-        do ie_loc=1,num_inter_loc
-            do j=1,DIM
-                col = (j-1)*Np
-                col_mpi = istart + (j-1)*Np*num_inter_loc
-                un_mpi(iestart+ie_loc, col+1:col+Np) = output_sol(col_mpi+1:col_mpi+Np)
-            enddo
-            istart = istart + Np
-        enddo
-        ! new position for new process
-        iestart = iestart + num_inter_loc
-        istart = Np*num_inter_loc*DIM
-    enddo
+    call MPI_WAITALL(ireq, requests, statuses, mpi_ierr)
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 

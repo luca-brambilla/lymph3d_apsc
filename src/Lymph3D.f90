@@ -103,7 +103,7 @@ program Lymph3D
 
     !integer(kind=4) :: j !,k,m,n,row,col
 
-    real(kind=8), dimension(:), allocatable :: prova_in, prova_out
+    real(kind=8), dimension(:,:), allocatable :: prova_in
     integer(kind=4) :: tmp_size, unit_print
     type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
 
@@ -191,6 +191,7 @@ program Lymph3D
                     0, MPI_COMM_WORLD, mpi_ierr)
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
     if (mpi_id == 0) print *, 'GRID SIZE: ', hmax
+    if (mpi_id == 0) print *, 'TIME STEP: ', time_step
 
     !! CHECK IF IT WORKS
     IS_failCFL = .true.
@@ -204,29 +205,45 @@ program Lymph3D
 
     Np = PolyMesh%Elem_loc(1)%NDof_elem
 
-    if (mpi_np>1) then
-        allocate(prova_in(PolyMesh%num_elem_loc*DIM*Np))
-        allocate(prova_out(PolyMesh%num_elem_inter_vec(mpi_id+1)*DIM*Np))
+    num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
+    allocate(un_mpi(num_inter_loc, DIM*Np))
+
+    if (mpi_np>1)   call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
+
+
+    if (mpi_np>8) then
+        print *, 'mpi check'
+        allocate(prova_in(PolyMesh%num_elem_loc,DIM*Np))
 
         prova_in=0
-        do i=1,PolyMesh%num_elem_loc*DIM*Np
-            prova_in(i) = 1000000*mpi_id + i
+        do ie_loc=1,PolyMesh%num_elem_loc
+            do i=1,DIM*Np
+                prova_in(ie_loc,i) = 1000000*mpi_id + (ie_loc-1)*DIM*Np + i
+            enddo
         enddo
 
-        num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
-        allocate(un_mpi(num_inter_loc, DIM*Np))
+        call LYMPH3D_BARRIER
+
+        if (mpi_id == 0) then
+            print *, "prova_in row-by-row:"
+            do ie_loc = 1, PolyMesh%num_elem_loc  ! Loop over rows
+                print *, prova_in(ie_loc, :)
+            end do
+        endif
+
+        ! num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
+        ! allocate(un_mpi(num_inter_loc, DIM*Np))
 
         !print *, 'proc:', mpi_id, 'data out: ', prova_in
 
         call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-        call MPI_EXCHANGE_DOF(PolyMesh, prova_in, prova_out, un_mpi, send_data, recv_data)
+        call MPI_EXCHANGE_DOF(PolyMesh, prova_in, un_mpi, send_data, recv_data)
 
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-        call MPI_EXCHANGE_DEALLOCATE(PolyMesh, send_data, recv_data)
+        !call MPI_EXCHANGE_DEALLOCATE(PolyMesh, send_data, recv_data)
         print *, 'end exchange'
-        if (mpi_id == 0) print *, 'proc:', mpi_id, 'data out: ', prova_out
 
         ! num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
         ! allocate(un_mpi(num_inter_loc, DIM*Np))
@@ -259,10 +276,8 @@ program Lymph3D
             end do
         endif
 
-        deallocate(prova_in, prova_out)
+        deallocate(prova_in)
     endif
-
-    !call LYMPH3D_STOP
 
     call WRITE_MESH_VISUALIZATION_VTK(PolyMesh%num_elem_loc, PolyMesh, mpi_id)
 
@@ -532,7 +547,23 @@ program Lymph3D
 
         !! computation on tetra or on poly??? solution dof on poly
 
-        call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_loc, v0_loc, un_loc)
+        if (mpi_np>1) then
+            call MPI_EXCHANGE_DOF(PolyMesh, u0_loc, un_mpi, send_data, recv_data)
+            if (mpi_id == 0) then
+                print *, "un_mpi row-by-row:"
+                do i = 1, PolyMesh%num_elem_inter_vec(mpi_id+1)  ! Loop over rows
+                    print *, i, un_mpi(i, :)
+                end do
+            endif
+        endif
+
+        !if (mpi_id==0) print *, PolyMesh%elem_inter_glo
+
+        call LYMPH3D_BARRIER
+
+        call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_loc, un_mpi, v0_loc, un_loc)
+
+        if (mpi_id==0) print *, 'END FIRST ITERATION'
 
         ! SAVE FIRST ITERATION
         if (IsSave_output .eqv. .true.) then
@@ -545,6 +576,18 @@ program Lymph3D
 
         num_dt = num_dt + 1
         t = t + time_step
+
+        if (mpi_np>1) then
+            call MPI_EXCHANGE_DOF(PolyMesh, un_loc, un_mpi, send_data, recv_data)
+            if (mpi_id == 0) then
+                print *, "un_mpi row-by-row:"
+                do i = 1, PolyMesh%num_elem_inter_vec(mpi_id+1)  ! Loop over rows
+                    print *, un_mpi(i, :)
+                end do
+            endif
+        endif
+
+        call LYMPH3D_STOP
 
         ! loop start
         do while (t <= stop_time)
