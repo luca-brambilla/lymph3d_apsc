@@ -18,6 +18,7 @@ SET_PETSC_SYSTEM.o : SET_PETSC_SYSTEM.f90 Poly_global.o Poly_setup_MPI.o
 SOLVER_SETTINGS.o : SOLVER_SETTINGS.f90 problem_data_and_properties.o Poly_global.o Poly_setup_MPI.o 
 assemble_element.o : assemble_element.f90 Poly_global.o basis_function.o Poly_ref_mappings.o Poly_mesh.o problem_data_and_properties.o 
 basis_function.o : basis_function.f90 vet_mat_operations.o Poly_mesh.o Poly_global.o 
+checks.o : checks.f90 Poly_global.o Poly_global.o Poly_setup_MPI.o 
 exchange_data.o : exchange_data.f90 Poly_global.o Poly_mesh.o Poly_setup_MPI.o 
 export_file_formats.o : export_file_formats.f90 MAKE_PARTITION_AND_MPI_FILES.o problem_data_and_properties.o Poly_setup_MPI.o Poly_global.o Poly_mesh.o 
 matrix_free.o : matrix_free.f90 utilities.o Poly_global.o Poly_global.o MAKE_PARTITION_AND_MPI_FILES.o vet_mat_operations.o Poly_mesh.o Poly_data.o Poly_ref_mappings.o Poly_global.o assemble_element.o basis_function.o problem_data_and_properties.o Poly_setup_MPI.o 

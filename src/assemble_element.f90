@@ -170,7 +170,7 @@ subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi,
 end subroutine MAKE_RHS_VOLUME
 
 !> Assemble the element rhs term `rhs_tet_face` approximating the integral on the boundary faces of the tetrahedron (boundary conditions)
-!> \f[ [F_{\partial K}]_i = \sum_{F \in {\mathcal{F}_h^{N}}|_{K} } \int_F \boldsymbol{g}_N \cdot \boldsymbol{\varphi}_{i,K} +  \theta \sum_{F \in \mathcal{F}_h^D |_{K} } \int_F \{\boldsymbol{\sigma}(\boldsymbol{g}_D) \} \cdot [\![ \boldsymbol{\varphi}_{i,K} ]\!] + \sum_{F\in \mathcal{F}_h^D |_{K} } \int_F \eta [\![ \boldsymbol{g}_D ]\!] \cdot [\![ \boldsymbol{\varphi}_{i,K} ]\!]  \f]
+!> \f[ [F_{\partial K}]_i = \sum_{F \in {\mathcal{F}_h^{N}}|_{K} } \int_F \boldsymbol{g}_N \cdot \boldsymbol{\varphi}_{i,K} +  \theta \sum_{F \in \mathcal{F}_h^D |_{K} } \int_F \{\boldsymbol{\sigma}(\boldsymbol{g}_D) \} : [\![ \boldsymbol{\varphi}_{i,K} ]\!] + \sum_{F\in \mathcal{F}_h^D |_{K} } \int_F \eta [\![ \boldsymbol{g}_D ]\!] : [\![ \boldsymbol{\varphi}_{i,K} ]\!]  \f]
 subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, Fk, nodtria2, weitria2, nq2, lambda, mu, node_maps, &
                             phi_b, grad_b, space_fun_tag, rhs_tet_face)
 
@@ -308,14 +308,14 @@ end subroutine MAKE_RHS_FACE
 
 !> Assemble the terms of the stiffness matrix  `S_E1` and `I_E1` approximating the integrals on the faces of the tetrahedron
 !> and the ones `S_E2` and `I_E2` approximating the integrals on the faces of the neighbouring tetrahedron E-
-!> \f[ [I_K]_{ij} = \sum_{F\in (F_h^I \cup F_h^D)|_{K} } \int_F  \{ \boldsymbol{\sigma}(\boldsymbol{\varphi}_{j,K}) \} \cdot [\![ \boldsymbol{\varphi}_{i,K} ]\!] \quad  [S_K]_{ij} =  \sum_{F\in (F_h^I \cup F_h^D) |_{K} } \int_F \eta [\![ \boldsymbol{\varphi}_{j,K} ]\!] \cdot [\![ \boldsymbol{\varphi}_{i,K} ]\!] \f]
+!> \f[ [I_K]_{ij} = \sum_{F\in (F_h^I \cup F_h^D)|_{K} } \int_F  \{ \boldsymbol{\sigma}(\boldsymbol{\varphi}_{j,K}) \} : [\![ \boldsymbol{\varphi}_{i,K} ]\!] \quad  [S_K]_{ij} =  \sum_{F\in (F_h^I \cup F_h^D) |_{K} } \int_F \eta [\![ \boldsymbol{\varphi}_{j,K} ]\!] : [\![ \boldsymbol{\varphi}_{i,K} ]\!] \f]
 !> components
-!> \f[ [S_{K+}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+):(\boldsymbol{\varphi}_{i,K}^+ \textbf{n}^+ ) + \sum_{F\in F_h^D|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+):(\boldsymbol{\varphi}_{i,K}^+ \textbf{n}^+) \f]
-!> \f[ [S_{K-}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+):( \boldsymbol{\varphi}_{i,K}^- \textbf{n}^-) \f]
-!> \f[ [I_{K+}]_{ij} = [I_{K+}]^T_{ij} = \sum_{F\in F_h^I|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) + \sum_{F\in F_h^D|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
-!> \f[ [I_{K-}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F ( \boldsymbol{\varphi}_{j,K}^- \textbf{n}^- ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
+!> \f[ [S_{K+}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \odot \textbf{n}^+):(\boldsymbol{\varphi}_{i,K}^+ \odot \textbf{n}^+ ) + \sum_{F\in F_h^D|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \odot \textbf{n}^+):(\boldsymbol{\varphi}_{i,K}^+ \odot \textbf{n}^+) \f]
+!> \f[ [S_{K-}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F \eta (\boldsymbol{\varphi}_{j,K}^+ \odot \textbf{n}^+):( \boldsymbol{\varphi}_{i,K}^- \odot \textbf{n}^-) \f]
+!> \f[ [I_{K+}]_{ij} = [I_{K+}]^T_{ij} = \sum_{F\in F_h^I|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \odot \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) + \sum_{F\in F_h^D|_{K} } \int_F (\boldsymbol{\varphi}_{j,K}^+ \odot \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
+!> \f[ [I_{K-}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F ( \boldsymbol{\varphi}_{j,K}^- \odot \textbf{n}^- ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
 !>
-!> \f[ [I_{K-}]^T_{ij} = \sum_{F\in F_h^I|_{K} } \int_F ( \boldsymbol{\varphi}_{j,K}^+ \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^-) \f]
+!> \f[ [I_{K-}]^T_{ij} = \sum_{F\in F_h^I|_{K} } \int_F ( \boldsymbol{\varphi}_{j,K}^+ \odot \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^-) \f]
 
 subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2, nq2, lambda, mu, &
                             phi_b, grad_b, S_E1, I_E1, S_E2, I_E2, IT_E2)
@@ -495,6 +495,7 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
                         enddo
                         do i=1,DIM
                             do j=1,DIM
+                                ! + sign since it's computed from E- and normal has opposite sign
                                 IT_E2(i,j,n,m) = IT_E2(i,j,n,m) + 0.5*weitria2(q)*area*temp2(i,j,m,n)
                             enddo
                         enddo

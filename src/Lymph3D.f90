@@ -25,6 +25,7 @@ program Lymph3D
     !use MOD_MPI_CUSTOM
     use global_parameters
     use utilities
+    use checks
 
     implicit none
 
@@ -183,6 +184,17 @@ program Lymph3D
         write(*,'(A)') '---------------------Partitioning----------------------'
 
     call MAKE_PARTITION_AND_MPI_FILES(PolyData, PolyMesh, Npoly)
+
+    ! compute h_max
+    hmax_mpi = compute_hmax(PolyMesh)
+    call MPI_REDUCE(hmax_mpi, hmax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+                    0, MPI_COMM_WORLD, mpi_ierr)
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    if (mpi_id == 0) print *, 'GRID SIZE: ', hmax
+
+    !! CHECK IF IT WORKS
+    IS_failCFL = .true.
+    call COMPUTE_CFL(hmax, time_step)
 
     call LYMPH3D_BARRIER
 
@@ -845,14 +857,8 @@ program Lymph3D
     t2 = MPI_WTIME()
     tp_error = t2 - t1
 
-    hmax_mpi = compute_hmax(PolyMesh)
-
-    call MPI_REDUCE(hmax_mpi, hmax, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-                    0, MPI_COMM_WORLD, mpi_ierr)
-
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
     if (mpi_id == 0) print *, 'GRID SIZE: ', hmax
+
     !if (mpi_id == 0) call WRITE_ERRORS(p, err_DG, err_L2, hmax, PolyMesh, IsPoly)
 
 

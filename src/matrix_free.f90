@@ -1370,7 +1370,6 @@ end subroutine COMPUTE_ERROR_L2_MATRIX_FREE
 !> Compute DG error in matrix-free framework
 subroutine COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, uh_loc, uex_loc, err_DG_loc)
 
-    !! CHECK
     !TODO make parallel
     implicit none
 
