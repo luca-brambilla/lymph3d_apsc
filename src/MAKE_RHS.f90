@@ -1,4 +1,4 @@
-subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
+subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs, f_forcing, f_dirichlet, f_neumann)
 
 #include<petsc/finclude/petscksp.h>
     
@@ -17,6 +17,29 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
 
     implicit none
     
+
+    ! PASS FUNCTION AS ARGUMENT
+    interface
+        function f_forcing(lambda, mu, point, rho) result(res)
+            use global_parameters, only: DIM
+            real(kind=8) :: rho, lambda, mu
+            real(kind=8), dimension(DIM) :: point, res
+        end function f_forcing
+
+        function f_dirichlet(point, space_fun_tag) result(res)
+            use global_parameters, only: DIM
+            real(kind=8), dimension(DIM) :: point, res
+            integer(kind=4) :: space_fun_tag
+        end function f_dirichlet
+
+        function f_neumann(lambda, mu, normal, point, space_fun_tag) result(res)
+            use global_parameters, only: DIM
+            real(kind=8) :: lambda, mu
+            real(kind=8), dimension(DIM) :: point, res, normal
+            integer(kind=4) :: space_fun_tag
+        end function f_neumann
+    end interface
+
     real(kind=8) :: present = 0.0
     ! petsc_rhs is provided by SET_PETSC_VECTOR.f90
 
@@ -154,7 +177,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
         call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
 
         ! computation of the rhs term on the volume rhs_tet_loc (see assemble_element.f90)
-        call MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho)
+        call MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_loc, rho, f_forcing)
 
         ! this allows to assemble the local vector correctly into the global vector
         beg = (ipoly_glob-1)*Np + 1
@@ -238,7 +261,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
                                         PolyMesh%Poly(ipoly_loc)%neigh_bbox(iface_poly,:,:),blist, Np, Fk, node_maps, nodtria2, nq2)
 
                     call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly_loc)%neigh_hk(iface_poly),&
-                                        nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
+                                        nn,PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc, f_dirichlet, f_neumann)
 
                 else
 
@@ -248,7 +271,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
                                             PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(ipoly2_loc)%hk,nn, &
-                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
+                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc, f_dirichlet, f_neumann)
 
                     else
 
@@ -256,7 +279,7 @@ subroutine MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
                                             PolyMesh%Poly(1)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
 
                         call MAKE_RHS_FACE(theta,alpha,p,Np,e,E2,PolyMesh%Poly(ipoly_loc)%hk,PolyMesh%Poly(1)%hk,nn, &
-                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc)
+                                            PolyMesh%Elem_loc(E1)%area(e),Fk,nodtria2,weitria2,nq2,lambda,mu,node_maps,phi_b,grad_b,space_fun_tag,rhs_face_bd_loc, f_dirichlet, f_neumann)
 
                     endif
 

@@ -112,12 +112,23 @@ end subroutine MAKE_MASS_VOLUME
 
 !> Assemble the term `rhs_tet_vol` approximating the volume integral over the tetrahedral element
 !> \f[ [F_{K}]_{i} = \int_K \boldsymbol{f} \cdot \boldsymbol{\varphi}_{i,K} \f]
-subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_vol, rho)
+subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_vol, rho, forcing_fun)
 
     ! phi is provided by the subroutine basis in basis_function.f90
     ! weitet3 is provided by the subroutine mapping_quadrature_3D in Poly_ref_mappings.f90
     ! nq3 is provided by the subroutine quadrature in basis_function.f90
     ! Fk and Jdet are provided by the subroutine jacobians in Poly_ref_mappings.f90
+
+    implicit none
+
+    ! PASS FUNCTION AS ARGUMENT
+    interface
+        function forcing_fun(lambda, mu, point, rho) result(res)
+            use global_parameters, only: DIM
+            real(kind=8) :: rho, lambda, mu
+            real(kind=8), dimension(DIM) :: point, res
+        end function forcing_fun
+    end interface
 
     ! density is 0.0 in static case
     real(kind=8), intent(in) :: rho !< element density
@@ -156,7 +167,7 @@ subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi,
             ! f_time is provided by problem_data_and_properties.f90
             !! considers correct density if dynamic problem, otherwise rho=0.0
             ! forc_term = f(lambda,mu,points)
-            forc_term = f_time(lambda,mu,points,rho)
+            forc_term = forcing_fun(lambda,mu,points,rho)
 
             do i=1,DIM
                 rhs_tet_vol(i,m) = rhs_tet_vol(i,m) + abs(Jdet)*weitet3(q)*forc_term(i)*phi(m,q)
@@ -172,7 +183,7 @@ end subroutine MAKE_RHS_VOLUME
 !> Assemble the element rhs term `rhs_tet_face` approximating the integral on the boundary faces of the tetrahedron (boundary conditions)
 !> \f[ [F_{\partial K}]_i = \sum_{F \in {\mathcal{F}_h^{N}}|_{K} } \int_F \boldsymbol{g}_N \cdot \boldsymbol{\varphi}_{i,K} +  \theta \sum_{F \in \mathcal{F}_h^D |_{K} } \int_F \{\boldsymbol{\sigma}(\boldsymbol{g}_D) \} : [\![ \boldsymbol{\varphi}_{i,K} ]\!] + \sum_{F\in \mathcal{F}_h^D |_{K} } \int_F \eta [\![ \boldsymbol{g}_D ]\!] : [\![ \boldsymbol{\varphi}_{i,K} ]\!]  \f]
 subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, Fk, nodtria2, weitria2, nq2, lambda, mu, node_maps, &
-                            phi_b, grad_b, space_fun_tag, rhs_tet_face)
+                            phi_b, grad_b, space_fun_tag, rhs_tet_face, dirichlet_fun, neumann_fun)
 
     ! theta and alpha are provided by the subroutine set_properties in problem_data_and_properties.f90
     ! phi_b and grad_b are provided by the subroutine basis_boundary in basis_functions.f90
@@ -180,6 +191,22 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
     ! nq2 is provided by the subroutine quadrature in basis_function.f90
     ! Fk is provided by by the subroutine jacobians in Poly_ref_mappings.f90
 
+    implicit none
+
+    interface
+        function dirichlet_fun(point, space_fun_tag) result(res)
+            use global_parameters, only: DIM
+            real(kind=8), dimension(DIM) :: point, res
+            integer(kind=4) :: space_fun_tag
+        end function dirichlet_fun
+
+        function neumann_fun(lambda, mu, normal, point, space_fun_tag) result(res)
+            use global_parameters, only: DIM
+            real(kind=8) :: lambda, mu
+            real(kind=8), dimension(DIM) :: point, res, normal
+            integer(kind=4) :: space_fun_tag
+        end function neumann_fun
+    end interface
 
     integer(kind=4), intent(in) :: nq2  !< number of 2D quadrature nodes
     integer(kind=4), intent(in) :: Np   !< number of element dofs per dimension
@@ -244,7 +271,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
                     end do
                 end do
 
-                diri_data = gd(points,space_fun_tag)
+                diri_data = dirichlet_fun(points,space_fun_tag)
 
                 temp(1,m) = (lambda + 2*mu)*grad_b(1,m,q,1)*diri_data(1)*normal(1) + &
                             mu*grad_b(2,m,q,1)*diri_data(1)*normal(2) + mu*grad_b(3,m,q,1)*diri_data(1)*normal(3) + &
@@ -291,7 +318,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
                     end do
                 end do
 
-                neum_data = gn(lambda,mu,normal,points,space_fun_tag)
+                neum_data = neumann_fun(lambda,mu,normal,points,space_fun_tag)
 
                 do i=1,DIM
                     rhs_tet_face(i,m) = rhs_tet_face(i,m) &

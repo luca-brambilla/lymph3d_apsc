@@ -10,7 +10,7 @@ module problem_data_and_properties
 
     contains
 
-    !> @brief time function to be multiplied to space function to have h(x,t)=f(x)*g(t)
+    !> @brief time function to be multiplied to space function to have h(x,t)=f(x)*g(t) - nodal values
     function time_function(time)result(r)
 
         implicit none
@@ -22,7 +22,7 @@ module problem_data_and_properties
 
     end function time_function
 
-    !> @brief Forcing term
+    !> @brief Forcing term - nodal values
     function f(lambda, mu, p)result(r)
 
         implicit none
@@ -44,7 +44,7 @@ module problem_data_and_properties
 
     end function f
 
-    !> @brief Forcing term depending on time takes correct density, otherwise 0
+    !> @brief Forcing term depending on time takes correct density, otherwise 0 - nodal values
     function f_time(lambda, mu, p, rho)result(r)
 
         implicit none
@@ -69,7 +69,64 @@ module problem_data_and_properties
 
     end function f_time
 
-    !> @brief Dirichlet boundary data
+    function f_null(lambda, mu, p, rho)result(r)
+
+        implicit none
+
+        real(kind=8), dimension(3) :: r
+        real(kind=8), dimension(3) :: p
+        real(kind=8) :: lambda, mu, rho
+
+        r = 0.0d0
+
+    end function f_null
+
+    function gd_null(p,space_fun_tag)result(r)
+
+        integer(kind=4) :: space_fun_tag
+        real(kind=8), dimension(3) :: r
+        real(kind=8), dimension(3) :: p
+
+        r = 0.0d0
+
+    end function gd_null
+
+    function gn_null(lambda,mu,normal,p,space_fun_tag)result(r)
+        implicit none
+
+        integer(kind=4) :: space_fun_tag
+        real(kind=8), dimension(3) :: r
+        real(kind=8), dimension(3) :: p, normal
+        real(kind=8) :: lambda, mu
+
+        r = 0.0d0
+
+    end function gn_null
+
+    function gd_stat(p,space_fun_tag)result(r)
+
+        integer(kind=4) :: space_fun_tag
+        real(kind=8), dimension(3) :: r
+        real(kind=8), dimension(3) :: p
+
+        r = 2.0d0
+
+    end function gd_stat
+
+    function gn_stat(lambda,mu,normal,p,space_fun_tag)result(r)
+
+        implicit none
+
+        integer(kind=4) :: space_fun_tag
+        real(kind=8), dimension(3) :: r
+        real(kind=8), dimension(3) :: p, normal
+        real(kind=8) :: lambda, mu
+
+        r = 0.0d0
+
+    end function gn_stat
+
+    !> @brief Dirichlet boundary data - nodal values
     function gd(p,space_fun_tag)result(r)
 
         integer(kind=4) :: space_fun_tag
@@ -96,7 +153,7 @@ module problem_data_and_properties
 
     end function gd
 
-    !> @brief Dirichlet boundary data depending on time
+    !> @brief Dirichlet boundary data depending on time - nodal values
     function gd_time(p,space_fun_tag,time)result(r)
 
         real(kind=8) :: time
@@ -125,7 +182,7 @@ module problem_data_and_properties
 
     end function gd_time
 
-    !> @brief Surface traction data
+    !> @brief Surface traction data - nodal values
     function gn(lambda,mu,normal,p,space_fun_tag)result(r)
 
         implicit none
@@ -184,7 +241,7 @@ module problem_data_and_properties
 
     end function gn
 
-    !> @brief Analytical solution
+    !> @brief Analytical solution - nodal values
     function uex(p)result(r)
 
         real(kind=8), dimension(3) :: r
@@ -196,7 +253,17 @@ module problem_data_and_properties
 
     end function uex
 
-    !> @brief Analytical solution depenting on time
+        !> @brief Analytical solution - nodal values
+    function uex_stat(p)result(r)
+
+        real(kind=8), dimension(3) :: r
+        real(kind=8), dimension(3) :: p
+
+        r = 2.0d0
+
+    end function uex_stat
+
+    !> @brief Analytical solution depenting on time - nodal values
     function uex_time(p, time)result(r)
 
         real(kind=8) :: time
@@ -204,25 +271,24 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
 
-        r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-        r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-        r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+        r(1) = 1.0d0 + sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
+        r(2) = 1.0d0 + sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+        r(3) = 1.0d0 + sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
     end function uex_time
 
-    !> @brief Initial condition for displacement
+    !> @brief Initial condition for displacement - nodal values
     function ic_displacement(p)result(r)
 
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
 
-        r(1) = 0.0 * p(1)
-        r(2) = 0.0 * p(2)
-        r(3) = 0.0 * p(3)
+        !r = 0.0d0
+        r = 2.0d0 + 0.0d0*p
 
     end function ic_displacement
 
-    !> @brief Initial condition for velocity
+    !> @brief Initial condition for velocity - nodal values
     function ic_velocity(p)result(r)
 
         real(kind=8), dimension(3) :: r
