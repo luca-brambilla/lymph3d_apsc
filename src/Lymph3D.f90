@@ -83,7 +83,7 @@ program Lymph3D
     real(kind=8), dimension(:,:), allocatable :: rhs_stat_loc
     real(kind=8), dimension(:,:), allocatable :: rhs_dyn_loc
 
-    real(kind=8), dimension(:,:), allocatable :: un_mpi
+    real(kind=8), dimension(:,:), allocatable :: un_mpi, uex_mpi
 
     real(kind=8), dimension(:,:,:,:), allocatable :: M_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: M_modal_loc
@@ -207,12 +207,13 @@ program Lymph3D
     Np = PolyMesh%Elem_loc(1)%NDof_elem
 
     num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
-    allocate(un_mpi(num_inter_loc, DIM*Np))
+    !allocate(un_mpi(num_inter_loc, DIM*Np))
+    !allocate(uex_mpi(num_inter_loc, DIM*Np))
 
-    if (mpi_np>1) call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
+    !if (mpi_np>1) call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
 
 
-    if (mpi_np>1) then
+    if (mpi_np>200) then
         print *, 'mpi check'
         allocate(prova_in(PolyMesh%num_elem_loc,DIM*Np))
 
@@ -359,9 +360,16 @@ program Lymph3D
         allocate(v0_loc(PolyMesh%num_poly_loc, DIM*Np))
         !allocate(un_mpi(PolyMesh%num_elem_inter_vec(mpi_id+1), DIM*Np))
 
+        allocate(un_mpi(num_inter_loc, DIM*Np))
+        allocate(uex_mpi(num_inter_loc, DIM*Np))
+
         u0_loc = 0.0d0
         un_loc = 0.0d0
         v0_loc = 0.0d0
+        un_mpi = 0.0d0
+        uex_mpi= 0.0d0
+
+        if (mpi_np>1) call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
 
     else
         call FLUSH
@@ -387,6 +395,9 @@ program Lymph3D
         call SET_PETSC_VECTOR(petsc_f, local_dof, global_dof)
         call SET_PETSC_VECTOR(petsc_u0, local_dof, global_dof)
         call SET_PETSC_VECTOR(petsc_v0, local_dof, global_dof)
+
+        call SET_PETSC_VECTOR(petsc_modal_coeff_uex, local_dof, global_dof)
+
     end if
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -503,9 +514,9 @@ program Lymph3D
     time_step = 0.001
     num_dt_mon = 20
 
-    stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
-    !stop_time = SQRT2 / 4.0 + 0.0 * SQRT2
-    !stop_time = 0.021
+    !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
+    !stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
+    stop_time = 0.021
     !stop_time = 0.002
     
     dt2 = time_step*time_step
@@ -680,7 +691,7 @@ program Lymph3D
 
         if (IsTime_dependent .eqv. .false.) then
             ! Au=f
-            PetscCallA(KSPSolve(ksp, petsc_rhs_stat, petsc_sol, mpi_ierr))
+            PetscCallA(KSPSolve(ksp, petsc_rhs_dyn, petsc_sol, mpi_ierr))
 
         else
             if(mpi_id == 0) print *, "                   TIME LOOP START                   "
@@ -862,27 +873,35 @@ program Lymph3D
         ! check time dependence
         if (IsTime_dependent .eqv. .true.) then
             if (mpi_id == 0) write(*, '(A,F14.5)') 'Scale modal solution by time function at t = ', t
-            u0_loc = v0_loc + u0_loc * time_function(t)
+            u0_loc = v0_loc*0.0d0 + u0_loc * time_function(t)
         endif
         t2 = MPI_WTIME()
         tp_exact = t2-t1
 
+        if (mpi_np>1) then
+            call MPI_EXCHANGE_DOF(PolyMesh, u0_loc, uex_mpi, send_data, recv_data)
+        endif
+
     else
         print *, 'Computing modal coefficients...'
-        call COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex)
+        call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex, uex)
         ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'petsc_modal_coeff_uex',viewer,mpi_ierr))
         ! PetscCallA(VecView(petsc_modal_coeff_uex,viewer,mpi_ierr))
         ! PetscCallA(PetscViewerDestroy(viewer,mpi_ierr))
 
         print *, 'Calling solver for modal solution...'
-        PetscCallA(KSPSolve(ksp3, petsc_modal_coeff_uex, petsc_uex, mpi_ierr))
 
         ! check time dependence
         if (IsTime_dependent .eqv. .true.) then
-            !! WHAT TIME IS THE CORRECT?
-            !t=t-time_step
-            if (mpi_id == 0) print *, 'Scale modal solution by time function at t = ', t
-            PetscCallA(VecScale(petsc_uex, time_function(t), mpi_ierr))
+            PetscCallA(KSPSolve(ksp3, petsc_modal_coeff_uex, petsc_v_tmp, mpi_ierr))
+
+            call COMPUTE_MODAL_COEFFICIENTS_GEN(PolyMesh, petsc_num, global_dof, local_dof, Np, petsc_modal_coeff_uex, uex_stat)
+            PetscCallA(KSPSolve(ksp3, petsc_modal_coeff_uex, petsc_uex, mpi_ierr))
+
+            if (mpi_id == 0) write(*, '(A,F14.5)') 'Scale modal solution by time function at t = ', t
+            PetscCallA(VecAXPY(petsc_uex, time_function(t), petsc_v_tmp, mpi_ierr))
+        else
+            PetscCallA(KSPSolve(ksp3, petsc_modal_coeff_uex, petsc_uex, mpi_ierr))
         endif
 
         ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_uex',viewer,mpi_ierr))
@@ -920,7 +939,7 @@ program Lymph3D
         print *, 'Computing the errors...'
         ! u0_loc for exact solution
         call COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, un_loc, u0_loc, err_L2)
-        !call COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, un_loc, u0_loc, err_DG)
+        call COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, un_loc, u0_loc, un_mpi, uex_mpi, err_DG)
     else
         if(mpi_id == 0) print *,'Computing the errors...'
 
@@ -933,31 +952,29 @@ program Lymph3D
     if (mpi_id == 0) then
         call MPI_REDUCE(MPI_IN_PLACE, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                     0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, err_DG, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                    0, MPI_COMM_WORLD, mpi_ierr)
     else
         call MPI_REDUCE(err_L2, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                     0, MPI_COMM_WORLD, mpi_ierr)
-    endif
-
-    !call MPI_REDUCE(MPI_IN_PLACE, err_DG, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-    !                    0, MPI_COMM_WORLD, mpi_ierr)
-
-    if (mpi_id == 0) then
-        err_L2 = sqrt(err_L2)
-        !err_DG = sqrt(err_DG)
-        print *,'Done with the errors'
+        call MPI_REDUCE(err_DG, err_DG, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                    0, MPI_COMM_WORLD, mpi_ierr)
     endif
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
     if (mpi_id == 0) then
-        print *,'ERROR IN NORM L2: ', err_L2
-        !print *,'ERROR IN NORM DG: ', err_DG
+        err_L2 = sqrt(err_L2)
+        err_DG = sqrt(err_DG)
+        print *, 'Done with the errors'
+
+        print *, 'GRID SIZE: ', hmax
+        print *, 'ERROR IN NORM L2: ', err_L2
+        print *, 'ERROR IN NORM DG: ', err_DG
     endif
 
     t2 = MPI_WTIME()
     tp_error = t2 - t1
-
-    if (mpi_id == 0) print *, 'GRID SIZE: ', hmax
 
     !if (mpi_id == 0) call WRITE_ERRORS(p, err_DG, err_L2, hmax, PolyMesh, IsPoly)
 

@@ -109,7 +109,7 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
 
-        r = 2.0d0
+        r = 0.0d0
 
     end function gd_stat
 
@@ -259,7 +259,7 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
 
-        r = 2.0d0
+        r = 0.0d0
 
     end function uex_stat
 
@@ -284,7 +284,7 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: p
 
         !r = 0.0d0
-        r = 2.0d0 + 0.0d0*p
+        r = 0.0d0 + 0.0d0*p
 
     end function ic_displacement
 
