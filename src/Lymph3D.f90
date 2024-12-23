@@ -102,10 +102,9 @@ program Lymph3D
 
     ! IsTime_dependent = .false.
 
-    !integer(kind=4) :: j !,k,m,n,row,col
+    !integer(kind=4) :: j !,k,m,n,row,col,tmp_size
 
-    real(kind=8), dimension(:,:), allocatable :: prova_in
-    integer(kind=4) :: tmp_size, unit_print
+    integer(kind=4) :: unit_print
     type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
 
     real(kind=8) :: t1, t2
@@ -200,86 +199,9 @@ program Lymph3D
 
     call LYMPH3D_BARRIER
 
-    call FLUSH
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-    call FLUSH
-
     Np = PolyMesh%Elem_loc(1)%NDof_elem
 
-    num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
-    !allocate(un_mpi(num_inter_loc, DIM*Np))
-    !allocate(uex_mpi(num_inter_loc, DIM*Np))
-
-    !if (mpi_np>1) call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
-
-
-    if (mpi_np>200) then
-        print *, 'mpi check'
-        allocate(prova_in(PolyMesh%num_elem_loc,DIM*Np))
-
-        prova_in=0
-        do ie_loc=1,PolyMesh%num_elem_loc
-            do i=1,DIM*Np
-                prova_in(ie_loc,i) = 1000000*mpi_id + (ie_loc-1)*DIM*Np + i
-            enddo
-        enddo
-
-        call LYMPH3D_BARRIER
-
-        if (mpi_id == 0) then
-            print *, "prova_in row-by-row:"
-            do ie_loc = 1, PolyMesh%num_elem_loc  ! Loop over rows
-                print *, prova_in(ie_loc, :)
-            end do
-        endif
-
-        ! num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
-        ! allocate(un_mpi(num_inter_loc, DIM*Np))
-
-        !print *, 'proc:', mpi_id, 'data out: ', prova_in
-
-        !call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
-        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-        call MPI_EXCHANGE_DOF(PolyMesh, prova_in, un_mpi, send_data, recv_data)
-
-        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-        !call MPI_EXCHANGE_DEALLOCATE(PolyMesh, send_data, recv_data)
-        print *, 'end exchange'
-
-        ! num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
-        ! allocate(un_mpi(num_inter_loc, DIM*Np))
-
-        ! ! for each processor
-        ! istart = 0
-        ! iestart = 0
-        ! do i = 1,mpi_np
-        !     ! number of received element data per process
-        !     num_inter_loc = PolyMesh%num_elem_inter_comm(mpi_id+1,i)
-        !     if (num_inter_loc == 0) cycle
-
-        !     do ie_loc=1,num_inter_loc
-        !         do j=1,DIM
-        !             col = (j-1)*Np
-        !             col_mpi = istart + (j-1)*Np*num_inter_loc
-        !             un_mpi(iestart+ie_loc, col+1:col+Np) = prova_out(col_mpi+1:col_mpi+Np)
-        !         enddo
-        !         istart = istart + Np
-        !     enddo
-        !     ! new position for new process
-        !     iestart = iestart + num_inter_loc
-        !     istart = Np*num_inter_loc*DIM
-        ! enddo
-
-        !if (mpi_id == 0) then
-            print *, "un_mpi row-by-row:"
-            do i = 1, PolyMesh%num_elem_inter_vec(mpi_id+1)  ! Loop over rows
-            print *, mpi_id, un_mpi(i, :)
-            end do
-        !endif
-
-        deallocate(prova_in)
-    endif
+    !call CHECK_MPI_EXCHANGE(PolyMesh, Np)
 
     call WRITE_MESH_VISUALIZATION_VTK(PolyMesh%num_elem_loc, PolyMesh, mpi_id)
 
@@ -335,9 +257,6 @@ program Lymph3D
     !IS_MatrixFree = .true.
     if (IS_MatrixFree .eqv. .true.) then
         print *, 'matrix-free - set matrices and vectors'
-        ! allocate(internal_neigh(PolyMesh%num_elem_loc))
-        ! allocate(A_dg_loc(PolyMesh%num_elem_loc))
-        ! allocate(K_loc(PolyMesh%num_elem_loc))
 
         n_neigh = PolyMesh%Elem_loc(1)%num_faces
         !! WASTE OF MEMORY... MAKE SCATTERED SIZE VECTOR?
@@ -358,7 +277,8 @@ program Lymph3D
         allocate(u0_loc(PolyMesh%num_poly_loc, DIM*Np))
         allocate(un_loc(PolyMesh%num_poly_loc, DIM*Np))
         allocate(v0_loc(PolyMesh%num_poly_loc, DIM*Np))
-        !allocate(un_mpi(PolyMesh%num_elem_inter_vec(mpi_id+1), DIM*Np))
+
+        num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
 
         allocate(un_mpi(num_inter_loc, DIM*Np))
         allocate(uex_mpi(num_inter_loc, DIM*Np))
@@ -454,7 +374,7 @@ program Lymph3D
     if (IS_MatrixFree .eqv. .true.) then
 
         print *, 'assemble matrix-free RHS'
-        call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_stat_loc, f_null, gd_stat, gn_null)
+        call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_stat_loc, f_null, gd_null, gn_null)
 
         call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_dyn_loc, f_time, gd, gn)
 
@@ -507,20 +427,20 @@ program Lymph3D
     IsSave_output = .true.
 
     !! CHECK IF START AT num_dt=0
-    t = 0.0
+    t = 0.0d0
     num_dt = 0
 
     !stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
-    time_step = 0.001
+    time_step = 1.0d-3
     num_dt_mon = 20
 
-    !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
+    stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
     !stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
-    stop_time = 0.021
+    !stop_time = 0.021
     !stop_time = 0.002
     
     dt2 = time_step*time_step
-    half_dt2 = 0.5*dt2
+    half_dt2 = 0.5d0*dt2
 
     ! --------------------- MATRIX FREE -----------------------
     if (IS_MatrixFree .eqv. .true.) then

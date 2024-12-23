@@ -158,7 +158,7 @@ subroutine DELETE_ALL_FILES
     character(len=200) :: command
 
     ! System command to delete all files
-    command = "rm -f FILES_MPI/*"
+    command = "rm -f FILES_MPI/* MONITORS/*"
     call EXECUTE_COMMAND_LINE(command, wait=.true., exitstat=ierr)
 
     if (ierr /= 0) then

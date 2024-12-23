@@ -62,9 +62,9 @@ module problem_data_and_properties
         ! r(2) = 0
         ! r(3) = - 9.8 * 2400
 
-        r(1) = (-2.0*rho + 3.0*(lambda+2.0*mu))*PI**2 * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-        r(2) = (-2.0*rho + 3.0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-        r(3) = (-2.0*rho + 3.0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+        r(1) = (-2.0d0*rho + 3.0d0*(lambda+2.0*mu))*PI**2 * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
+        r(2) = (-2.0d0*rho + 3.0d0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+        r(3) = (-2.0d0*rho + 3.0d0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
 
     end function f_time
@@ -109,7 +109,7 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
 
-        r = 0.0d0
+        r = 2.0d0
 
     end function gd_stat
 

@@ -307,7 +307,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
 
             M_modal_loc(ie_loc,i,:,:) = mass_loc(i,i,:,:)
             M_loc(ie_loc,i,:,:) = mass_loc(i,i,:,:)*rho
-        
+
         enddo
         t2 = MPI_WTIME()
         tp_setup_M = tp_setup_M + t2 - t1
@@ -656,7 +656,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
     ! assign 0 to density for static case
     if (IsTime_dependent .eqv. .true.) then
         print *,'RHS with additional dynamic component'
-        present = 1.0
+        present = 1.0d0
     else
         print *,'RHS with only static component'
     endif
@@ -825,7 +825,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
 
         t2 = MPI_WTIME()
         tp_setup_RHS = tp_setup_RHS + t2 - t1
-    
+
     enddo elem_loop
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -1131,8 +1131,6 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat
 
     real(kind=8), dimension(DIM*Np) :: tmp
     integer(kind=4) :: ie_loc, E1, E2, iface, ie_neigh_loc, n_neigh
-    logical :: is_E2_local
-
 
     !> partial result for contribution from stiffness and forcing term
     real(kind=8), dimension(Np) :: v_ptr
@@ -1140,7 +1138,7 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat
     real(kind=8), dimension(Np,Np) :: R, RT
 
     integer(kind=4) :: i, istart, iend
-    integer(kind=4) :: row
+    integer(kind=4) :: row, elem_proc_id
 
     n_neigh = PolyMesh%Elem_loc(1)%num_faces
 
@@ -1156,28 +1154,25 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat
         ! E- contributions
         neigh_loop: do iface=1,n_neigh
 
-            is_E2_local = .false.
             E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
 
             ! if boundary face, no contribution in E-, Dirichlet contribution already in E+
             if (E2 < 0) then
-                
+
                 !print *, '-- cycle --'
                 !if (mpi_id==0) print *, 'mpi_id:', mpi_id, ' ie_loc:', ie_loc, ' E2:', E2, ' - BOUNDARY'
-                
+
                 cycle neigh_loop
             endif
 
+            elem_proc_id = PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0)
             ! check if neighbor is in the same process
-            if (PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) == mpi_id) then
-                is_E2_local = .true.
-            endif
+            if (elem_proc_id == mpi_id) then
 
-            if (is_E2_local) then
                 ie_neigh_loc = PolyMesh%elem_glo2loc(E2)
-                
+
                 !print *, 'mpi_id:', mpi_id, ' ie_loc:', ie_loc, ' E2:', E2, ' at', ie_neigh_loc, ' column: ', iface+1, ' - LOCAL'
-                
+
                 ! use u0_loc directly
                 tmp = tmp + matmul(K_loc(E1,iface+1,:,:), u0_loc(ie_neigh_loc,:))
 
@@ -1198,7 +1193,7 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat
                 ie_neigh_loc = ie_neigh_loc - PolyMesh%inter_disp(mpi_id+1,1)
 
                 !print *, 'mpi_id:', mpi_id, ' ie_loc:', ie_loc, ' E2:', E2, ' at', ie_neigh_loc, ' column: ', iface+1
-                
+
                 ! use u_mpi directly
                 tmp = tmp + matmul(K_loc(E1,iface+1,:,:), u0_mpi(ie_neigh_loc,:))
             endif
@@ -1208,7 +1203,7 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat
         !print *, 'mpi_id:', mpi_id, ' ---- end neigh loop', ie_loc, '----'
 
         ! add forcing term and rescale
-        tmp = - tmp + 0.0d0*rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:) * time_function(t)
+        tmp = - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:) * time_function(t)
 
         ! mass linear system in matrix-free
         do i=1,DIM
@@ -1226,8 +1221,6 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat
 
     end do elem_loop
 
-    !print *, mpi_id, '------------- end element loop --------------'
-
     !deallocate(v_ptr)
     call LYMPH3D_BARRIER
 
@@ -1237,10 +1230,7 @@ end subroutine FIRST_TIME_STEP_MATRIX_FREE
 subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, un_loc, usol_loc, un_mpi)
 
     !TODO consider different Np
-    !TODO compute inverse of mass matrix only once ?
     !DONE sides different for each row of K
-    !TODO create a list of neighbors or pass ie_loc
-    !TODO check format for solutions, pass whole or pass sections - update in place or outside subroutine? un gets lost?
 
     implicit none
 
@@ -1271,8 +1261,6 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
 
     real(kind=8), dimension(DIM*Np) :: tmp
     integer(kind=4) :: ie_loc, E1, E2, iface, ie_neigh_loc, n_neigh
-    logical :: is_E2_local
-
 
     !> partial result for contribution from stiffness and forcing term
     real(kind=8), dimension(Np) :: v_ptr
@@ -1280,7 +1268,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
     real(kind=8), dimension(Np,Np) :: R, RT
 
     integer(kind=4) :: i, istart, iend
-    integer(kind=4) :: row
+    integer(kind=4) :: row, elem_proc_id
 
     real(kind=8) :: t1,t2
 
@@ -1303,7 +1291,6 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
         ! E- contributions
         neigh_loop: do iface=1,n_neigh
 
-            is_E2_local = .false.
             E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
 
             ! if boundary face, no contribution in E-, Dirichlet contribution already in E+
@@ -1313,15 +1300,15 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
                 cycle neigh_loop
             endif
 
+            elem_proc_id = PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0)
             ! check if neighbor is in the same process
-            if (PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,0) == mpi_id) then
-                is_E2_local = .true.
-            endif
+            if (elem_proc_id == mpi_id) then
 
-            if (is_E2_local) then
                 ie_neigh_loc = PolyMesh%elem_glo2loc(E2)
+
                 !print *, 'mpi_id:', mpi_id, ' ie_loc:', ie_loc, ' E2:', E2, 'at', ie_neigh_loc, 'column: ', iface+1, ' - LOCAL'
                 ! use un_loc directly
+
                 tmp = tmp + matmul(K_loc(E1,iface+1,:,:), un_loc(ie_neigh_loc,:))
 
             ! find index in u_mpi, given the global index of E-
@@ -1351,10 +1338,10 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
         tp_KU = tp_KU + t2 - t1
         !----
 
-        ! add forcing term and rescale
-        tmp = - tmp + 0.0d0*rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:) * time_function(t)
+        ! add element forcing term and rescale
+        tmp = - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:) * time_function(t)
 
-        ! mass linear system in matrix-free
+        ! element mass linear system - matrix-free in each dimension
         do i=1,DIM
 
             row = (i-1)*Np

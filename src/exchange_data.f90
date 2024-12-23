@@ -6,6 +6,59 @@ module exchange_data
 
 contains
 
+subroutine CHECK_MPI_EXCHANGE(PolyMesh, Np)
+
+    use utilities
+    use Poly_setup_MPI
+    use global_parameters
+    use Poly_mesh
+
+    implicit none
+
+    type(Mesh_Structure), intent(in) :: PolyMesh    !< mesh
+    integer(kind=4), intent(in) :: Np               !< number of element dofs per direction
+    real(kind=8), dimension(PolyMesh%num_elem_loc,DIM*Np) :: check_in
+    real(kind=8), dimension(PolyMesh%num_elem_loc,DIM*Np) :: check_out
+    type(ScatteredArray), dimension(:,:), allocatable:: send_data !< variable size send buffers
+    type(ScatteredArray), dimension(:,:), allocatable :: recv_data !< variable size receive buffers
+
+    integer(kind=4) :: ie_loc,i
+
+    if (mpi_id == 0) print *, 'CHECK MPI EXCHANGE'
+
+    check_in=0.0d0
+    do ie_loc=1,PolyMesh%num_elem_loc
+        do i=1,DIM*Np
+            check_in(ie_loc,i) = 1000000*mpi_id + (ie_loc-1)*DIM*Np + i
+        enddo
+    enddo
+
+    call LYMPH3D_BARRIER
+
+    if (mpi_id == 0) then
+        print *, "prova_in row-by-row:"
+        do ie_loc = 1, PolyMesh%num_elem_loc  ! Loop over rows
+            print *, check_in(ie_loc, :)
+        end do
+    endif
+
+    call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    call MPI_EXCHANGE_DOF(PolyMesh, check_in, check_out, send_data, recv_data)
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    call MPI_EXCHANGE_DEALLOCATE(PolyMesh, send_data, recv_data)
+
+    if (mpi_id==0) then
+        print *, "check_out row-by-row:"
+        do i = 1, PolyMesh%num_elem_inter_vec(mpi_id+1)  ! Loop over rows
+            print *, mpi_id, check_out(i, :)
+        end do
+    endif
+
+end subroutine CHECK_MPI_EXCHANGE
+
 !> allocate send and receive buffer for interface communication
 subroutine MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
 
