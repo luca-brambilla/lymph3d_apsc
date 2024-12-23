@@ -1352,7 +1352,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
         !----
 
         ! add forcing term and rescale
-        tmp = ( - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:) * time_function(t) )
+        tmp = dt2*( - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:) * time_function(t) )
 
         ! mass linear system in matrix-free
         do i=1,DIM
@@ -1384,7 +1384,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
         enddo
 
         ! sum initial condition contributions
-        usol_loc(ie_loc,:) = dt2*usol_loc(ie_loc,:) + 2.0d0*un_loc(ie_loc,:) - u0_loc(ie_loc,:)
+        usol_loc(ie_loc,:) = usol_loc(ie_loc,:) + 2.0d0*un_loc(ie_loc,:) - u0_loc(ie_loc,:)
 
     end do elem_loop
 

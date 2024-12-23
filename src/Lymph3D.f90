@@ -38,7 +38,7 @@ program Lymph3D
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     Mat :: petsc_stiff, petsc_mass, mat_dg, petsc_mass_modal ! stiffness, mass and DG matrices, reconstruction matrix
-    Vec :: petsc_sol, petsc_rhs ! solution and rhs vectors for the algebraic system
+    Vec :: petsc_sol, petsc_rhs_stat, petsc_rhs_dyn ! solution and rhs vectors for the algebraic system
     Vec :: petsc_uex, petsc_modal_coeff_uex ! modal (exact) solution and its coefficients
 
     Vec :: petsc_v_tmp, petsc_f ! temp vectors to store solution for sums
@@ -378,7 +378,8 @@ program Lymph3D
         call SET_PETSC_MATRIX(mat_dg, local_dof, global_dof)
         call SET_PETSC_MATRIX(petsc_mass_modal, local_dof, global_dof)
 
-        call SET_PETSC_VECTOR(petsc_rhs, local_dof, global_dof)
+        call SET_PETSC_VECTOR(petsc_rhs_stat, local_dof, global_dof)
+        call SET_PETSC_VECTOR(petsc_rhs_dyn, local_dof, global_dof)
         call SET_PETSC_VECTOR(petsc_sol, local_dof, global_dof)
         call SET_PETSC_VECTOR(petsc_uex, local_dof, global_dof)
 
@@ -449,7 +450,8 @@ program Lymph3D
     else
         print *, 'ASSEMBLE RHS'
 
-        !call MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
+        call MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs_stat, f_null, gd_stat, gn_null)
+        call MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs_dyn, f_time, gd, gn)
 
         ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_rhs',viewer,mpi_ierr))
         ! PetscCallA(VecView(petsc_rhs,viewer,mpi_ierr))
@@ -678,7 +680,7 @@ program Lymph3D
 
         if (IsTime_dependent .eqv. .false.) then
             ! Au=f
-            PetscCallA(KSPSolve(ksp, petsc_rhs, petsc_sol, mpi_ierr))
+            PetscCallA(KSPSolve(ksp, petsc_rhs_stat, petsc_sol, mpi_ierr))
 
         else
             if(mpi_id == 0) print *, "                   TIME LOOP START                   "
@@ -749,7 +751,8 @@ program Lymph3D
 
             !!! check if the same f'(t) applies for both forcing and BC
             ! petsc_f = [(M-dt^2/2*A)u_0 + dt*M*v_0] + dt^2/2 * f_0(x)*f'_0(t)
-            PetscCallA(VecAXPY(petsc_f, half_dt2*time_function(t), petsc_rhs, mpi_ierr))
+            PetscCallA(VecAXPY(petsc_f, half_dt2*time_function(t), petsc_rhs_dyn, mpi_ierr))
+            PetscCallA(VecAXPY(petsc_f, half_dt2, petsc_rhs_stat, mpi_ierr))
             ! M u1 = F
             PetscCallA(KSPSolve(ksp2, petsc_f, petsc_sol, mpi_ierr))
 
@@ -791,7 +794,8 @@ program Lymph3D
 
                 ! petsc_rhs = dt^2 * f_n(x)*f'_n(t)
                 ! F = petsc_f = [(M-dt^2/2*A)u_n + dt*M*u_{n-1}] + dt^2 * f_n(x)*f'_n(t)
-                PetscCallA(VecAXPY(petsc_f, dt2*time_function(t), petsc_rhs, mpi_ierr))
+                PetscCallA(VecAXPY(petsc_f, dt2*time_function(t), petsc_rhs_dyn, mpi_ierr))
+                PetscCallA(VecAXPY(petsc_f, dt2, petsc_rhs_stat, mpi_ierr))
 
                 ! copy old solution before overwriting solution
                 PetscCallA(VecCopy(petsc_sol, petsc_u0, mpi_ierr))
@@ -897,7 +901,8 @@ program Lymph3D
         PetscCallA(KSPDestroy(ksp, mpi_ierr))
         PetscCallA(KSPDestroy(ksp2, mpi_ierr))
         PetscCallA(KSPDestroy(ksp3, mpi_ierr))
-        PetscCallA(VecDestroy(petsc_rhs, mpi_ierr))
+        PetscCallA(VecDestroy(petsc_rhs_stat, mpi_ierr))
+        PetscCallA(VecDestroy(petsc_rhs_dyn, mpi_ierr))
         PetscCallA(VecDestroy(petsc_modal_coeff_uex, mpi_ierr))
     endif
 
