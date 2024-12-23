@@ -174,50 +174,105 @@ subroutine LYMPH3D_BARRIER
 end subroutine
 
 subroutine PRINT_PROFILING
+    use Poly_setup_MPI
     use Poly_global
     implicit none
 
     call LYMPH3D_BARRIER
 
-    print *,''
-    print *,'------------- PROFILING -------------'
-    print *,''
-    ! partition
-    call calc_time(time_hour, time_min, time_sec, int(tp_partition))
-    print *, 'tp_partition     = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! assemble stiffness
-    call calc_time(time_hour, time_min, time_sec, int(tp_setup_K))
-    print *, 'tp_setup_K       = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! assemble mass
-    call calc_time(time_hour, time_min, time_sec, int(tp_setup_M))
-    print *, 'tp_setup_M       = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! assemble rhs
-    call calc_time(time_hour, time_min, time_sec, int(tp_setup_RHS))
-    print *, 'tp_setup_RHS     = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! product K*U
-    call calc_time(time_hour, time_min, time_sec, int(tp_KU))
-    print *, 'tp_KU            = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! solve mass linear system
-    call calc_time(time_hour, time_min, time_sec, int(tp_linear_system))
-    print *, 'tp_linear_system = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! assign pointer to temp matrix
-    call calc_time(time_hour, time_min, time_sec, int(tp_copy_matrix))
-    print *, 'tp_copy_matrix   = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! assign pointer to temp vector
-    call calc_time(time_hour, time_min, time_sec, int(tp_copy_vector))
-    print *, 'tp_copy_vector   = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! setup Krylov solver
-    call calc_time(time_hour, time_min, time_sec, int(tp_system_setup))
-    print *, 'tp_system_setup  = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! export
-    call calc_time(time_hour, time_min, time_sec, int(tp_export))
-    print *, 'tp_export        = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! exact solution
-    call calc_time(time_hour, time_min, time_sec, int(tp_exact))
-    print *, 'tp_exact         = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-    ! compute error
-    call calc_time(time_hour, time_min, time_sec, int(tp_exact))
-    print *, 'tp_exact         = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+    if (mpi_id == 0) then
+        call MPI_REDUCE(MPI_IN_PLACE, tp_copy_matrix, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_linear_system, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_KU, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_copy_vector, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_system_setup, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_setup_K, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_setup_M, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_setup_RHS, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_partition, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_export, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_exact, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_error, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+    else
+        call MPI_REDUCE(tp_copy_matrix, tp_copy_matrix, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_linear_system, tp_linear_system, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_KU, tp_KU, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_copy_vector, tp_copy_vector, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_system_setup, tp_system_setup, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_setup_K, tp_setup_K, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_setup_M, tp_setup_M, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_setup_RHS, tp_setup_RHS, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_partition, tp_partition, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_export, tp_export, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_exact, tp_exact, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_error, tp_error, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+    endif
+
+    if (mpi_id == 0) then
+        print *,''
+        print *,'------------- PROFILING -------------'
+        print *,''
+        ! partition
+        call calc_time(time_hour, time_min, time_sec, int(tp_partition))
+        print *, 'tp_partition     = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! assemble stiffness
+        call calc_time(time_hour, time_min, time_sec, int(tp_setup_K))
+        print *, 'tp_setup_K       = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! assemble mass
+        call calc_time(time_hour, time_min, time_sec, int(tp_setup_M))
+        print *, 'tp_setup_M       = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! assemble rhs
+        call calc_time(time_hour, time_min, time_sec, int(tp_setup_RHS))
+        print *, 'tp_setup_RHS     = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! product K*U
+        call calc_time(time_hour, time_min, time_sec, int(tp_KU))
+        print *, 'tp_KU            = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! solve mass linear system
+        call calc_time(time_hour, time_min, time_sec, int(tp_linear_system))
+        print *, 'tp_linear_system = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! assign pointer to temp matrix
+        call calc_time(time_hour, time_min, time_sec, int(tp_copy_matrix))
+        print *, 'tp_copy_matrix   = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! assign pointer to temp vector
+        call calc_time(time_hour, time_min, time_sec, int(tp_copy_vector))
+        print *, 'tp_copy_vector   = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! setup Krylov solver
+        call calc_time(time_hour, time_min, time_sec, int(tp_system_setup))
+        print *, 'tp_system_setup  = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! export
+        call calc_time(time_hour, time_min, time_sec, int(tp_export))
+        print *, 'tp_export        = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! exact solution
+        call calc_time(time_hour, time_min, time_sec, int(tp_exact))
+        print *, 'tp_exact         = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! compute error
+        call calc_time(time_hour, time_min, time_sec, int(tp_exact))
+        print *, 'tp_exact         = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+    endif
     
 end subroutine
 

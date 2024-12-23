@@ -80,10 +80,10 @@ program Lymph3D
     real(kind=8), dimension(:,:), allocatable :: v0_loc
     real(kind=8), dimension(:,:), allocatable :: u0_loc
     real(kind=8), dimension(:,:), allocatable :: un_loc
-    real(kind=8), dimension(:,:), allocatable :: rhs_loc
+    real(kind=8), dimension(:,:), allocatable :: rhs_stat_loc
+    real(kind=8), dimension(:,:), allocatable :: rhs_dyn_loc
 
     real(kind=8), dimension(:,:), allocatable :: un_mpi
-
 
     real(kind=8), dimension(:,:,:,:), allocatable :: M_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: M_modal_loc
@@ -91,6 +91,7 @@ program Lymph3D
     real(kind=8), dimension(:,:,:,:), allocatable :: A_dg_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: R_M_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: R_M_modal_loc
+    real(kind=8), dimension(:,:), pointer :: M_tmp
 
     ! type(KRowArray), dimension(:), allocatable :: K_loc
     ! type(KRowArray), dimension(:), allocatable :: A_dg_loc
@@ -208,10 +209,10 @@ program Lymph3D
     num_inter_loc = PolyMesh%num_elem_inter_vec(mpi_id+1)
     allocate(un_mpi(num_inter_loc, DIM*Np))
 
-    if (mpi_np>1)   call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
+    if (mpi_np>1) call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
 
 
-    if (mpi_np>8) then
+    if (mpi_np>1) then
         print *, 'mpi check'
         allocate(prova_in(PolyMesh%num_elem_loc,DIM*Np))
 
@@ -236,7 +237,7 @@ program Lymph3D
 
         !print *, 'proc:', mpi_id, 'data out: ', prova_in
 
-        call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
+        !call MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
         call MPI_EXCHANGE_DOF(PolyMesh, prova_in, un_mpi, send_data, recv_data)
@@ -269,12 +270,12 @@ program Lymph3D
         !     istart = Np*num_inter_loc*DIM
         ! enddo
 
-        if (mpi_id == 0) then
+        !if (mpi_id == 0) then
             print *, "un_mpi row-by-row:"
             do i = 1, PolyMesh%num_elem_inter_vec(mpi_id+1)  ! Loop over rows
-            print *, un_mpi(i, :)
+            print *, mpi_id, un_mpi(i, :)
             end do
-        endif
+        !endif
 
         deallocate(prova_in)
     endif
@@ -344,16 +345,23 @@ program Lymph3D
 
         allocate( M_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
         allocate( M_modal_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
-        allocate( rhs_loc(PolyMesh%num_elem_loc, DIM*Np) )
+        allocate( rhs_stat_loc(PolyMesh%num_elem_loc, DIM*Np) )
+        allocate( rhs_dyn_loc(PolyMesh%num_elem_loc, DIM*Np) )
 
         allocate( R_M_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
         allocate( R_M_modal_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
+
+        allocate( M_tmp(Np, Np) )
 
         ! initial conditions
         allocate(u0_loc(PolyMesh%num_poly_loc, DIM*Np))
         allocate(un_loc(PolyMesh%num_poly_loc, DIM*Np))
         allocate(v0_loc(PolyMesh%num_poly_loc, DIM*Np))
         !allocate(un_mpi(PolyMesh%num_elem_inter_vec(mpi_id+1), DIM*Np))
+
+        u0_loc = 0.0d0
+        un_loc = 0.0d0
+        v0_loc = 0.0d0
 
     else
         call FLUSH
@@ -392,10 +400,14 @@ program Lymph3D
 
         do ie_loc=1,PolyMesh%num_elem_loc
             do i=1,DIM
-                R_M_loc(ie_loc,i,:,:) = cholesky(M_loc(ie_loc,i,:,:),Np)
-                R_M_modal_loc(ie_loc,i,:,:) = cholesky(M_modal_loc(ie_loc,i,:,:),Np)
+                M_tmp = M_loc(ie_loc,i,:,:)
+                R_M_loc(ie_loc,i,:,:) = cholesky(M_tmp,Np)
+                M_tmp = M_modal_loc(ie_loc,i,:,:)
+                R_M_modal_loc(ie_loc,i,:,:) = cholesky(M_tmp,Np)
             enddo
         enddo
+
+        deallocate(M_tmp)
 
     else
         print *, 'ASSEMBLE PETSC MATRICES'
@@ -430,12 +442,14 @@ program Lymph3D
     if (IS_MatrixFree .eqv. .true.) then
 
         print *, 'assemble matrix-free RHS'
-        call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_loc)
+        call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_stat_loc, f_null, gd_stat, gn_null)
+
+        call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_dyn_loc, f_time, gd, gn)
 
     else
         print *, 'ASSEMBLE RHS'
 
-        call MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
+        !call MAKE_RHS(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_rhs)
 
         ! PetscCallA(PetscViewerASCIIOpen(PETSC_COMM_WORLD,'vec_rhs',viewer,mpi_ierr))
         ! PetscCallA(VecView(petsc_rhs,viewer,mpi_ierr))
@@ -481,15 +495,16 @@ program Lymph3D
 
     !! CHECK IF START AT num_dt=0
     t = 0.0
-    num_dt = 1
+    num_dt = 0
 
     !stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
     time_step = 0.001
     num_dt_mon = 20
 
-    !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
-    stop_time = SQRT2 / 4.0 + 0.0 * SQRT2
-    !stop_time = 0.1
+    stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
+    !stop_time = SQRT2 / 4.0 + 0.0 * SQRT2
+    !stop_time = 0.021
+    !stop_time = 0.002
     
     dt2 = time_step*time_step
     half_dt2 = 0.5*dt2
@@ -503,7 +518,7 @@ program Lymph3D
         ! allocate nnod_num, gathered_sizes, displacements, u
         call PREPROCESS_SOLUTION_MATRIX_FREE(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
 
-        if(mpi_id == 0) write(*,'(A,I10,A,F10.5)') "Iteration: ", 0, " Time: ", t
+        if(mpi_id == 0) write(*,'(A,I10,A,F14.5)') "Iteration: ", 0, " Time: ", t
 
         if (mpi_id==0) print *, "Assemble initial conditions"
 
@@ -516,7 +531,7 @@ program Lymph3D
             if (mpi_id==0) print *, '--- IC displacement ---'
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
             call POST_PROCESS_MATRIX_FREE(PolyMesh, u0_loc, u, gathered_sizes, displacements)
-            call EXPORT_SOLUTION(PolyMesh, u, IsPoly, 0)
+            call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
 
             if (mpi_id==0) print *, '---   IC velocity   ---'
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -530,6 +545,7 @@ program Lymph3D
 
         endif
         
+        num_dt = num_dt + 1
         ! call SAVE_MATRIX_PETSC(massa(1,1)%data, Np, Np, 'massa.txt')
         ! call SAVE_MATRIX_PETSC(massa_modale(1,1)%data, Np, Np, 'massa_modale.txt')
         ! if (mpi_id==0) call SAVE_MATRIX_F90(K_loc(1,:,:,:), DIM*Np, 'rigidezza.txt')
@@ -541,29 +557,40 @@ program Lymph3D
         call FLUSH
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
         if(mpi_id == 0) print *, ""
-        if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
+        if(mpi_id == 0) write(*,'(A,I10,A,F14.5)') "Iteration: ", num_dt, " Time: ", t+time_step
         call FLUSH
         call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
         !! computation on tetra or on poly??? solution dof on poly
 
+        ! SCALE FOR UNDERFLOW
+        ! update interface solution for u^{0}
         if (mpi_np>1) then
             call MPI_EXCHANGE_DOF(PolyMesh, u0_loc, un_mpi, send_data, recv_data)
-            if (mpi_id == 0) then
-                print *, "un_mpi row-by-row:"
-                do i = 1, PolyMesh%num_elem_inter_vec(mpi_id+1)  ! Loop over rows
-                    print *, i, un_mpi(i, :)
-                end do
-            endif
+            !un_mpi = un_mpi / 1.0d10
+            ! if (mpi_id == 0) then
+            !     print *, "un_mpi row-by-row:"
+            !     do i = 1, PolyMesh%num_elem_inter_vec(mpi_id+1)  ! Loop over rows
+            !         print *, i, un_mpi(i, :)
+            !     end do
+            ! endif
+        !     call FLUSH
+        !     call LYMPH3D_BARRIER
+        !     call FLUSH
+        !     if (mpi_id==0) print *, mpi_id, 'u0_loc send', 3, u0_loc(3, :)
+        !     if (mpi_id==1) print *, mpi_id, 'un_mpi recv', 1, un_mpi(1, :)
+        !     if (mpi_id==0) print *, mpi_id, 'u0_loc send', 1, u0_loc(1, :)
+        !     if (mpi_id==3) print *, mpi_id, 'u0_loc recv', 2, un_mpi(2, :)
+        ! else
+        !     print *, mpi_id, 'u0_loc send', 1, u0_loc(1, :)
         endif
 
         !if (mpi_id==0) print *, PolyMesh%elem_inter_glo
 
         call LYMPH3D_BARRIER
 
-        call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_loc, un_mpi, v0_loc, un_loc)
-
-        if (mpi_id==0) print *, 'END FIRST ITERATION'
+        ! compute u^{1}
+        call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, v0_loc, un_loc, un_mpi)
 
         ! SAVE FIRST ITERATION
         if (IsSave_output .eqv. .true.) then
@@ -574,27 +601,30 @@ program Lymph3D
             tp_export = tp_export + t2 - t1
         endif
 
+        ! update time
         num_dt = num_dt + 1
         t = t + time_step
 
+        ! update interface solution for u^{1}
         if (mpi_np>1) then
             call MPI_EXCHANGE_DOF(PolyMesh, un_loc, un_mpi, send_data, recv_data)
-            if (mpi_id == 0) then
-                print *, "un_mpi row-by-row:"
-                do i = 1, PolyMesh%num_elem_inter_vec(mpi_id+1)  ! Loop over rows
-                    print *, un_mpi(i, :)
-                end do
-            endif
+            ! call FLUSH
+            ! call LYMPH3D_BARRIER
+            ! call FLUSH
+            ! if (mpi_id==0) print *, mpi_id, 'un_loc send', un_loc(3, :)
+            ! if (mpi_id==1) print *, mpi_id, 'un_mpi recv', un_mpi(1, :)
+            ! if (mpi_id==0) print *, mpi_id, 'un_loc send', un_loc(1, :)
+            ! if (mpi_id==3) print *, mpi_id, 'un_loc recv', un_mpi(2, :)
+        ! else
+        !     print *, mpi_id, 'un_loc send', 1, un_loc(1, :)
         endif
-
-        call LYMPH3D_STOP
 
         ! loop start
         do while (t <= stop_time)
-            if(mpi_id == 0) write(*,'(A,I10,A,F8.5)') "Iteration: ", num_dt, " Time: ", t
+            if(mpi_id == 0) write(*,'(A,I10,A,F14.6)') "Iteration: ", num_dt, " Time: ", t+time_step
             
             ! v0_loc is used for u^{n+1}
-            call TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_loc, u0_loc, un_loc, v0_loc)
+            call TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, un_loc, v0_loc, un_mpi)
 
             ! update solution
             u0_loc = un_loc
@@ -609,10 +639,28 @@ program Lymph3D
                 tp_export = tp_export + t2 - t1
             endif
 
+            ! update interface solution for u^{n}
+            if (mpi_np>1) then
+                call MPI_EXCHANGE_DOF(PolyMesh, un_loc, un_mpi, send_data, recv_data)
+                ! call FLUSH
+                ! call LYMPH3D_BARRIER
+                ! call FLUSH
+                ! if (mpi_id==0) print *, mpi_id, 'un_loc send', un_loc(3, :)
+                ! if (mpi_id==1) print *, mpi_id, 'un_mpi recv', un_mpi(1, :)
+                ! if (mpi_id==0) print *, mpi_id, 'un_loc send', un_loc(1, :)
+                ! if (mpi_id==3) print *, mpi_id, 'un_mpi recv', un_mpi(2, :)
+            ! else
+                !print *, mpi_id, 'un_loc send', 1, un_loc(1, :)
+            endif
+
             ! update time
             num_dt = num_dt + 1
             t = t + time_step
+
+            call LYMPH3D_BARRIER
         end do
+
+        num_dt = num_dt - 1
 
         if (IsSave_output .eqv. .true.) then
             t1 = MPI_WTIME()
@@ -802,19 +850,18 @@ program Lymph3D
         print *, 'matrix-free exact solution'
 
         t1 = MPI_WTIME()
-        ! u0_loc for exact solution
+        ! u0_loc for exact solution - time dependent component
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex, u0_loc)
+        ! v0_loc for exact solution - static component
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex_stat, v0_loc)
 
         ! check time dependence
         if (IsTime_dependent .eqv. .true.) then
-            !! WHAT TIME IS THE CORRECT?
-            !t=t-time_step
-            if (mpi_id == 0) print *, 'Scale modal solution by time function at t = ', t
-            u0_loc = u0_loc * time_function(t)
+            if (mpi_id == 0) write(*, '(A,F14.5)') 'Scale modal solution by time function at t = ', t
+            u0_loc = v0_loc + u0_loc * time_function(t)
         endif
         t2 = MPI_WTIME()
         tp_exact = t2-t1
-
 
     else
         print *, 'Computing modal coefficients...'
@@ -860,15 +907,15 @@ program Lymph3D
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    err_L2 = 0.0
-    err_DG = 0.0
+    err_L2 = 0.0d0
+    err_DG = 0.0d0
 
     t1 = MPI_WTIME()
     if (IS_MatrixFree .eqv. .true.) then
-        print *, 'matrix free solver'
+        print *, 'Computing the errors...'
         ! u0_loc for exact solution
         call COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, un_loc, u0_loc, err_L2)
-        call COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, un_loc, u0_loc, err_DG)
+        !call COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, un_loc, u0_loc, err_DG)
     else
         if(mpi_id == 0) print *,'Computing the errors...'
 
@@ -878,15 +925,20 @@ program Lymph3D
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    call MPI_REDUCE(MPI_IN_PLACE, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+    if (mpi_id == 0) then
+        call MPI_REDUCE(MPI_IN_PLACE, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                     0, MPI_COMM_WORLD, mpi_ierr)
+    else
+        call MPI_REDUCE(err_L2, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                    0, MPI_COMM_WORLD, mpi_ierr)
+    endif
 
-    call MPI_REDUCE(MPI_IN_PLACE, err_DG, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-                        0, MPI_COMM_WORLD, mpi_ierr)
+    !call MPI_REDUCE(MPI_IN_PLACE, err_DG, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+    !                    0, MPI_COMM_WORLD, mpi_ierr)
 
     if (mpi_id == 0) then
         err_L2 = sqrt(err_L2)
-        err_DG = sqrt(err_DG)
+        !err_DG = sqrt(err_DG)
         print *,'Done with the errors'
     endif
 
@@ -894,7 +946,7 @@ program Lymph3D
 
     if (mpi_id == 0) then
         print *,'ERROR IN NORM L2: ', err_L2
-        print *,'ERROR IN NORM DG: ', err_DG
+        !print *,'ERROR IN NORM DG: ', err_DG
     endif
 
     t2 = MPI_WTIME()
@@ -911,7 +963,7 @@ program Lymph3D
     if (IS_MatrixFree .eqv. .true.) then
         print *, 'matrix free destroy vector and matrices'
 
-        deallocate(u0_loc, un_loc, v0_loc, rhs_loc)
+        deallocate(u0_loc, un_loc, v0_loc, rhs_stat_loc, rhs_dyn_loc)
 
         do i=1,PolyMesh%num_elem_loc
             !deallocate(K_loc(i)%values, A_dg_loc(i)%values, internal_neigh(i)%values)

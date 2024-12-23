@@ -117,9 +117,13 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
     integer(kind=4) :: row_sol, row_send, row_recv
 
     type(ScatteredArray), dimension(mpi_np, mpi_np), intent(inout) :: send_data, recv_data
-    integer, allocatable :: requests(:), statuses(:,:)  ! For tracking operations
+    integer(kind=4), allocatable :: requests(:), statuses(:,:)  ! For tracking operations
 
     integer(kind=4) :: iestart, istart, col, col_mpi, num_inter_loc,j
+    real(kind=8) :: factor, ifactor
+
+    factor = 1.0d0
+    ifactor = 1.0d0
 
     allocate(requests(2 * mpi_np), statuses(2 * mpi_np, MPI_STATUS_SIZE))
 
@@ -145,7 +149,7 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
 
                     ! insert in buffer
                     row_send = (k-1)*Np*DIM
-                    send_data(id_recv,id_send)%data(row_send+1:row_send+DIM*Np) = input_sol(ie_send_loc,:)
+                    send_data(id_recv,id_send)%data(row_send+1:row_send+DIM*Np) = input_sol(ie_send_loc,:) * factor
                 enddo
 
                 ! multiply by number of dof per element and dimension 3D
@@ -183,7 +187,7 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
                 do k=1,n_elem
                     ie_recv_loc = el_sum + k
                     row_recv = (k-1)*Np*DIM
-                    output_sol(ie_recv_loc,:) = recv_data(id_recv,id_send)%data(row_recv+1:row_recv+DIM*Np)
+                    output_sol(ie_recv_loc,:) = recv_data(id_recv,id_send)%data(row_recv+1:row_recv+DIM*Np) * ifactor
                 enddo
 
             end if
