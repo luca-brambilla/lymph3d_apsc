@@ -22,7 +22,7 @@ subroutine VTK_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
 
     ! Input arguments
     character(len=*), intent(in) :: filename                !< string file name
-    integer*4, intent(in) :: n_elem                     !< local number of dofs for the process
+    integer*4, intent(in) :: n_elem                     !< local number elements for the process
     integer*4, intent(in) :: nvert_per_el               !< number of vertices per element
     real*8, dimension(nvert_per_el, n_elem), intent(in) :: xx       !< x coordinates of 4 vertices of tetrahedron
     real*8, dimension(nvert_per_el, n_elem), intent(in) ::yy        !< y coordinates of 4 vertices of tetrahedron
@@ -500,19 +500,92 @@ subroutine VTU_WRITE_SOLUTION(filename, xx, yy, zz, nvert_per_el, n_elem, n_elem
 
 end subroutine VTU_WRITE_SOLUTION
 
-!> writes soltuion file in ensight format
-!> saves geometry and solution into 2 separate files
+!> receive data and print to file
+subroutine RECEIVE_PRINT_FILE(file_unit, fmt, n_elem, nvert_per_el, xx, ii)
+
+    use Poly_setup_MPI
+    implicit none
+
+    real(kind=8), dimension(:,:), optional, intent(in) :: xx
+    integer(kind=4), dimension(:), optional, intent(in) :: ii
+    integer(kind=4), intent(in) :: n_elem
+    integer(kind=4), intent(in) :: nvert_per_el
+    integer(kind=4), intent(in) :: file_unit
+
+    real(kind=8), dimension(:,:), allocatable :: tmp_xx
+    integer(kind=4), dimension(:), allocatable :: tmp_ii
+    integer(kind=4) :: ie,j,tmp_nelem,k
+    character(len=*), intent(in) :: fmt
+
+    ! float
+    if (fmt=='(E12.5)' ) then
+
+        ! local
+        do ie=1,n_elem
+            do j=1,nvert_per_el
+                write(file_unit, fmt) xx(j,ie)
+            enddo
+        enddo
+
+        ! mpi loop
+        do k=1,mpi_np-1
+            ! receive size
+            call MPI_Recv(tmp_nelem, 1, MPI_INTEGER, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+            ! allocate and receive data - different sizes
+            allocate(tmp_xx(nvert_per_el, tmp_nelem))
+            call MPI_Recv(tmp_xx, tmp_nelem*nvert_per_el, MPI_DOUBLE_PRECISION, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+            ! write to file
+            do ie=1,tmp_nelem
+                do j=1,nvert_per_el
+                    write(file_unit, fmt) tmp_xx(j,ie)
+                enddo
+            enddo
+            ! deallocate data, different sizes
+            deallocate(tmp_xx)
+        enddo
+
+    ! integer
+    elseif (fmt=='(I10)' ) then
+
+        ! local
+        do ie=1,n_elem
+            write(file_unit, fmt) ii(ie)
+        enddo
+
+        ! mpi loop
+        do k=1,mpi_np-1
+            ! receive size
+            call MPI_Recv(tmp_nelem, 1, MPI_INTEGER, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+            ! allocate and receive data - different sizes
+            allocate(tmp_ii(tmp_nelem))
+            call MPI_Recv(tmp_ii, tmp_nelem, MPI_INTEGER, k, 1, MPI_COMM_WORLD, MPI_STATUS_IGNORE, mpi_ierr)
+            ! write to file
+            do ie=1,tmp_nelem
+                write(file_unit, fmt) tmp_ii(ie)
+            enddo
+            ! deallocate data, different sizes
+            deallocate(tmp_ii)
+        enddo
+
+    else
+        print *, 'wrong format'
+    endif
+
+end subroutine RECEIVE_PRINT_FILE
+
+!> writes solution file in ensight format
+!> saves geometry and polyhedra into 2 separate files
 !> can save geometry only once
-subroutine ENSIGHT_WRITE_SOLUTION(base_filename,xx, yy, zz, nvert_per_el, n_elem, n_elem_tot, u_name, u, displacements, gathered_sizes, num_dt)
+!> FORTRAN ASCII floats E12.5, integers I10 one per line
+subroutine ENSIGHT_WRITE_MESH(base_filename, xx, yy, zz, nvert_per_el, n_elem, n_elem_tot, PolyMesh)
 
     use mpi
     use Poly_setup_MPI
 
-    !TODO mpi not working
-    !TODO save mesh only once
-    !TODO add polyhedra
     !TODO save correct polyhedra and node numbering from input file
     implicit none
+
+    type(Mesh_Structure), intent(in) :: PolyMesh            !< mesh
 
     ! Input arguments
     integer*4, intent(in) :: nvert_per_el             !< number of vertices per element
@@ -520,57 +593,32 @@ subroutine ENSIGHT_WRITE_SOLUTION(base_filename,xx, yy, zz, nvert_per_el, n_elem
     real(8), intent(in) :: xx(nvert_per_el, n_elem)            !< x coordinates of 4 vertices of tetrahedra
     real(8), intent(in) :: yy(nvert_per_el, n_elem)            !< y coordinates of 4 vertices of tetrahedra
     real(8), intent(in) :: zz(nvert_per_el, n_elem)            !< z coordinates of 4 vertices of tetrahedra
-    character(len=*), intent(in), optional :: u_name !< Solution name (e.g., "Velocity")
-    real(8), intent(in), optional :: u(DIM, nvert_per_el, n_elem) !< Solution values (3D vectors per node)
-    integer*4, dimension(mpi_np), intent(in) :: displacements                  !< starting node for the part
-    integer*4, dimension(mpi_np), intent(in) :: gathered_sizes
-    integer*4, intent(in) :: num_dt                            !< number of timestep
+
     character(len=*), intent(in) :: base_filename
 
     ! Internal variables
     integer*4 :: i, j
-    integer*4 :: geo_unit, sol_unit
-    character(len=256) :: geo_filename, sol_filename
+    integer*4 :: geo_unit, poly_unit
+    character(len=256) :: geo_filename, poly_filename
 
-    real*8, dimension(:), allocatable :: xx_tot, yy_tot, zz_tot
-    real*8, dimension(:), allocatable :: ux_tot, uy_tot, uz_tot
-    real*8, dimension(nvert_per_el*n_elem) :: x_tmp, y_tmp, z_tmp, ux_tmp, uy_tmp, uz_tmp
+    if (mpi_id /= 0) then
+        ! tag=1 before MPI_COMM_WORLD
+        ! send size and coordinates
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(xx, n_elem*nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(yy, n_elem*nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(zz, n_elem*nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
 
-    !! NOT SAVING CORRECT GEOMETRY... PROBLEM WITH MPI
-    ! if (mpi_id == 0 ) then
-        allocate(xx_tot(nvert_per_el*n_elem_tot))
-        allocate(yy_tot(nvert_per_el*n_elem_tot))
-        allocate(zz_tot(nvert_per_el*n_elem_tot))
-        allocate(ux_tot(nvert_per_el*n_elem_tot))
-        allocate(uy_tot(nvert_per_el*n_elem_tot))
-        allocate(uz_tot(nvert_per_el*n_elem_tot))
-        xx_tot = 0.0
-        yy_tot = 0.0
-        zz_tot = 0.0
-        ux_tot = 0.0
-        uy_tot = 0.0
-        uz_tot = 0.0
-    ! end if
+        ! poly
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(PolyMesh%elem_in_poly_loc, n_elem, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
 
-    x_tmp = reshape(xx, (/nvert_per_el*n_elem/))
-    y_tmp = reshape(yy, (/nvert_per_el*n_elem/))
-    z_tmp = reshape(zz, (/nvert_per_el*n_elem/))
-    ux_tmp = reshape(u(1,:,:), (/nvert_per_el*n_elem/))
-    uy_tmp = reshape(u(2,:,:), (/nvert_per_el*n_elem/))
-    uz_tmp = reshape(u(3,:,:), (/nvert_per_el*n_elem/))
-    ! send all to process 0
-    call MPI_Gatherv(x_tmp, n_elem*nvert_per_el, MPI_DOUBLE_PRECISION, xx_tot, gathered_sizes*nvert_per_el, displacements, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpi_ierr)
-    call MPI_Gatherv(y_tmp, n_elem*nvert_per_el, MPI_DOUBLE_PRECISION, yy_tot, gathered_sizes*nvert_per_el, displacements, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpi_ierr)
-    call MPI_Gatherv(z_tmp, n_elem*nvert_per_el, MPI_DOUBLE_PRECISION, zz_tot, gathered_sizes*nvert_per_el, displacements, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpi_ierr)
-    call MPI_Gatherv(ux_tmp, n_elem*nvert_per_el, MPI_DOUBLE_PRECISION, ux_tot, gathered_sizes*nvert_per_el, displacements, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpi_ierr)
-    call MPI_Gatherv(uy_tmp, n_elem*nvert_per_el, MPI_DOUBLE_PRECISION, uy_tot, gathered_sizes*nvert_per_el, displacements, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpi_ierr)
-    call MPI_Gatherv(uz_tmp, n_elem*nvert_per_el, MPI_DOUBLE_PRECISION, uz_tot, gathered_sizes*nvert_per_el, displacements, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, mpi_ierr)
+    elseif (mpi_id == 0) then
 
-    if (mpi_id == 0) then
-
-        ! Generate filenames for this part
         write(geo_filename, '(A, "mesh.geo")') trim(base_filename)
-        write(sol_filename, '(A, "sol_", I0, ".vec")') trim(base_filename), num_dt
+        write(poly_filename, '(A, "poly.sca")') trim(base_filename)
 
         ! **********************
         ! Write Geometry File
@@ -595,24 +643,11 @@ subroutine ENSIGHT_WRITE_SOLUTION(base_filename,xx, yy, zz, nvert_per_el, n_elem
         do i = 1, n_elem_tot * nvert_per_el
             write(geo_unit, '(I10)') i
         end do
-        ! x coordinates
-        !do j = 1, nvert_per_el
-            do i = 1, n_elem_tot*nvert_per_el
-                write(geo_unit, '(F16.8)') xx_tot(i)
-            end do
-        !end do
-        ! y coordinates
-        !do j = 1, nvert_per_el
-            do i = 1, n_elem_tot*nvert_per_el
-                write(geo_unit, '(F16.8)') yy_tot(i)
-            end do
-        !end do
-        ! z coordinates
-        !do j = 1, nvert_per_el
-            do i = 1, n_elem_tot*nvert_per_el
-                write(geo_unit, '(F16.8)') zz_tot(i)
-            end do
-        !end do
+
+        ! coordinates
+        call RECEIVE_PRINT_FILE(geo_unit, '(E12.5)', n_elem, nvert_per_el, xx=xx)
+        call RECEIVE_PRINT_FILE(geo_unit, '(E12.5)', n_elem, nvert_per_el, xx=yy)
+        call RECEIVE_PRINT_FILE(geo_unit, '(E12.5)', n_elem, nvert_per_el, xx=zz)
 
         ! Write elements
         write(geo_unit, '(A)') 'tetra4' ! Use tetrahedral representation
@@ -626,6 +661,78 @@ subroutine ENSIGHT_WRITE_SOLUTION(base_filename,xx, yy, zz, nvert_per_el, n_elem
 
         close(geo_unit)
 
+
+        open(newunit=poly_unit, file=poly_filename, action='WRITE', status='REPLACE', form='FORMATTED')
+
+        ! Write solution header
+        write(poly_unit, '(A)') 'scalar per element'
+        write(poly_unit, '(A)') 'part'
+        write(poly_unit, '(I10)') 1
+        write(poly_unit, '(A)') 'tetra4'
+
+        ! Write solution values
+        call RECEIVE_PRINT_FILE(poly_unit, '(I10)', n_elem, nvert_per_el, ii=PolyMesh%elem_in_poly_loc)
+
+        close(poly_unit)
+
+    endif
+
+end subroutine ENSIGHT_WRITE_MESH
+
+!> writes solution file in ensight format
+!> FORTRAN ASCII floats E12.5, integers I10 one per line
+subroutine ENSIGHT_WRITE_SOLUTION(base_filename, nvert_per_el, n_elem, n_elem_tot, u_name, u, num_dt, PolyMesh)
+
+    use mpi
+    use Poly_setup_MPI
+
+    implicit none
+
+    type(Mesh_Structure), intent(in) :: PolyMesh            !< mesh
+
+    ! Input arguments
+    integer*4, intent(in) :: nvert_per_el             !< number of vertices per element
+    integer*4, intent(in) :: n_elem,n_elem_tot                   !< Number of elements in this part
+    character(len=*), intent(in), optional :: u_name !< Solution name (e.g., "Velocity")
+    real(8), intent(in), optional :: u(DIM, nvert_per_el, n_elem) !< Solution values (3D vectors per node)
+    integer*4, intent(in) :: num_dt                            !< number of timestep
+    character(len=*), intent(in) :: base_filename
+
+    ! Internal variables
+    integer*4 :: sol_unit
+    character(len=256) :: sol_filename, tmp_filename
+
+    if (mpi_id /= 0) then
+
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(u(1,:,:), n_elem * nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(u(2,:,:), n_elem * nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(u(3,:,:), n_elem * nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+
+
+    elseif (mpi_id == 0) then
+
+        tmp_filename = 'sol_tet_000000.vec'
+
+        ! num_dt
+        if (num_dt < 10) then
+            write(tmp_filename(14:14),'(i1)') num_dt
+        elseif (num_dt < 100) then
+            write(tmp_filename(13:14),'(i2)') num_dt
+        elseif (num_dt < 1000) then
+            write(tmp_filename(12:14),'(i3)') num_dt
+        elseif (num_dt < 10000) then
+            write(tmp_filename(11:14),'(i4)') num_dt
+        elseif (num_dt < 100000) then
+            write(tmp_filename(10:14),'(i5)') num_dt
+        elseif (num_dt < 1000000) then
+            write(tmp_filename(9:14),'(i6)') num_dt
+        endif
+
+        write(sol_filename, '(A, A)') trim(base_filename), trim(tmp_filename)
+
         ! **********************
         ! Write Solution File
         ! **********************
@@ -636,26 +743,27 @@ subroutine ENSIGHT_WRITE_SOLUTION(base_filename,xx, yy, zz, nvert_per_el, n_elem
             write(sol_unit, '(A)') 'vector per node'
             write(sol_unit, '(A)') 'part'
             write(sol_unit, '(I10)') 1
+            write(sol_unit, '(A)') 'coordinates'
 
             ! Write solution values
-            do i=1,nvert_per_el*n_elem_tot
-                !write(sol_unit, '(I10, 3F16.8)') ((i-1)*nvert_per_el + j), ux_tot((i-1)*nvert_per_el + j), uy_tot((i-1)*nvert_per_el + j), uz_tot((i-1)*nvert_per_el + j)
-                write(sol_unit, '(3F16.8)') ux_tot(i), uy_tot(i), uz_tot(i)
-            end do
+            call RECEIVE_PRINT_FILE(sol_unit, '(E12.5)', n_elem, nvert_per_el, xx=u(1,:,:))
+            call RECEIVE_PRINT_FILE(sol_unit, '(E12.5)', n_elem, nvert_per_el, xx=u(2,:,:))
+            call RECEIVE_PRINT_FILE(sol_unit, '(E12.5)', n_elem, nvert_per_el, xx=u(3,:,:))
 
             close(sol_unit)
         end if
 
     endif
-    deallocate(xx_tot,yy_tot,zz_tot,ux_tot,uy_tot,uz_tot)
+
 end subroutine ENSIGHT_WRITE_SOLUTION
 
 !> write solution in ensight format
 !> saves the case file to reference the solution at each timestep, with the same mesh
-subroutine WRITE_ENSIGHT_CASE(base_filename, num_dt, solution_name)
+subroutine ENSIGHT_WRITE_CASE(base_filename, num_dt, solution_name)
 
     use mpi
     use Poly_setup_MPI
+    use Poly_global
 
     implicit none
 
@@ -666,10 +774,10 @@ subroutine WRITE_ENSIGHT_CASE(base_filename, num_dt, solution_name)
 
     ! Internal variables
     character(len=256) :: case_filename!, tmp_name
-    integer*4 :: case_file_unit, iostat
+    integer*4 :: case_file_unit, iostat, i, ndt
 
     ! Generate case filename
-    write(case_filename, '(A, "_", I0,".case")') trim(base_filename), num_dt
+    write(case_filename, '(A, "solution.case")') trim(base_filename)
 
     open(newunit=case_file_unit, file=case_filename, action='WRITE', status='REPLACE', form='FORMATTED', iostat=iostat)
 
@@ -688,24 +796,33 @@ subroutine WRITE_ENSIGHT_CASE(base_filename, num_dt, solution_name)
     ! Write solution section if needed
     if (present(solution_name)) then
         write(case_file_unit, '(A)') 'VARIABLE'
-        ! write(case_file_unit, '(A, A)', advance='NO') 'vector per node: ', trim(solution_name)
-        ! do i = 0, mpi_np-2
-        !     write(tmp_name, '(" sol_", I0, "_part", I0, ".vec")') num_dt,  i
-        !     write(case_file_unit, '(A)', advance='NO') trim(tmp_name)
-        ! end do
-        ! i=mpi_np-1
-        ! write(tmp_name, '(" sol_", I0, "_part", I0, ".vec")') num_dt,  i
-        ! write(case_file_unit, '(A)') trim(tmp_name)
-        ! write(case_file_unit, '(A, A)') 'vector per node: ', trim(solution_name)
-        write(case_file_unit, '(A, I10, A, A, " sol_", I0, ".vec")') 'vector per node: ', num_dt, ' ', trim(solution_name), num_dt
-        ! do i = 0, mpi_np-1
-        !     write(tmp_name, '(A, " sol_", I0, "_part", I0, ".vec")') trim(solution_name), num_dt,  i
-        !     write(case_file_unit, '(A)') trim(tmp_name)
-        ! end do
+        write(case_file_unit, '(A, I10, A)') 'vector per node: ', 1, ' u sol_tet_******.vec'
+        write(case_file_unit, '(A, I10, A)') 'scalar per element: ', 1, ' poly poly.sca'
+
+        ndt = floor(stop_time / time_step)/num_dt_mon+1
+
+        ! Write the TIME section
+        write(case_file_unit, '(A)') "TIME"
+        write(case_file_unit, '(A, I10)') "time set: ", 1
+        write(case_file_unit, '(A, I10)') "number of steps: ", ndt
+        write(case_file_unit, '(A, I10)') "filename start number: ", 0
+        write(case_file_unit, '(A, I10)') "filename increment: ", num_dt_mon
+
+        ! Write time values in a single line
+        write(case_file_unit, '(A)', advance='yes') "time values:"
+        do i = 0, ndt-1
+            if (mod(i,10)==0 .and. i/=0) write(case_file_unit, '(A)', advance='yes') ''
+            if (i == ndt) then
+                write(case_file_unit, '(F10.4)', advance='yes') i*num_dt_mon*time_step  ! Last value, finish the line
+            else
+                write(case_file_unit, '(F10.4)', advance='no') i*num_dt_mon*time_step  ! Continue on the same line
+            end if
+        end do
+
     end if
 
     close(case_file_unit)
-end subroutine WRITE_ENSIGHT_CASE
+end subroutine ENSIGHT_WRITE_CASE
 
 !> write mesh partition files, only geometric data
     subroutine VTK_WRITE_MESH_PARTITION(filename, xx, yy, zz, nvert_per_el, n_elem, PolyMesh)
@@ -956,11 +1073,9 @@ end subroutine WRITE_ENSIGHT_CASE
         logical, intent(in) :: IsPoly
         real(kind=8), dimension(4,n_elem) :: xx, yy, zz
         character(len=80) :: vtk_filename_num!, vtk_filename_exact
-        integer(kind=4) :: ie_loc,ivert,id_node,i
-        integer(kind=4) :: start_node(mpi_np), start_elem(mpi_np), gathered_sizes(mpi_np), start_solution(mpi_np)
+        integer(kind=4) :: ie_loc,ivert,id_node!,i
+        ! integer(kind=4) :: start_node(mpi_np), start_elem(mpi_np), gathered_sizes(mpi_np), start_solution(mpi_np)
         integer(kind=4) :: nvert_per_el
-
-        if (mpi_id == 0) print *, 'WRITE_SOLUTION'
 
         nvert_per_el = PolyMesh%Elem_loc(1)%num_vert
 
@@ -1040,50 +1155,54 @@ end subroutine WRITE_ENSIGHT_CASE
             if(.not. IsPoly) vtk_filename_num = 'MONITORS/sol_tet_000000.vtk'
 
             write(vtk_filename_num(23:23),'(A)') 'V'
+            call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
         endif
 
-        if (mpi_id==0) print *, 'Writing .vtk file...'
-        call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
+        !if (mpi_id==0) print *, 'Writing .vtk file...'
+        !call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
 
-        if (present(num_dt) .and. .false.) then
+        if (present(num_dt)) then
+            !call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+            !if (mpi_id==0) print *, 'Writing .vtu file...'
+
+            !call VTU_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh, num_dt)
+
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-            if (mpi_id==0) print *, 'Writing .vtu file...'
-
-            call VTU_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh, num_dt)
-
-            call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-            start_node(1) = 0
-            start_elem(1) = 0
-            start_solution(1) = 0
+            ! start_node(1) = 0
+            ! start_elem(1) = 0
+            ! start_solution(1) = 0
             ! only in parallel
-            if(mpi_np > 1) then
-                call MPI_AllGather(PolyMesh%num_elem_loc, 1, MPI_INTEGER, gathered_sizes, 1, &
-                MPI_INTEGER, MPI_COMM_WORLD, ierr)
-                start_elem = gathered_sizes
-                ! mpi process from 0
-                do i = mpi_np,2,-1
-                start_elem(i) = start_elem(i-1)
-                enddo
-                start_elem(1) = 0
-                do i = 2,mpi_np
-                    start_node(i) = start_node(i-1) + nvert_per_el*start_elem(i)
-                enddo
-                start_solution(1) = 0
-                do i = 2,mpi_np
-                    start_solution(i) = start_solution(i-1) + DIM*nvert_per_el*start_elem(i)
-                enddo
-                do i = 2,mpi_np
-                    start_elem(i) = start_elem(i-1) + start_elem(i)
-                enddo
+            ! if(mpi_np > 1) then
+            !     call MPI_AllGather(PolyMesh%num_elem_loc, 1, MPI_INTEGER, gathered_sizes, 1, &
+            !     MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            !     start_elem = gathered_sizes
+            !     ! mpi process from 0
+            !     do i = mpi_np,2,-1
+            !     start_elem(i) = start_elem(i-1)
+            !     enddo
+            !     start_elem(1) = 0
+            !     do i = 2,mpi_np
+            !         start_node(i) = start_node(i-1) + nvert_per_el*start_elem(i)
+            !     enddo
+            !     start_solution(1) = 0
+            !     do i = 2,mpi_np
+            !         start_solution(i) = start_solution(i-1) + DIM*nvert_per_el*start_elem(i)
+            !     enddo
+            !     do i = 2,mpi_np
+            !         start_elem(i) = start_elem(i-1) + start_elem(i)
+            !     enddo
+            ! endif
+
+            if (num_dt==0) then
+                if (mpi_id==0) print *, 'Writing Ensight mesh.geo and poly.sca file...'
+                call ENSIGHT_WRITE_MESH('MONITORS/', xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, PolyMesh)
             endif
 
-            if (mpi_id==0) print *, 'Writing Ensight .geo and .vec file...'
-            call ENSIGHT_WRITE_SOLUTION('MONITORS/',xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'DISPLACEMENT', u, start_node, gathered_sizes, num_dt)
+            if (mpi_id==0) print *, 'Writing Ensight .vec file...'
+            call ENSIGHT_WRITE_SOLUTION('MONITORS/', nvert_per_el, n_elem, PolyMesh%num_elem, 'DISPLACEMENT', u, num_dt, PolyMesh=PolyMesh)
 
             call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-            if (mpi_id==0) print *, 'Writing Ensight .case file...'
 
-            if (mpi_id == 0) call WRITE_ENSIGHT_CASE('MONITORS/solution', num_dt, 'DISPLACEMENT')
         endif
 
     end subroutine WRITE_SOLUTION

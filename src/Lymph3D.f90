@@ -434,10 +434,10 @@ program Lymph3D
     time_step = 1.0d-3
     num_dt_mon = 20
 
-    stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
-    !stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
-    !stop_time = 0.021
-    !stop_time = 0.002
+    !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
+    stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
+    !stop_time = 0.101
+    !stop_time = 0.001
     
     dt2 = time_step*time_step
     half_dt2 = 0.5d0*dt2
@@ -526,13 +526,13 @@ program Lymph3D
         call FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, v0_loc, un_loc, un_mpi)
 
         ! SAVE FIRST ITERATION
-        if (IsSave_output .eqv. .true.) then
-            t1 = MPI_WTIME()
-            call POST_PROCESS_MATRIX_FREE(PolyMesh, un_loc, u, gathered_sizes, displacements)
-            call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
-            t2 = MPI_WTIME()
-            tp_export = tp_export + t2 - t1
-        endif
+        ! if (IsSave_output .eqv. .true.) then
+        !     t1 = MPI_WTIME()
+        !     call POST_PROCESS_MATRIX_FREE(PolyMesh, un_loc, u, gathered_sizes, displacements)
+        !     call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
+        !     t2 = MPI_WTIME()
+        !     tp_export = tp_export + t2 - t1
+        ! endif
 
         ! update time
         num_dt = num_dt + 1
@@ -595,13 +595,14 @@ program Lymph3D
 
         num_dt = num_dt - 1
 
-        if (IsSave_output .eqv. .true.) then
-            t1 = MPI_WTIME()
-            call POST_PROCESS_MATRIX_FREE(PolyMesh, un_loc, u, gathered_sizes, displacements)
-            call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
-            t2 = MPI_WTIME()
-            tp_export = tp_export + t2 - t1
-        endif
+        ! LAST ITERATION
+        ! if (IsSave_output .eqv. .true.) then
+        !     t1 = MPI_WTIME()
+        !     call POST_PROCESS_MATRIX_FREE(PolyMesh, un_loc, u, gathered_sizes, displacements)
+        !     call EXPORT_SOLUTION(PolyMesh, u, IsPoly, num_dt)
+        !     t2 = MPI_WTIME()
+        !     tp_export = tp_export + t2 - t1
+        ! endif
 
     ! ----------------------------- PETSc -------------------------------------
     else
@@ -764,6 +765,9 @@ program Lymph3D
         deallocate(displacements)
         deallocate(gathered_sizes)
     endif
+
+    if (mpi_id==0) print *, 'Writing Ensight .case file...'
+    if (mpi_id==0) call ENSIGHT_WRITE_CASE('MONITORS/', num_dt, 'DISPLACEMENT')
 
     !call PVD_SETUP(num_dt_mon, 0, num_dt)
 
