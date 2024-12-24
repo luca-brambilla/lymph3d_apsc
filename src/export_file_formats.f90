@@ -679,6 +679,159 @@ subroutine ENSIGHT_WRITE_MESH(base_filename, xx, yy, zz, nvert_per_el, n_elem, n
 
 end subroutine ENSIGHT_WRITE_MESH
 
+subroutine ENSIGHT_WRITE_BOUNDARY(base_filename, nvert_per_el, n_elem, PolyMesh)
+
+    use mpi
+    use Poly_setup_MPI
+    use mesh_partition_and_mpi_files
+
+    !TODO save correct polyhedra and node numbering from input file
+    implicit none
+
+    type(Mesh_Structure), intent(in) :: PolyMesh            !< mesh
+
+    ! Input arguments
+    integer*4, intent(in) :: nvert_per_el             !< number of vertices per element
+    integer*4, intent(in) :: n_elem                   !< Number of elements in this part
+
+    character(len=*), intent(in) :: base_filename
+
+    ! Internal variables
+    integer*4 :: i, j
+    integer*4 :: bd_unit
+    character(len=256) :: bd_filename
+
+    integer(kind=4) :: nbd, nbd_tot, face_id, E2, ie_loc, iface, mat_id, ivert, row_vert, vert_id
+    integer(kind=4), dimension(:), allocatable :: bd_faces
+    real(kind=8), dimension(:,:), allocatable :: xx, yy, zz
+
+    nbd = 0
+
+    ! count boundaries
+    do ie_loc = 1,n_elem
+        do iface=1,PolyMesh%Elem_loc(1)%num_faces
+
+            E2 = PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,2)
+            if (E2<0) then
+                nbd = nbd +1
+            endif
+
+        enddo
+    enddo
+
+    allocate(bd_faces(nbd))
+    allocate(xx(nvert_per_el,nbd), yy(nvert_per_el,nbd), zz(nvert_per_el,nbd))
+
+
+    ! store boundary face id
+    nbd = 0
+    do ie_loc = 1,n_elem
+        do iface=1,PolyMesh%Elem_loc(1)%num_faces
+
+            E2 = PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,2)
+            if (E2<0) then
+                ! counter
+                nbd = nbd+1
+
+                mat_id = PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,1)
+                bd_faces(nbd) = mat_id
+
+                ! row on connectivity
+                !face_id = PolyMesh%Elem_loc(ie_loc)%neigh_el(iface,3)
+                !row_vert = (ie_loc-1)*4 + face_id
+
+                do ivert=1,nvert_per_el
+
+                    call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+                    PolyMesh%Elem_loc(ie_loc)%vert(ivert),vert_id)
+
+                    ! global vertex id
+                    ! vert_id = PolyMesh%con_tria(row_vert,3+ivert)
+    
+                    ! vertex coordinates
+                    xx(ivert,nbd) = PolyMesh%coord_x(vert_id)
+                    yy(ivert,nbd) = PolyMesh%coord_y(vert_id)
+                    zz(ivert,nbd) = PolyMesh%coord_z(vert_id)
+                enddo
+            endif
+
+        enddo
+    enddo
+
+    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+    call MPI_REDUCE(nbd, nbd_tot, 1, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, mpi_ierr)
+
+    if (mpi_id /= 0) then
+        ! tag=1 before MPI_COMM_WORLD
+        ! send size and coordinates
+        call MPI_Send(nbd, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(xx, nvert_per_el*nbd, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(nbd, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(yy, nvert_per_el*nbd, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(nbd, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(zz, nvert_per_el*nbd, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+
+        ! poly
+        call MPI_Send(nbd, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(bd_faces, nbd, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+
+    elseif (mpi_id == 0) then
+
+        write(bd_filename, '(A, "boundaries.case")') trim(base_filename)
+
+        ! **********************
+        ! Write Geometry File
+        ! **********************
+        open(newunit=bd_unit, file=bd_filename, action='WRITE', status='REPLACE', form='FORMATTED')
+
+        ! EnSight header
+        write(bd_unit, '(A)') 'Ensight Gold'
+        write(bd_unit, '(A)') 'Unstructured mesh part'
+        write(bd_unit, '(A)') 'node id assign'
+        write(bd_unit, '(A)') 'element id assign'
+
+        ! Write part header
+        write(bd_unit, '(A)') 'part'
+        write(bd_unit, '(I10)') 1
+        write(bd_unit, '(A)') 'boundary faces'
+
+        ! Write coordinates
+        write(bd_unit, '(A)') 'coordinates'
+        write(bd_unit, '(I10)') nbd_tot * nvert_per_el
+        ! numbering first
+        do i = 1, nbd_tot * nvert_per_el
+            write(bd_unit, '(I10)') i
+        end do
+
+        ! coordinates
+        call RECEIVE_PRINT_FILE(bd_unit, '(E12.5)', nbd, NVERT_TRIA, xx=xx)
+        call RECEIVE_PRINT_FILE(bd_unit, '(E12.5)', nbd, NVERT_TRIA, xx=yy)
+        call RECEIVE_PRINT_FILE(bd_unit, '(E12.5)', nbd, NVERT_TRIA, xx=zz)
+
+        ! Write elements
+        write(bd_unit, '(A)') 'tria3' ! Use tetrahedral representation
+        write(bd_unit, '(I10)') nbd_tot
+        do i = 1, nbd_tot
+            write(bd_unit, '(I10)') i
+        end do
+        do i = 1, nbd_tot
+            write(bd_unit, '(3I10)') ( (i - 1) * nvert_per_el + j, j = 1, NVERT_TRIA )
+        end do
+
+        write(bd_unit, '(A)') "scalar per element"
+        write(bd_unit, '(A)') "part"
+        write(bd_unit, '(I10)') 1
+        write(bd_unit, '(A)') 'tria3'
+
+        ! Write solution values
+        call RECEIVE_PRINT_FILE(bd_unit, '(I10)', nbd, NVERT_TRIA, ii=bd_faces)
+
+        close(bd_unit)
+
+    endif
+
+end subroutine ENSIGHT_WRITE_BOUNDARY
+
 !> writes solution file in ensight format
 !> FORTRAN ASCII floats E12.5, integers I10 one per line
 subroutine ENSIGHT_WRITE_SOLUTION(base_filename, nvert_per_el, n_elem, n_elem_tot, u_name, u, num_dt, PolyMesh)
@@ -1069,9 +1222,9 @@ end subroutine ENSIGHT_WRITE_CASE
         integer(kind=4), intent(in), optional :: num_dt       !< number of timesteps
         type(Mesh_Structure), intent(inout) :: PolyMesh       !< mesh
         integer(kind=4), intent(in) :: n_elem                  !< local number of elements
-        real(kind=8), dimension(DIM,4,n_elem), intent(inout) :: u !< 3D, 4 vertices, n_elem
+        real(kind=8), dimension(DIM, NVERT_TET, n_elem), intent(inout) :: u !< 3D, 4 vertices, n_elem
         logical, intent(in) :: IsPoly
-        real(kind=8), dimension(4,n_elem) :: xx, yy, zz
+        real(kind=8), dimension(NVERT_TET, n_elem) :: xx, yy, zz
         character(len=80) :: vtk_filename_num!, vtk_filename_exact
         integer(kind=4) :: ie_loc,ivert,id_node!,i
         ! integer(kind=4) :: start_node(mpi_np), start_elem(mpi_np), gathered_sizes(mpi_np), start_solution(mpi_np)
@@ -1158,8 +1311,8 @@ end subroutine ENSIGHT_WRITE_CASE
             call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
         endif
 
-        !if (mpi_id==0) print *, 'Writing .vtk file...'
-        !call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
+        if (mpi_id==0) print *, 'Writing .vtk file...'
+        call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
 
         if (present(num_dt)) then
             !call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -1196,6 +1349,9 @@ end subroutine ENSIGHT_WRITE_CASE
             if (num_dt==0) then
                 if (mpi_id==0) print *, 'Writing Ensight mesh.geo and poly.sca file...'
                 call ENSIGHT_WRITE_MESH('MONITORS/', xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, PolyMesh)
+
+                if (mpi_id==0) print *, 'Writing Ensight boundaries.case file...'
+                call ENSIGHT_WRITE_BOUNDARY('MONITORS/', NVERT_TRIA, n_elem, PolyMesh)
             endif
 
             if (mpi_id==0) print *, 'Writing Ensight .vec file...'

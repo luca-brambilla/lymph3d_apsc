@@ -62,9 +62,9 @@ module problem_data_and_properties
         ! r(2) = 0
         ! r(3) = - 9.8 * 2400
 
-        r(1) = (-2.0d0*rho + 3.0d0*(lambda+2.0*mu))*PI**2 * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-        r(2) = (-2.0d0*rho + 3.0d0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-        r(3) = (-2.0d0*rho + 3.0d0*(lambda+2.0*mu))*PI**2 * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+        r(1) = (-2.0d0*rho + 3.0d0*(lambda+2.0d0*mu))*PI*PI * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
+        r(2) = (-2.0d0*rho + 3.0d0*(lambda+2.0d0*mu))*PI*PI * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+        r(3) = (-2.0d0*rho + 3.0d0*(lambda+2.0d0*mu))*PI*PI * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
 
 
     end function f_time
@@ -199,14 +199,14 @@ module problem_data_and_properties
         ! r(3) = - 23520
 
         if(space_fun_tag==1) then
-            stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
-            stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
-            stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
-            stress_tensor(1,2) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3.0d0*lambda + 2.0d0*mu)
+            stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3.0d0*lambda + 2.0d0*mu)
+            stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3.0d0*lambda + 2.0d0*mu)
+            stress_tensor(1,2) = 2.0d0*mu*PI*cos(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
             stress_tensor(2,1) = stress_tensor(1,2)
-            stress_tensor(1,3) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(3))*sin(PI*p(2))
+            stress_tensor(1,3) = 2.0d0*mu*PI*cos(PI*p(1))*cos(PI*p(3))*sin(PI*p(2))
             stress_tensor(3,1) = stress_tensor(1,3)
-            stress_tensor(2,3) = 2*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
+            stress_tensor(2,3) = 2.0d0*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
             stress_tensor(3,2) = stress_tensor(2,3)
         endif
         if(space_fun_tag==2) then
@@ -307,9 +307,9 @@ module problem_data_and_properties
 
         real(kind=8) :: alpha, theta, c
 
-        alpha = 10 ! penalty coefficient (which appears in the definition of the penalization function)
-        theta = - 1 ! IP method (theta = -1 ---> SIP, theta = 0 ---> IIP, theta = 1 ---> NIP)
-        c = 0 ! coefficient of the reaction term
+        alpha = 10.0d0 ! penalty coefficient (which appears in the definition of the penalization function)
+        theta = - 1.0d0 ! IP method (theta = -1 ---> SIP, theta = 0 ---> IIP, theta = 1 ---> NIP)
+        c = 0.0d0 ! coefficient of the reaction term
 
     end subroutine set_properties
 
