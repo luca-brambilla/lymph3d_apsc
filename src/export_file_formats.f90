@@ -701,7 +701,7 @@ subroutine ENSIGHT_WRITE_BOUNDARY(base_filename, nvert_per_el, n_elem, PolyMesh)
     integer*4 :: bd_unit
     character(len=256) :: bd_filename
 
-    integer(kind=4) :: nbd, nbd_tot, face_id, E2, ie_loc, iface, mat_id, ivert, row_vert, vert_id
+    integer(kind=4) :: nbd, nbd_tot, E2, ie_loc, iface, mat_id, ivert, vert_id
     integer(kind=4), dimension(:), allocatable :: bd_faces
     real(kind=8), dimension(:,:), allocatable :: xx, yy, zz
 
@@ -847,22 +847,32 @@ subroutine ENSIGHT_WRITE_SOLUTION(base_filename, nvert_per_el, n_elem, n_elem_to
     integer*4, intent(in) :: nvert_per_el             !< number of vertices per element
     integer*4, intent(in) :: n_elem,n_elem_tot                   !< Number of elements in this part
     character(len=*), intent(in), optional :: u_name !< Solution name (e.g., "Velocity")
-    real(8), intent(in), optional :: u(DIM, nvert_per_el, n_elem) !< Solution values (3D vectors per node)
+    real(8), dimension(DIM, nvert_per_el, n_elem), intent(in), optional :: u !< Solution values (3D vectors per node)
     integer*4, intent(in) :: num_dt                            !< number of timestep
     character(len=*), intent(in) :: base_filename
+
+    real(8), dimension(:,:), pointer :: u_tmp
 
     ! Internal variables
     integer*4 :: sol_unit
     character(len=256) :: sol_filename, tmp_filename
 
+    allocate(u_tmp(nvert_per_el, n_elem))
+
     if (mpi_id /= 0) then
 
+        ! send size each time because receive from all processes one dimension at a time
+        u_tmp = u(1,:,:)
         call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
-        call MPI_Send(u(1,:,:), n_elem * nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(u_tmp, n_elem * nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+
+        u_tmp = u(2,:,:)
         call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
-        call MPI_Send(u(2,:,:), n_elem * nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(u_tmp, n_elem * nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+
+        u_tmp = u(3,:,:)
         call MPI_Send(n_elem, 1, MPI_INTEGER, 0, 1, MPI_COMM_WORLD, mpi_ierr)
-        call MPI_Send(u(3,:,:), n_elem * nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_Send(u_tmp, n_elem * nvert_per_el, MPI_DOUBLE_PRECISION, 0, 1, MPI_COMM_WORLD, mpi_ierr)
 
 
     elseif (mpi_id == 0) then

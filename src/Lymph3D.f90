@@ -434,9 +434,9 @@ program Lymph3D
     time_step = 1.0d-3
     num_dt_mon = 20
 
-    stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
+    !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
     !stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
-    !stop_time = 0.101
+    stop_time = 0.101
     !stop_time = 0.001
     
     dt2 = time_step*time_step

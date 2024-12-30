@@ -3026,26 +3026,26 @@ subroutine WRITE_INTERFACE_INFO(mpi_file, PolyMesh)
    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
    call FLUSH
 
-   if (mpi_id == 0) then
-      print *, "num_elem_inter_comm row-by-row:"
-      do i = 1, mpi_np  ! Loop over rows
-         print *, PolyMesh%num_elem_inter_comm(i, :)
-      end do
+   ! if (mpi_id == 0) then
+   !    print *, "num_elem_inter_comm row-by-row:"
+   !    do i = 1, mpi_np  ! Loop over rows
+   !       print *, PolyMesh%num_elem_inter_comm(i, :)
+   !    end do
 
-      print *, "num_elem_inter_vec:"
-      print *, PolyMesh%num_elem_inter_vec
+   !    print *, "num_elem_inter_vec:"
+   !    print *, PolyMesh%num_elem_inter_vec
 
-      print *, "inter_disp row-by-row:"
-      do i = 1, mpi_np  ! Loop over rows
-         print *, PolyMesh%inter_disp(i, :)
-      end do
+   !    print *, "inter_disp row-by-row:"
+   !    do i = 1, mpi_np  ! Loop over rows
+   !       print *, PolyMesh%inter_disp(i, :)
+   !    end do
 
-      print *, 'elem_inter_glo'
-      print *, PolyMesh%elem_inter_glo
+   !    print *, 'elem_inter_glo'
+   !    print *, PolyMesh%elem_inter_glo
 
-      print *, 'elem_inter_loc'
-      print *, PolyMesh%elem_inter_loc
-   endif
+   !    print *, 'elem_inter_loc'
+   !    print *, PolyMesh%elem_inter_loc
+   ! endif
 
 end subroutine WRITE_INTERFACE_INFO
 
