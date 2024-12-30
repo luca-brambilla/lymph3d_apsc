@@ -110,6 +110,60 @@ subroutine MAKE_MASS_VOLUME(Np, Jdet, weitet3, nq3, phi, rho, mass_tet_vol)
 
 end subroutine MAKE_MASS_VOLUME
 
+!> compute double couple contribution
+subroutine MAKE_DOUBLE_COUPLE(Np, Jdet, weitet3, nq3, dphi, moment, rhs_couple)
+
+    use global_parameters
+
+    implicit none
+
+    ! dphi is provided by the subroutine basis in basis_function.f90
+    ! weitet3 is provided by the subroutine mapping_quadrature_3D in Poly_ref_mappings.f90
+    ! nq3 is provided by the subroutine quadrature in basis_function.f90
+    ! Jdet is provided by the subroutine jacobians in Poly_ref_mappings.f90
+
+    integer(kind=4), intent(in) :: nq3  !< number of 3D quadrature nodes
+    integer(kind=4), intent(in) :: Np   !< number of element dof per dimension
+    real(kind=8), intent(in) :: Jdet    !< transormation determinant
+    real(kind=8), dimension(nq3), intent(in) :: weitet3 !< tetrahedron 3D quadrature weights
+    ! dphi(l,j,q) partial derivative of j-th basis wrt direction l (evaluation in xq)
+    real(kind=8), dimension(DIM,Np,nq3), intent(in) :: dphi   !< basis function derivative evaluations
+    real(kind=8), dimension(DIM,DIM), intent(in) :: moment    !< element stiffness matrix volumetric contribution V
+    real(kind=8), dimension(DIM*Np), intent(out) :: rhs_couple    !< element stiffness matrix volumetric contribution V
+
+    integer(kind=4) :: q, i, j, m, row
+    real(kind=8) :: reduct
+
+    rhs_couple = 0.0d0
+
+    ! loop on 3D quadrature points
+    do q = 1,nq3
+        ! loop over dofs
+        do m=1,Np
+            ! loop over directions, different gradient structure for each direction
+            do i=1,DIM
+                reduct = 0.0d0
+                ! compute contraction directly
+                ! both symmetric tensors, 1/2 in strain is canceled by double contribution
+
+                ! sum over the i-th row
+
+                !reduct = moment(i,1)*dphi(1,m,q) + moment(i,2)*dphi(2,m,q) + moment(i,3)*dphi(3,m,q)
+                do j=1,DIM
+                    reduct = reduct + moment(i,j)*dphi(j,m,q)
+                enddo
+
+                ! direction i, dof m
+                row = (i-1)*Np+m
+                ! sum quadrature nodes contributions
+                rhs_couple(row) = rhs_couple(row) + weitet3(q)*abs(Jdet)*reduct
+            enddo
+
+        enddo
+    enddo
+
+end subroutine MAKE_DOUBLE_COUPLE
+
 !> Assemble the term `rhs_tet_vol` approximating the volume integral over the tetrahedral element
 !> \f[ [F_{K}]_{i} = \int_K \boldsymbol{f} \cdot \boldsymbol{\varphi}_{i,K} \f]
 subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_tet_vol, rho, forcing_fun)
@@ -159,7 +213,7 @@ subroutine MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi,
             ! map the quadrature nodes from the reference tetrahedron to the physical tetrahedron
             do j=1,DIM
                 points(j)=0.0d0
-                do k=1,4
+                do k=1,NVERT_TET
                     points(j) = points(j) + Fk(j,k)*nodtet3(k,q)
                 end do
             end do
