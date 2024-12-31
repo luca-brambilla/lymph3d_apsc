@@ -1,7 +1,7 @@
 COMPUTE_MODAL_COEFFICIENTS.o : COMPUTE_MODAL_COEFFICIENTS.f90 MAKE_PARTITION_AND_MPI_FILES.o SET_PETSC_SYSTEM.o Poly_global.o Poly_ref_mappings.o basis_function.o problem_data_and_properties.o Poly_global.o Poly_setup_MPI.o 
 COMPUTE_MODAL_COEFFICIENTS_GEN.o : COMPUTE_MODAL_COEFFICIENTS_GEN.f90 MAKE_PARTITION_AND_MPI_FILES.o Poly_global.o SET_PETSC_SYSTEM.o Poly_global.o Poly_ref_mappings.o basis_function.o problem_data_and_properties.o Poly_global.o Poly_setup_MPI.o 
 CREATE_LOCAL_NODE_NUM.o : CREATE_LOCAL_NODE_NUM.f90 Poly_mesh.o Poly_setup_MPI.o 
-Lymph3D.o : Lymph3D.f90 checks.o utilities.o Poly_global.o exchange_data.o matrix_free.o SET_PETSC_SYSTEM.o solution_processing.o Poly_mesh.o Poly_data.o Poly_global.o problem_data_and_properties.o Poly_setup_MPI.o 
+Lymph3D.o : Lymph3D.f90 find_tet.o checks.o utilities.o Poly_global.o exchange_data.o matrix_free.o SET_PETSC_SYSTEM.o solution_processing.o Poly_mesh.o Poly_data.o Poly_global.o problem_data_and_properties.o Poly_setup_MPI.o 
 MAKE_MATRICES.o : MAKE_MATRICES.f90 MAKE_PARTITION_AND_MPI_FILES.o Poly_data.o Poly_ref_mappings.o Poly_global.o assemble_element.o basis_function.o problem_data_and_properties.o Poly_setup_MPI.o Poly_mesh.o 
 MAKE_PARTITION_AND_MPI_FILES.o : MAKE_PARTITION_AND_MPI_FILES.f90 Poly_global.o Poly_global.o Poly_global.o Poly_mesh.o Poly_data.o Poly_global.o Poly_global.o Poly_setup_MPI.o 
 MAKE_RHS.o : MAKE_RHS.f90 Poly_global.o MAKE_PARTITION_AND_MPI_FILES.o Poly_data.o Poly_ref_mappings.o Poly_global.o assemble_element.o basis_function.o problem_data_and_properties.o Poly_setup_MPI.o Poly_mesh.o 
@@ -21,6 +21,7 @@ basis_function.o : basis_function.f90 vet_mat_operations.o Poly_mesh.o Poly_glob
 checks.o : checks.f90 utilities.o Poly_global.o Poly_global.o Poly_setup_MPI.o 
 exchange_data.o : exchange_data.f90 Poly_mesh.o Poly_global.o Poly_setup_MPI.o utilities.o 
 export_file_formats.o : export_file_formats.f90 problem_data_and_properties.o Poly_global.o MAKE_PARTITION_AND_MPI_FILES.o Poly_setup_MPI.o Poly_global.o Poly_mesh.o 
+find_tet.o : find_tet.f90 MAKE_PARTITION_AND_MPI_FILES.o Poly_setup_MPI.o Poly_global.o Poly_mesh.o 
 matrix_free.o : matrix_free.f90 utilities.o Poly_global.o Poly_global.o MAKE_PARTITION_AND_MPI_FILES.o vet_mat_operations.o Poly_mesh.o Poly_data.o Poly_ref_mappings.o Poly_global.o assemble_element.o basis_function.o problem_data_and_properties.o Poly_setup_MPI.o 
 problem_data_and_properties.o : problem_data_and_properties.f90 Poly_global.o 
 solution_processing.o : solution_processing.f90 Poly_global.o Poly_global.o MAKE_PARTITION_AND_MPI_FILES.o SET_PETSC_SYSTEM.o export_file_formats.o basis_function.o Poly_ref_mappings.o Poly_mesh.o problem_data_and_properties.o Poly_global.o Poly_setup_MPI.o 

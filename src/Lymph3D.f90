@@ -27,6 +27,8 @@ program Lymph3D
     use utilities
     use checks
 
+    use find_tet
+
     implicit none
 
     ! read additional flags
@@ -200,6 +202,10 @@ program Lymph3D
     call LYMPH3D_BARRIER
 
     Np = PolyMesh%Elem_loc(1)%NDof_elem
+
+    call TEST_TET(PolyMesh)
+
+    stop
 
     !call CHECK_MPI_EXCHANGE(PolyMesh, Np)
 
