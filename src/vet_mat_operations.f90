@@ -34,7 +34,7 @@ module vet_mat_operations
 
     end function matinv3
 
-    ! Determinant of a 3x3 matrix A
+    !> Determinant of a 3x3 matrix A
     function det3(A) result(determinant)
 
         implicit none
@@ -47,6 +47,26 @@ module vet_mat_operations
                      +A(1,3)*A(2,1)*A(3,2)-A(2,2)*A(1,3)*A(3,1)
 
     end function det3
+
+    !> Determinant of a 4x4 matrix A
+    function det4(A) result(determinant)
+        implicit none
+
+        real(kind=8), intent(in) :: A(4, 4)
+        real(kind=8) :: determinant
+        determinant = A(1,1) * (A(2,2) * (A(3,3) * A(4,4) - A(3,4) * A(4,3)) - &
+                          A(2,3) * (A(3,2) * A(4,4) - A(3,4) * A(4,2)) + &
+                          A(2,4) * (A(3,2) * A(4,3) - A(3,3) * A(4,2))) - &
+              A(1,2) * (A(2,1) * (A(3,3) * A(4,4) - A(3,4) * A(4,3)) - &
+                          A(2,3) * (A(3,1) * A(4,4) - A(3,4) * A(4,1)) + &
+                          A(2,4) * (A(3,1) * A(4,3) - A(3,3) * A(4,1))) + &
+              A(1,3) * (A(2,1) * (A(3,2) * A(4,4) - A(3,4) * A(4,2)) - &
+                          A(2,2) * (A(3,1) * A(4,4) - A(3,4) * A(4,1)) + &
+                          A(2,4) * (A(3,1) * A(4,2) - A(3,2) * A(4,1))) - &
+              A(1,4) * (A(2,1) * (A(3,2) * A(4,3) - A(3,3) * A(4,2)) - &
+                          A(2,2) * (A(3,1) * A(4,3) - A(3,3) * A(4,1)) + &
+                          A(2,3) * (A(3,1) * A(4,2) - A(3,2) * A(4,1)))
+    end function det4
 
     ! Write vector vec in the inverse way
     subroutine flip_vector(vec,n,flip_vec)

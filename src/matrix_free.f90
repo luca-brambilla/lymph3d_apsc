@@ -540,6 +540,8 @@ end subroutine MAKE_MATRICES_FREE
 !> @brief Compute the RHS vector for each element.
 subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcing, f_dirichlet, f_neumann)
 
+    use find_tet
+
     implicit none
 
     ! PASS FUNCTION AS ARGUMENT
@@ -616,6 +618,12 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
     ! local vector
     real(kind=8), dimension(PolyMesh%num_elem_loc, DIM, Np) :: rhs_loc_tmp
     real(kind=8), dimension(PolyMesh%num_elem_loc, DIM*Np), intent(inout) :: rhs_loc
+    real(kind=8), dimension(DIM*Np) :: rhs_loc_couple
+
+    real(kind=8), dimension(DIM,DIM) :: moment
+    real(kind=8) :: vol, M0
+    real(kind=8), dimension(DIM) :: s,n
+    integer(kind=4) :: ie_couple, rank_id
 
     integer(kind=4) :: row
     real(kind=8) :: t1, t2
@@ -663,6 +671,8 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
 
     ! initialize output once
     rhs_loc = 0.0d0
+
+    call FIND_ELEM_FROM_POINT(PolyMesh, (/ 0.5d0, 0.5d0, 0.5d0 /), ie_couple, rank_id)
 
     ! loop on the tetrahedra
     elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
@@ -716,6 +726,17 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
             row = (i-1)*Np
             rhs_loc(ie_loc, row+1:row+Np) = rhs_loc_tmp(ie_loc,i,:)
         enddo
+
+        ! double couple
+        if (ie_loc == ie_couple .and. rank_id==mpi_id) then
+            vol = volume(PolyMesh,ie_loc)
+            s = (/ 1.0d0, 0.0d0, 0.0d0 /)
+            n = (/ 0.0d0, 1.0d0, 0.0d0 /)
+            M0 = 1.0d0
+            moment = moment_density(M0,vol,s,n)
+            call MAKE_DOUBLE_COUPLE(Np, Jdet, weitet3, nq3, dphi, moment, rhs_loc_couple)
+            rhs_loc(ie_loc,:) = rhs_loc(ie_loc,:) + rhs_loc_couple
+        endif
 
         ! current element E+
         E1 = ie_loc

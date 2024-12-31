@@ -180,4 +180,33 @@ module find_tet
 
     endfunction COMPUTE_BARYCENTER
 
+
+    function volume(PolyMesh,ie_loc) result(vol)
+        use mesh_partition_and_mpi_files
+        use vet_mat_operations
+        implicit none
+
+        type(Mesh_Structure), intent(in) :: PolyMesh !< mesh
+        real(kind=8), dimension(DIM+1,DIM+1) :: mat   !< barycenter coordinates
+        integer(kind=4) :: ie_loc   !< local element id
+        integer(kind=4) :: ivert, id_node
+        real(kind=8) :: vol
+
+        ! computation of the coordinates of the tetrahedron
+        do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
+
+            ! see MAKE_PARTITION_AND_MPI_FILES.f90
+            call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+                                    PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)
+
+            mat(ivert,1) = PolyMesh%coord_x(id_node)
+            mat(ivert,2) = PolyMesh%coord_y(id_node)
+            mat(ivert,3) = PolyMesh%coord_z(id_node)
+            mat(ivert,4) = 1.0d0
+        enddo
+
+        vol = abs(det4(mat)) / 6.0d0
+
+    end function volume
+
 end module find_tet

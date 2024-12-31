@@ -203,10 +203,6 @@ program Lymph3D
 
     Np = PolyMesh%Elem_loc(1)%NDof_elem
 
-    call TEST_TET(PolyMesh)
-
-    stop
-
     !call CHECK_MPI_EXCHANGE(PolyMesh, Np)
 
     call WRITE_MESH_VISUALIZATION_VTK(PolyMesh%num_elem_loc, PolyMesh, mpi_id)
@@ -384,6 +380,8 @@ program Lymph3D
 
         call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_dyn_loc, f_time, gd, gn)
 
+        rhs_dyn_loc = 0.0d0
+
     else
         print *, 'ASSEMBLE RHS'
 
@@ -441,8 +439,8 @@ program Lymph3D
     num_dt_mon = 20
 
     !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
-    !stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
-    stop_time = 0.101
+    stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
+    !stop_time = 0.101
     !stop_time = 0.001
     
     dt2 = time_step*time_step
@@ -462,7 +460,8 @@ program Lymph3D
         if (mpi_id==0) print *, "Assemble initial conditions"
 
         call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_displacement, u0_loc)
-        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_velocity, v0_loc)
+        ! call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_velocity, v0_loc)
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_displacement, v0_loc)
 
         ! SAVE IC
         if (IsSave_output .eqv. .true.) then

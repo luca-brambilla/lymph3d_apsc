@@ -313,4 +313,25 @@ module problem_data_and_properties
 
     end subroutine set_properties
 
+
+    function moment_density(M0, V, s, n) result(moment)
+        real(kind=8) :: M0
+        real(kind=8) :: V
+        real(kind=8), dimension(DIM) :: s
+        real(kind=8), dimension(DIM) :: n
+        real(kind=8), dimension(DIM,DIM) :: moment
+
+        integer(kind=4) :: i,j
+
+        moment = 0.0d0
+        do i=1,DIM
+            do j=1,DIM
+                moment(i,j) = s(i)*n(j) + s(j)*n(i)
+            enddo
+        enddo
+
+        moment = moment * M0/V
+
+    end function moment_density
+
 end module problem_data_and_properties
