@@ -17,6 +17,8 @@ module assemble_element
 !! change from LOCAL to ELEMENT
 !! REMOVE SUMS FROM DOCUMENTATION???
 
+!! compute temp(i,j,m,n)? compute scalar and insert?
+
 !> Assemble the element stiffness matrix `stiff_tet_vol` approximating the volume integral over the tetrahedral element
 !> \f[ [V_{K}]_{ij} = \int_K  \boldsymbol{\sigma}(\boldsymbol{\varphi}_{j,K}) : \boldsymbol{\varepsilon}(\boldsymbol{\varphi}_{i,K}) \f]
 subroutine MAKE_STIFFNESS_VOLUME(Np, Jdet, weitet3, nq3, lambda, mu, dphi, stiff_tet_vol)
@@ -311,7 +313,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
         temp2 = 0.0d0
 
         ! if the condition is satisfied, then e is a Dirichlet boundary face
-        if (E2 == -1) then
+        if (E2 == BCDIRI) then
 
             do m=1,Np
 
@@ -358,7 +360,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
         endif
 
         ! if the condition is satisfied, then e is a Neumann boundary face
-        if (E2 == -2) then
+        if (E2 == BCNEUM) then
 
             do m=1,Np
 
@@ -397,9 +399,11 @@ end subroutine MAKE_RHS_FACE
 !> \f[ [I_{K-}]_{ij} = \sum_{F\in F_h^I|_{K} } \int_F ( \boldsymbol{\varphi}_{j,K}^- \odot \textbf{n}^- ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^+) \f]
 !>
 !> \f[ [I_{K-}]^T_{ij} = \sum_{F\in F_h^I|_{K} } \int_F ( \boldsymbol{\varphi}_{j,K}^+ \odot \textbf{n}^+ ) : \frac 12 \boldsymbol{\sigma}(\boldsymbol{\varphi}_{i,K}^-) \f]
-
-subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitria2, nq2, lambda, mu, &
-                            phi_b, grad_b, S_E1, I_E1, S_E2, I_E2, IT_E2)
+!>
+!> add contributions of absorbing boundary conditions to E+ with matrix `R_E1`
+subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, &
+                               weitria2, nq2, lambda, mu, phi_b, grad_b, S_E1, &
+                               I_E1, S_E2, I_E2, IT_E2, tangent1, tangent2, R_E1)
 
     ! theta and alpha are provided by the subroutine set_properties in problem_data_and_properties.f90
     ! phi_b and grad_b are provided by the subroutine basis_boundary in basis_functions.f90
@@ -426,18 +430,26 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
     real(kind=8), dimension(DIM,DIM,Np,Np), intent(out), optional :: IT_E2        !< element stiffness matrix interior flux I, E- on E+ contribution
     real(kind=8), dimension(DIM,DIM,Np,Np), intent(out) :: S_E2        !< element stiffness matrix stabilization S, E+ on E- contribution
 
+    real(kind=8), dimension(DIM,DIM,Np,Np), intent(out), optional :: R_E1        !< element stiffness matrix absorbing boundary contribution
+
+    real(kind=8), dimension(DIM), intent(in), optional :: tangent1      !< tangent vector direction 1
+    real(kind=8), dimension(DIM), intent(in), optional :: tangent2      !< tangent vector direction 2
+
+    real(kind=8), dimension(DIM) :: a
+    real(kind=8) :: c1, c2, c3
+
     real(kind=8), dimension(DIM,DIM,Np,Np) :: temp, temp1, temp2, temp3
     real(kind=8), dimension(2) :: val
-    real(kind=8) :: sigma, D_bar
+    real(kind=8) :: sigma, D_bar, tmp_val
     integer(kind=4) :: q, i, j, m, n
 
     D_bar = lambda + 2*mu ! harmonic average of lambda+2*mu
 
     ! evaluation of the penalization function
-    if (E2 == -1) then
+    if (E2 == BCDIRI) then
         sigma = alpha*(p**2) / hk_1 * D_bar
     endif
-    if(E2 /= -1 .and. E2 /= -2) then
+    if(E2 /= BCDIRI .and. E2 /= BCNEUM) then
         val(1) = hk_1
         val(2) = hk_2
         sigma = alpha*(p**2) / minval(val) * D_bar
@@ -450,7 +462,7 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
     S_E2 = 0.0d0
 
     ! check if the actual face is not a Neumann boundary face
-    if(E2 /= -2) then
+    if(E2 /= BCNEUM) then
 
         temp = 0.0d0
 
@@ -481,10 +493,10 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
             enddo
 
             ! if the condition is satisfied, then e is a Dirichlet boundary face
-            if (E2 == -1) then
+            if (E2 == BCDIRI) then
 
                 temp = 0.0d0
-                
+
                 ! compute I_E1
                 do m=1,Np
                     do n=1,Np
@@ -505,6 +517,46 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
                         do i=1,DIM
                             do j=1,DIM
                                 I_E1(i,j,m,n) = I_E1(i,j,m,n) + weitria2(q)*area*temp(i,j,m,n)
+                            enddo
+                        enddo
+
+                    enddo
+                enddo
+
+            ! absorbing boundary
+            elseif (E2 == BCABSO) then
+
+                temp = 0.0d0
+
+                c1 = 1.0d0
+                c2 = 1.0d0
+                c3 = 1.0d0
+
+                ! compute R_E1
+                do i=1,DIM
+                    do j=i,DIM  ! upper triangular
+                        do m=1,Np
+                            do n=m,Np   ! upper triangular
+
+                        a(1) = (grad_b(1,n,q,1)*normal(1) + &
+                                grad_b(2,n,q,1)*normal(2) + &
+                                grad_b(3,n,q,1)*normal(3)) * tangent1(j) * c1
+                        a(2) = (grad_b(1,n,q,1)*normal(1) + &
+                                grad_b(2,n,q,1)*normal(2) + &
+                                grad_b(3,n,q,1)*normal(3)) * tangent2(j) * c2
+                        a(3) = (grad_b(1,n,q,1)*tangent1(1) + &
+                                grad_b(2,n,q,1)*tangent1(2) + &
+                                grad_b(3,n,q,1)*tangent1(3)) * tangent2(j) + &
+                               (grad_b(1,n,q,1)*tangent2(1) + &
+                                grad_b(2,n,q,1)*tangent2(2) + &
+                                grad_b(3,n,q,1)*tangent2(3)) * tangent1(j) * c3
+
+                        tmp_val = phi_b(m,q,1) * ( tangent1(i)*a(1) + &
+                                        tangent2(i)*a(2) + normal(i)*a(3) )
+
+                        ! exploit symmetry
+                        R_E1(i,j,m,n) = R_E1(i,j,m,n) + weitria2(q)*area*tmp_val
+                        R_E1(j,i,n,m) = R_E1(j,i,n,m) + weitria2(q)*area*tmp_val
                             enddo
                         enddo
 
@@ -607,6 +659,76 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, weitr
     endif
 
 end subroutine MAKE_STIFFNESS_FACE
+
+
+!> compute contributions of absorbing boundary conditions to damping matrix
+subroutine MAKE_DAMPING_FACE(Np, normal, tangent1, tangent2, area, &
+                               weitria2, nq2, lambda, mu, phi_b, C_E1)
+
+    ! theta and alpha are provided by the subroutine set_properties in problem_data_and_properties.f90
+    ! phi_b and grad_b are provided by the subroutine basis_boundary in basis_functions.f90
+    ! weitria2 is provided by the subroutine mapping_quadrature_2D in Poly_ref_mappings.f90
+    ! nq2 is provided by the subroutine quadrature in basis_function.f90
+
+    integer(kind=4), intent(in) :: nq2  !< number of 2D quadrature nodes
+    integer(kind=4), intent(in) :: Np   !< element dof per dimension
+    real(kind=8), intent(in) :: area    !< element area
+    real(kind=8), intent(in) :: lambda  !< Lamé 1st parameter
+    real(kind=8), intent(in) :: mu      !< Lamé 2nd parameter
+    real(kind=8), dimension(nq2), intent(in) :: weitria2    !< 2d weights
+    real(kind=8), dimension(DIM), intent(in) :: normal      !< normal vector
+    real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b  !< basis on the boundary
+
+    real(kind=8), dimension(DIM*Np,DIM*Np), intent(out), optional :: C_E1        !< element stiffness matrix absorbing boundary contribution
+
+    real(kind=8), dimension(DIM), intent(in), optional :: tangent1      !< tangent vector direction 1
+    real(kind=8), dimension(DIM), intent(in), optional :: tangent2      !< tangent vector direction 2
+
+    real(kind=8), dimension(DIM) :: b
+    real(kind=8) :: c1, c2, c3
+
+    real(kind=8) :: val
+    integer(kind=4) :: q, i, j, m, n, row, col
+
+    val = 0.0d0
+
+    c1 = 1.0d0
+    c2 = 1.0d0
+    c3 = 1.0d0
+
+    ! loop on 2D quadrature nodes
+    nquad_loop: do q = 1,nq2
+
+        ! compute C_E1
+        do i=1,DIM
+            do j=i,DIM  ! upper triangular
+                do m=1,Np
+                    do n=m,Np   ! upper triangular
+
+                        row = (i-1)*DIM + m
+                        col = (j-1)*DIM + n
+
+                        b(1) = c1 * phi_b(n,q,1) * tangent1(j)
+                        b(2) = c2 * phi_b(n,q,1) * tangent2(j)
+                        b(3) = c3 * phi_b(n,q,1) * normal(j)
+
+                        val = phi_b(m,q,1) * ( tangent1(i)*b(1) + &
+                                        tangent2(i)*b(2) + normal(i)*b(3) )
+
+                        ! exploit symmetry
+                        C_E1(row,col) = C_E1(row,col) + weitria2(q)*area*val
+                        C_E1(col,row) = C_E1(col,row) + weitria2(q)*area*val
+
+                    enddo
+                enddo
+            enddo
+        enddo
+
+    enddo nquad_loop
+
+
+end subroutine MAKE_DAMPING_FACE
+
 
 !> @brief Assemble the local vector term vec_loc approximating the integral on the tetrahedron
 !> @param[in] f_analytic custom function

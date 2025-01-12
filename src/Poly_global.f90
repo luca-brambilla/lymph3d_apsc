@@ -411,4 +411,8 @@ module global_parameters
     real(kind=8), parameter :: PI = 4.d0*datan(1.0d0)   !< parameter for @f$ \pi @f$
     real(kind=8), parameter :: TOL = 1.0d-40            !< tolerance for small numbers
 
+    integer(kind=4), parameter :: BCDIRI = -1       !< tag for Dirichlet boundary
+    integer(kind=4), parameter :: BCNEUM = -2       !< tag for Dirichlet boundary
+    integer(kind=4), parameter :: BCABSO = -3       !< tag for Dirichlet boundary
+
 end module global_parameters
