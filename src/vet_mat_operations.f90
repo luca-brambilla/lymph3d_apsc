@@ -104,7 +104,7 @@ module vet_mat_operations
                 print *, "Matrix is not positive definite!"
                 stop
             end if
-            R(j, j) = sqrt(sum)
+            R(j, j) = dsqrt(sum)
     
             ! Compute off-diagonal terms
             do i = j + 1, dim

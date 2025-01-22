@@ -1321,8 +1321,8 @@ end subroutine ENSIGHT_WRITE_CASE
             call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
         endif
 
-        if (mpi_id==0) print *, 'Writing .vtk file...'
-        call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
+        !if (mpi_id==0) print *, 'Writing .vtk file...'
+        !call VTK_WRITE_SOLUTION(vtk_filename_num, xx,yy,zz, nvert_per_el, n_elem, PolyMesh%num_elem, 'solution', u, PolyMesh)
 
         if (present(num_dt)) then
             !call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)

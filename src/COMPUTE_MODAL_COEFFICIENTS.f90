@@ -104,7 +104,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
             do m=1,Np
 
                 do ii=1,3
-                    points(ii)=0.0
+                    points(ii)=0.0d0
                     do jj=1,4
                         points(ii)=points(ii)+Fk(ii,jj)*nodtet3(jj,q)
                     enddo
@@ -128,6 +128,7 @@ subroutine COMPUTE_MODAL_COEFFICIENTS(PolyMesh, petsc_num, global_dof, local_dof
             val(1) = modal_coeff_uex(i,m)
             irow(1) = petsc_num((i-1)*Np*Npoly + beg+m-1)
 
+            !!! 0.0 double? not equal or tol?
             if (val(1) .ne. 0.0) then
                 PetscCall(VecSetValues(petsc_modal_coeff_uex, 1, irow, val, ADD_VALUES, mpi_ierr))
             endif

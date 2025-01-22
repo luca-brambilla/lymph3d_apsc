@@ -18,7 +18,7 @@ module problem_data_and_properties
         real(kind=8) :: time
 
 
-        r = sin(SQRT2*PI*time)
+        r = dsin(SQRT2*PI*time)
 
     end function time_function
 
@@ -37,9 +37,9 @@ module problem_data_and_properties
         ! r(1) = 0
         ! r(2) = 0
         ! r(3) = - 9.8 * 2400
-        r(1) = 3*PI**2*cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(lambda + 2*mu)
-        r(2) = 3*PI**2*cos(PI*p(2))*sin(PI*p(1))*sin(PI*p(3))*(lambda + 2*mu)
-        r(3) = 3*PI**2*cos(PI*p(3))*sin(PI*p(1))*sin(PI*p(2))*(lambda + 2*mu)
+        r(1) = 3*PI**2*dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(lambda + 2*mu)
+        r(2) = 3*PI**2*dcos(PI*p(2))*dsin(PI*p(1))*dsin(PI*p(3))*(lambda + 2*mu)
+        r(3) = 3*PI**2*dcos(PI*p(3))*dsin(PI*p(1))*dsin(PI*p(2))*(lambda + 2*mu)
 
 
     end function f
@@ -62,9 +62,9 @@ module problem_data_and_properties
         ! r(2) = 0
         ! r(3) = - 9.8 * 2400
 
-        r(1) = (-2.0d0*rho + 3.0d0*(lambda+2.0d0*mu))*PI*PI * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-        r(2) = (-2.0d0*rho + 3.0d0*(lambda+2.0d0*mu))*PI*PI * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-        r(3) = (-2.0d0*rho + 3.0d0*(lambda+2.0d0*mu))*PI*PI * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+        r(1) = (-2.0d0*rho + 3.0d0*(lambda+2.0d0*mu))*PI*PI * dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+        r(2) = (-2.0d0*rho + 3.0d0*(lambda+2.0d0*mu))*PI*PI * dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+        r(3) = (-2.0d0*rho + 3.0d0*(lambda+2.0d0*mu))*PI*PI * dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
 
 
     end function f_time
@@ -136,19 +136,19 @@ module problem_data_and_properties
         ! r = 0.0
 
         if(space_fun_tag==1) then
-            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-            r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-            r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+            r(1) = dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+            r(2) = dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+            r(3) = dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
         endif
         if(space_fun_tag==2) then
-            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-            r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-            r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+            r(1) = dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+            r(2) = dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+            r(3) = dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
         endif
         if(space_fun_tag==3) then
-            r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-            r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-            r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+            r(1) = dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+            r(2) = dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+            r(3) = dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
         endif
 
     end function gd
@@ -165,19 +165,19 @@ module problem_data_and_properties
         ! r = 0.0
 
         if(space_fun_tag==1) then
-            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-            r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-            r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+            r(1) = dsin(SQRT2*PI*time) * dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+            r(2) = dsin(SQRT2*PI*time) * dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+            r(3) = dsin(SQRT2*PI*time) * dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
         endif
         if(space_fun_tag==2) then
-            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-            r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-            r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+            r(1) = dsin(SQRT2*PI*time) * dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+            r(2) = dsin(SQRT2*PI*time) * dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+            r(3) = dsin(SQRT2*PI*time) * dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
         endif
         if(space_fun_tag==3) then
-            r(1) = sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-            r(2) = sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-            r(3) = sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+            r(1) = dsin(SQRT2*PI*time) * dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+            r(2) = dsin(SQRT2*PI*time) * dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+            r(3) = dsin(SQRT2*PI*time) * dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
         endif
 
     end function gd_time
@@ -199,36 +199,36 @@ module problem_data_and_properties
         ! r(3) = - 23520
 
         if(space_fun_tag==1) then
-            stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3.0d0*lambda + 2.0d0*mu)
-            stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3.0d0*lambda + 2.0d0*mu)
-            stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3.0d0*lambda + 2.0d0*mu)
-            stress_tensor(1,2) = 2.0d0*mu*PI*cos(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            stress_tensor(1,1) = -PI*dsin(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(3.0d0*lambda + 2.0d0*mu)
+            stress_tensor(2,2) = -PI*dsin(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(3.0d0*lambda + 2.0d0*mu)
+            stress_tensor(3,3) = -PI*dsin(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(3.0d0*lambda + 2.0d0*mu)
+            stress_tensor(1,2) = 2.0d0*mu*PI*dcos(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
             stress_tensor(2,1) = stress_tensor(1,2)
-            stress_tensor(1,3) = 2.0d0*mu*PI*cos(PI*p(1))*cos(PI*p(3))*sin(PI*p(2))
+            stress_tensor(1,3) = 2.0d0*mu*PI*dcos(PI*p(1))*dcos(PI*p(3))*dsin(PI*p(2))
             stress_tensor(3,1) = stress_tensor(1,3)
-            stress_tensor(2,3) = 2.0d0*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
+            stress_tensor(2,3) = 2.0d0*mu*PI*dcos(PI*p(2))*dcos(PI*p(3))*dsin(PI*p(1))
             stress_tensor(3,2) = stress_tensor(2,3)
         endif
         if(space_fun_tag==2) then
-            stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
-            stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
-            stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
-            stress_tensor(1,2) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            stress_tensor(1,1) = -PI*dsin(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(2,2) = -PI*dsin(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(3,3) = -PI*dsin(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(1,2) = 2*mu*PI*dcos(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
             stress_tensor(2,1) = stress_tensor(1,2)
-            stress_tensor(1,3) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(3))*sin(PI*p(2))
+            stress_tensor(1,3) = 2*mu*PI*dcos(PI*p(1))*dcos(PI*p(3))*dsin(PI*p(2))
             stress_tensor(3,1) = stress_tensor(1,3)
-            stress_tensor(2,3) = 2*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
+            stress_tensor(2,3) = 2*mu*PI*dcos(PI*p(2))*dcos(PI*p(3))*dsin(PI*p(1))
             stress_tensor(3,2) = stress_tensor(2,3)
         endif
         if(space_fun_tag==3) then
-            stress_tensor(1,1) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
-            stress_tensor(2,2) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
-            stress_tensor(3,3) = -PI*sin(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))*(3*lambda + 2*mu)
-            stress_tensor(1,2) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
+            stress_tensor(1,1) = -PI*dsin(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(2,2) = -PI*dsin(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(3,3) = -PI*dsin(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))*(3*lambda + 2*mu)
+            stress_tensor(1,2) = 2*mu*PI*dcos(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
             stress_tensor(2,1) = stress_tensor(1,2)
-            stress_tensor(1,3) = 2*mu*PI*cos(PI*p(1))*cos(PI*p(3))*sin(PI*p(2))
+            stress_tensor(1,3) = 2*mu*PI*dcos(PI*p(1))*dcos(PI*p(3))*dsin(PI*p(2))
             stress_tensor(3,1) = stress_tensor(1,3)
-            stress_tensor(2,3) = 2*mu*PI*cos(PI*p(2))*cos(PI*p(3))*sin(PI*p(1))
+            stress_tensor(2,3) = 2*mu*PI*dcos(PI*p(2))*dcos(PI*p(3))*dsin(PI*p(1))
             stress_tensor(3,2) = stress_tensor(2,3)
         endif
 
@@ -247,9 +247,9 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
 
-        r(1) = cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-        r(2) = sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-        r(3) = sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+        r(1) = dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+        r(2) = dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+        r(3) = dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
 
     end function uex
 
@@ -271,9 +271,9 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
 
-        r(1) = 1.0d0 + sin(SQRT2*PI*time) * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-        r(2) = 1.0d0 + sin(SQRT2*PI*time) * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-        r(3) = 1.0d0 + sin(SQRT2*PI*time) * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+        r(1) = 1.0d0 + dsin(SQRT2*PI*time) * dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+        r(2) = 1.0d0 + dsin(SQRT2*PI*time) * dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+        r(3) = 1.0d0 + dsin(SQRT2*PI*time) * dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
 
     end function uex_time
 
@@ -294,9 +294,9 @@ module problem_data_and_properties
         real(kind=8), dimension(3) :: r
         real(kind=8), dimension(3) :: p
 
-        r(1) = SQRT2*PI * cos(PI*p(1))*sin(PI*p(2))*sin(PI*p(3))
-        r(2) = SQRT2*PI * sin(PI*p(1))*cos(PI*p(2))*sin(PI*p(3))
-        r(3) = SQRT2*PI * sin(PI*p(1))*sin(PI*p(2))*cos(PI*p(3))
+        r(1) = SQRT2*PI * dcos(PI*p(1))*dsin(PI*p(2))*dsin(PI*p(3))
+        r(2) = SQRT2*PI * dsin(PI*p(1))*dcos(PI*p(2))*dsin(PI*p(3))
+        r(3) = SQRT2*PI * dsin(PI*p(1))*dsin(PI*p(2))*dcos(PI*p(3))
 
     end function ic_velocity
 

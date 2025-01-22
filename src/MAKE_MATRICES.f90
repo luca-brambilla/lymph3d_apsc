@@ -108,8 +108,8 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
     do ie_loc = 1, PolyMesh%num_elem_loc
         ! if (mod(ie_loc,50) == 0) print *, ie_loc
         ! initialization of V_loc and M_loc
-        V_loc = 0.0
-        M_loc = 0.0
+        V_loc = 0.0d0
+        M_loc = 0.0d0
 
         mat_id = PolyMesh%Elem_loc(ie_loc)%mat_prop
         rho = PolyData%prop_mat(mat_id,1) ! density used for dynamics
@@ -204,10 +204,10 @@ subroutine MAKE_MATRICES(PolyMesh, PolyData, petsc_num, global_dof, Np, petsc_st
             face_flag(e) = 0
 
             ! initialization of the face matrices I_loc, S_loc, IN_loc and SN_loc
-            I_loc = 0.0
-            S_loc = 0.0
-            IN_loc = 0.0
-            SN_loc = 0.0
+            I_loc = 0.0d0
+            S_loc = 0.0d0
+            IN_loc = 0.0d0
+            SN_loc = 0.0d0
 
             ! find the neighbouring tetrahedron E2 sharing the face e with E1
             E2 = PolyMesh%Elem_loc(E1)%neigh_el(e,2)
