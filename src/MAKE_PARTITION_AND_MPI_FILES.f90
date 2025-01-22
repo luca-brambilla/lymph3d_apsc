@@ -1396,16 +1396,18 @@ end subroutine WRITE_PARTITION
             allocate(PolyMesh%Poly(kiter)%neigh_bbox(num_faces_in_poly,3,2))
             allocate(PolyMesh%Poly(kiter)%neigh_hk(num_faces_in_poly))
 
-            PolyMesh%Poly(kiter)%hk=0.0
-            PolyMesh%Poly(kiter)%b_box(1,:)=[0.0,0.0]
-            PolyMesh%Poly(kiter)%b_box(2,:)=[0.0,0.0]
-            PolyMesh%Poly(kiter)%b_box(3,:)=[0.0,0.0]
+            PolyMesh%Poly(kiter)%hk=0.0d0
+            PolyMesh%Poly(kiter)%b_box = 0.0d0
+            ! PolyMesh%Poly(kiter)%b_box(1,:)=[0.0,0.0]
+            ! PolyMesh%Poly(kiter)%b_box(2,:)=[0.0,0.0]
+            ! PolyMesh%Poly(kiter)%b_box(3,:)=[0.0,0.0]
 
             do i=1,num_faces_in_poly
-               PolyMesh%Poly(kiter)%neigh_bbox(i,1,:) = [0.0,0.0]
-               PolyMesh%Poly(kiter)%neigh_bbox(i,2,:) = [0.0,0.0]
-               PolyMesh%Poly(kiter)%neigh_bbox(i,3,:) = [0.0,0.0]
-               PolyMesh%Poly(kiter)%neigh_hk(i)=0.0
+               PolyMesh%Poly(kiter)%neigh_bbox(i,:,:) = 0.0d0
+               ! PolyMesh%Poly(kiter)%neigh_bbox(i,1,:) = [0.0,0.0]
+               ! PolyMesh%Poly(kiter)%neigh_bbox(i,2,:) = [0.0,0.0]
+               ! PolyMesh%Poly(kiter)%neigh_bbox(i,3,:) = [0.0,0.0]
+               PolyMesh%Poly(kiter)%neigh_hk(i)=0.0d0
             enddo
 
             do j=1,num_tet_in_poly
@@ -1441,6 +1443,8 @@ subroutine CREATE_NORMAL_FACE(PolyMesh, mpi_id)
    do ie = 1, PolyMesh%num_elem_loc
 
       allocate(PolyMesh%Elem_loc(ie)%normal(PolyMesh%Elem_loc(ie)%num_faces,3))
+      allocate(PolyMesh%Elem_loc(ie)%tangent1(PolyMesh%Elem_loc(ie)%num_faces,3))
+      allocate(PolyMesh%Elem_loc(ie)%tangent2(PolyMesh%Elem_loc(ie)%num_faces,3))
       allocate(PolyMesh%Elem_loc(ie)%area(PolyMesh%Elem_loc(ie)%num_faces))
 
       do iface = 1, PolyMesh%Elem_loc(ie)%num_faces
@@ -1473,12 +1477,26 @@ subroutine CREATE_NORMAL_FACE(PolyMesh, mpi_id)
          !write(*,*) n1, n2, n3
          !read(*,*)
 
-         norm_n = dsqrt(n1**2+n2**2+n3**2)
+         norm_n = dsqrt(n1**2 + n2**2 + n3**2)
 
          PolyMesh%Elem_loc(ie)%normal(iface,1) = n1/norm_n
          PolyMesh%Elem_loc(ie)%normal(iface,2) = n2/norm_n
          PolyMesh%Elem_loc(ie)%normal(iface,3) = n3/norm_n
          PolyMesh%Elem_loc(ie)%area(iface) = norm_n
+
+         ! Compute tangent vectors
+
+         norm_n = dsqrt(Px**2 + Py**2 + Pz**2)
+
+         PolyMesh%Elem_loc(ie)%tangent1(iface,1) = Px / norm_n
+         PolyMesh%Elem_loc(ie)%tangent1(iface,2) = Py / norm_n
+         PolyMesh%Elem_loc(ie)%tangent1(iface,3) = Pz / norm_n
+
+         norm_n = dsqrt(Qx**2 + Qy**2 + Qz**2)
+
+         PolyMesh%Elem_loc(ie)%tangent2(iface,1) = Qx / norm_n
+         PolyMesh%Elem_loc(ie)%tangent2(iface,2) = Qy / norm_n
+         PolyMesh%Elem_loc(ie)%tangent2(iface,3) = Qz / norm_n
 
       enddo
    enddo
@@ -1547,10 +1565,10 @@ end subroutine CREATE_NORMAL_FACE
          PolyMesh%Poly(ipoly_loc)%b_box(3,1) = minval(zz_vert)
          PolyMesh%Poly(ipoly_loc)%b_box(3,2) = maxval(zz_vert)
 
-         PolyMesh%Poly(ipoly_loc)%hk=0.0
+         PolyMesh%Poly(ipoly_loc)%hk=0.0d0
          do  t = 1,num_vert_poly
             do l= t+1,num_vert_poly
-               dist = SQRT((xx_vert(t)-xx_vert(l))*(xx_vert(t)-xx_vert(l))+(yy_vert(t)-yy_vert(l))*(yy_vert(t)-yy_vert(l))+(zz_vert(t)-zz_vert(l))*(zz_vert(t)-zz_vert(l)))
+               dist = dsqrt((xx_vert(t)-xx_vert(l))*(xx_vert(t)-xx_vert(l))+(yy_vert(t)-yy_vert(l))*(yy_vert(t)-yy_vert(l))+(zz_vert(t)-zz_vert(l))*(zz_vert(t)-zz_vert(l)))
                if (dist > PolyMesh%Poly(ipoly_loc)%hk) then
                   PolyMesh%Poly(ipoly_loc)%hk = dist
                end if

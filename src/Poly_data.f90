@@ -47,9 +47,9 @@ module Poly_data
         integer(kind=4) :: nload_sism_el    !< number of seismic load (kinematic source)
         integer(kind=4) :: n_case           !< CASE number for not-honoring
         integer(kind=4) :: nmat_nhe         !< material number for not-honoring enhanced
-        integer(kind=4) :: srcmodflag       !<flag for srcmod - sism lines
-        real(kind=8)    :: fmax             !<reference f-value for damping
-        real(kind=8)    :: fpeak            !<peak frequency non linear case
+        integer(kind=4) :: srcmodflag       !< flag for srcmod - sism lines
+        real(kind=8)    :: fmax             !< reference f-value for damping
+        real(kind=8)    :: fpeak            !< peak frequency non linear case
 
 
         ! Integer arrays with allocatable dimensions
@@ -97,8 +97,12 @@ module Poly_data
         real(kind=8), dimension(:), allocatable :: QP
 
         ! Real arrays with two-dimensional allocatable arrays
+        ! first dimension for identifying the number
+        ! second dimension for actual data
+
         !> row material ID - column 1 density, 2 lambda, 3 mu
         real(kind=8), dimension(:,:), allocatable :: prop_mat
+
         real(kind=8), dimension(:,:), allocatable :: val_mat_nle
         real(kind=8), dimension(:,:), allocatable :: val_diri_el
         real(kind=8), dimension(:,:), allocatable :: val_neum_el
@@ -112,6 +116,17 @@ module Poly_data
         real(kind=8), dimension(:,:), allocatable :: val_forX_el
         real(kind=8), dimension(:,:), allocatable :: val_forY_el
         real(kind=8), dimension(:,:), allocatable :: val_forZ_el
+
+        !> Point source:
+        !> - `(x,y,z)` hypocenter
+        !> - `(sx,sy,sz)` strike
+        !> - `(nx,ny,nz)` normal
+        !> - rupture time
+        !> - M0 moment magniture
+        !> - rise time
+        !>
+        !> input SISM only -> 21 parameters: 4 hypoceneters
+        !> input SLIP LOAD-SRCMOD2 and SISM -> 15 parameters: 2 hypocenters
         real(kind=8), dimension(:,:), allocatable :: val_sism_el
 
 

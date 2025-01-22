@@ -89,6 +89,7 @@ program Lymph3D
 
     real(kind=8), dimension(:,:,:,:), allocatable :: M_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: M_modal_loc
+    real(kind=8), dimension(:,:,:), allocatable :: D_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: K_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: A_dg_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: R_M_loc
@@ -265,6 +266,8 @@ program Lymph3D
         allocate( K_loc(PolyMesh%num_elem_loc, n_neigh+1, DIM*Np, DIM*Np) )
         allocate( A_dg_loc(PolyMesh%num_elem_loc, n_neigh+1, DIM*Np, DIM*Np) )
 
+        allocate( D_loc(PolyMesh%num_elem_loc, DIM*Np, DIM*Np) )
+
         allocate( M_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
         allocate( M_modal_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
         allocate( rhs_stat_loc(PolyMesh%num_elem_loc, DIM*Np) )
@@ -330,7 +333,7 @@ program Lymph3D
         print *, 'assemble matrix-free matrices'
 
         ! make all matrices
-        call MAKE_MATRICES_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, n_neigh)
+        call MAKE_MATRICES_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, D_loc, n_neigh)
 
         do ie_loc=1,PolyMesh%num_elem_loc
             do i=1,DIM
@@ -893,8 +896,8 @@ program Lymph3D
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
     if (mpi_id == 0) then
-        err_L2 = sqrt(err_L2)
-        err_DG = sqrt(err_DG)
+        err_L2 = dsqrt(err_L2)
+        err_DG = dsqrt(err_DG)
         print *, 'Done with the errors'
 
         print *, 'GRID SIZE: ', hmax

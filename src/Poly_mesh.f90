@@ -31,7 +31,9 @@ module Poly_mesh
         integer(kind=4), dimension(:,:), pointer :: neigh_el
 
         integer(kind=4), dimension(:), pointer :: Dof_glo       !< Mapping to global degrees of freedom
-        real(kind=8), dimension(:,:), pointer :: normal     !< Coordinates of the normal to each face
+        real(kind=8), dimension(:,:), pointer :: normal     !< Components of the normal to each face
+        real(kind=8), dimension(:,:), pointer :: tangent1     !< Components of the first tangent to each face
+        real(kind=8), dimension(:,:), pointer :: tangent2     !< Components of the second tangent to each face
         real(kind=8), dimension(:), pointer :: area         !< Area of each face
         integer(kind=4), dimension(:), pointer :: flag      !! not used?
 

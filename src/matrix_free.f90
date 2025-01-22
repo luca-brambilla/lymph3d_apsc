@@ -104,7 +104,7 @@ end subroutine SET_PETSC_VECTOR_MATRIX_FREE
 !> The stiffness and dg matrices for the element E+ are rectangular and contain
 !> the contributions also from neighboring elements E-.
 !> mass matrix is directly in PETSc for later to solve linear systems.
-subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, max_faces)
+subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, D_loc, max_faces)
 
     !TODO variable number of sides, do not count boundaries
     !TODO polytopal elements, face contribution to same matrices
@@ -163,6 +163,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
     real(kind=8), dimension(DIM, DIM, Np, Np) :: V_loc
     real(kind=8), dimension(DIM, DIM, Np, Np) :: S_E1, I_E1, S_E2, I_E2, IT_E2
 
+    real(kind=8), dimension(DIM*Np, DIM*Np) :: D_E1
     ! each local has a matrix
     ! local square
     real(kind=8), dimension(DIM, DIM, Np, Np) :: mass_loc
@@ -172,7 +173,10 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
 
     ! process local matrices, rectangular for each element
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: K_loc
+    real(kind=8), dimension(:,:,:), allocatable, intent(inout) :: D_loc
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: A_dg_loc
+
+    type(Element), pointer :: E1_ptr
 
     integer(kind=4) :: row, col
 
@@ -228,6 +232,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
     A_dg_loc = 0.0d0
     M_loc = 0.0d0
     M_modal_loc = 0.0d0
+    D_loc = 0.0d0
 
     ! loop on the tetrahedra
     elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
@@ -235,6 +240,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
         ! count neighbor element contribution only to allocate K_loc
         ! current element E+
         E1 = ie_loc
+        E1_ptr = PolyMesh%Elem_loc(ie_loc)
+
         ! sides = PolyMesh%Elem_loc(E1)%num_faces ! could vary for each element
         !n_neigh = 0     ! could vary for each element
         !neigh_count = 1
@@ -346,14 +353,25 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
             I_E2 = 0.0d0
             S_E2 = 0.0d0
             IT_E2 = 0.0d0
+            D_E1 = 0.0d0
 
             ! find the neighbouring tetrahedron E2 sharing the face iface with E1
             ! E2 is element E-
             E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
             space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(iface,5)
 
+            if (E2 == BC_ABSO) then
+
+                call MAKE_DAMPING_FACE(Np, E1_ptr%normal(iface,:), E1_ptr%tangent1(iface,:), E1_ptr%tangent2(iface,:), E1_ptr%area(iface), &
+                weitria2, nq2, lambda, mu, phi_b, D_E1)
+
+                D_loc(ie_loc,:,:) = D_loc(ie_loc,:,:) + D_E1
+
+                cycle face_loop
+            endif
+
             ! if iface is not a boundary face
-            if (E2 /= -1 .and. E2 /= -2) then
+            if (E2 /= BC_DIRI .and. E2 /= BC_NEUM .and. E2 /= BC_ABSO) then
 
                 ! find the polyhedron in which E2 is contained
                 ipoly2_glob = PolyMesh%elem_in_poly(E2)
@@ -408,7 +426,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
 
                     ! check if iface is not a boundary face
                     ! otherwise take a default "neighbouring" element (its information won't be read)
-                    if (E2 /= -1 .and. E2 /= -2) then
+                    if (E2 /= BC_DIRI .and. E2 /= BC_NEUM) then
 
                         call basis_boundary(phi_b,grad_b,iface,E2,PolyMesh%Poly(ipoly_loc)%b_box,&
                                                 PolyMesh%Poly(ipoly2_loc)%b_box,blist, Np, Fk, node_maps, nodtria2, nq2)
@@ -434,7 +452,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
             ! Insert in stiffness matrix
             ! check face again and add boundary contributions
             ! If not Neumann boundary
-            if(E2 /= -2) then
+            if(E2 /= BC_NEUM) then
 
                 ! Add E+ contribution S_E1 to stiffness and DG
                 do i=1,DIM
@@ -456,7 +474,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
                 ! E- contribution in position iface+1 since position 1 is for E+
 
                 ! if Dirichlet
-                if (E2 == -1) then
+                if (E2 == BC_DIRI) then
 
                     do i=1,DIM
                         do j=1,DIM
@@ -622,7 +640,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
 
     real(kind=8), dimension(DIM,DIM) :: moment
     real(kind=8) :: vol, M0
-    real(kind=8), dimension(DIM) :: s,n
+    real(kind=8), dimension(DIM) :: s,n,point
     integer(kind=4) :: ie_couple, rank_id
 
     integer(kind=4) :: row
@@ -672,7 +690,8 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
     ! initialize output once
     rhs_loc = 0.0d0
 
-    call FIND_ELEM_FROM_POINT(PolyMesh, (/ 0.5d0, 0.5d0, 0.5d0 /), ie_couple, rank_id)
+    point = (/ PolyData%val_sism_el(1,1), PolyData%val_sism_el(1,2), PolyData%val_sism_el(1,3) /)
+    call FIND_ELEM_FROM_POINT(PolyMesh, point, ie_couple, rank_id)
 
     ! loop on the tetrahedra
     elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
@@ -729,12 +748,19 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
 
         ! double couple
         if (ie_loc == ie_couple .and. rank_id==mpi_id) then
+            ! volume
             vol = volume(PolyMesh,ie_loc)
-            s = (/ 1.0d0, 0.0d0, 0.0d0 /)
-            n = (/ 0.0d0, 1.0d0, 0.0d0 /)
-            M0 = 1.0d0
+            ! strike
+            s = (/ PolyData%val_sism_el(1,7), PolyData%val_sism_el(1,8), PolyData%val_sism_el(1,9) /)
+            ! normal
+            n = (/ PolyData%val_sism_el(1,10), PolyData%val_sism_el(1,11), PolyData%val_sism_el(1,12) /)
+            ! moment magnitude
+            M0 = PolyData%val_sism_el(1,14)
+            ! moment density
             moment = moment_density(M0,vol,s,n)
+
             call MAKE_DOUBLE_COUPLE(Np, Jdet, weitet3, nq3, dphi, moment, rhs_loc_couple)
+
             rhs_loc(ie_loc,:) = rhs_loc(ie_loc,:) + rhs_loc_couple
         endif
 

@@ -313,7 +313,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
         temp2 = 0.0d0
 
         ! if the condition is satisfied, then e is a Dirichlet boundary face
-        if (E2 == BCDIRI) then
+        if (E2 == BC_DIRI) then
 
             do m=1,Np
 
@@ -360,7 +360,7 @@ subroutine MAKE_RHS_FACE(theta, alpha, p, Np, e, E2, hk_1, hk_2, normal, area, F
         endif
 
         ! if the condition is satisfied, then e is a Neumann boundary face
-        if (E2 == BCNEUM) then
+        if (E2 == BC_NEUM) then
 
             do m=1,Np
 
@@ -446,10 +446,10 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, &
     D_bar = lambda + 2*mu ! harmonic average of lambda+2*mu
 
     ! evaluation of the penalization function
-    if (E2 == BCDIRI) then
+    if (E2 == BC_DIRI) then
         sigma = alpha*(p**2) / hk_1 * D_bar
     endif
-    if(E2 /= BCDIRI .and. E2 /= BCNEUM) then
+    if(E2 /= BC_DIRI .and. E2 /= BC_NEUM) then
         val(1) = hk_1
         val(2) = hk_2
         sigma = alpha*(p**2) / minval(val) * D_bar
@@ -462,7 +462,7 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, &
     S_E2 = 0.0d0
 
     ! check if the actual face is not a Neumann boundary face
-    if(E2 /= BCNEUM) then
+    if(E2 /= BC_NEUM) then
 
         temp = 0.0d0
 
@@ -493,7 +493,7 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, &
             enddo
 
             ! if the condition is satisfied, then e is a Dirichlet boundary face
-            if (E2 == BCDIRI) then
+            if (E2 == BC_DIRI) then
 
                 temp = 0.0d0
 
@@ -524,7 +524,7 @@ subroutine MAKE_STIFFNESS_FACE(alpha, p, Np, E2, hk_1, hk_2, normal, area, &
                 enddo
 
             ! absorbing boundary
-            elseif (E2 == BCABSO) then
+            elseif (E2 == BC_ABSO) then
 
                 temp = 0.0d0
 
@@ -662,8 +662,9 @@ end subroutine MAKE_STIFFNESS_FACE
 
 
 !> compute contributions of absorbing boundary conditions to damping matrix
+!> returns a 3x3 block matrix directly, each block is Np x Np
 subroutine MAKE_DAMPING_FACE(Np, normal, tangent1, tangent2, area, &
-                               weitria2, nq2, lambda, mu, phi_b, C_E1)
+                               weitria2, nq2, lambda, mu, phi_b, D_E1)
 
     ! theta and alpha are provided by the subroutine set_properties in problem_data_and_properties.f90
     ! phi_b and grad_b are provided by the subroutine basis_boundary in basis_functions.f90
@@ -679,7 +680,7 @@ subroutine MAKE_DAMPING_FACE(Np, normal, tangent1, tangent2, area, &
     real(kind=8), dimension(DIM), intent(in) :: normal      !< normal vector
     real(kind=8), dimension(Np,nq2,2), intent(in) :: phi_b  !< basis on the boundary
 
-    real(kind=8), dimension(DIM*Np,DIM*Np), intent(out), optional :: C_E1        !< element stiffness matrix absorbing boundary contribution
+    real(kind=8), dimension(DIM*Np,DIM*Np), intent(out), optional :: D_E1        !< element stiffness matrix absorbing boundary contribution
 
     real(kind=8), dimension(DIM), intent(in), optional :: tangent1      !< tangent vector direction 1
     real(kind=8), dimension(DIM), intent(in), optional :: tangent2      !< tangent vector direction 2
@@ -699,7 +700,7 @@ subroutine MAKE_DAMPING_FACE(Np, normal, tangent1, tangent2, area, &
     ! loop on 2D quadrature nodes
     nquad_loop: do q = 1,nq2
 
-        ! compute C_E1
+        ! compute D_E1
         do i=1,DIM
             do j=i,DIM  ! upper triangular
                 do m=1,Np
@@ -716,8 +717,8 @@ subroutine MAKE_DAMPING_FACE(Np, normal, tangent1, tangent2, area, &
                                         tangent2(i)*b(2) + normal(i)*b(3) )
 
                         ! exploit symmetry
-                        C_E1(row,col) = C_E1(row,col) + weitria2(q)*area*val
-                        C_E1(col,row) = C_E1(col,row) + weitria2(q)*area*val
+                        D_E1(row,col) = D_E1(row,col) + weitria2(q)*area*val
+                        D_E1(col,row) = D_E1(col,row) + weitria2(q)*area*val
 
                     enddo
                 enddo
