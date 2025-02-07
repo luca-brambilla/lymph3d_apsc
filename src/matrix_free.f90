@@ -1147,7 +1147,7 @@ subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, u_loc, u_glo, gathered_sizes, disp
 end subroutine POST_PROCESS_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
-subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, v0_loc, usol_loc, u0_mpi)
+subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, v0_loc, usol_loc, u0_mpi)
 
     implicit none
 
@@ -1159,6 +1159,8 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat
     integer(kind=4), intent(in) :: Np
     !> mass matrix for E+
     real(kind=8), dimension(:,:,:,:), intent(in) :: R_M_loc
+    ! damping matrix for E1
+    real(kind=8), dimension(:,:,:), intent(in) :: D_loc
 
     !> stiffness matrix with contributions only from element E+ and neighbors E-
     real(kind=8), dimension(:,:,:,:), intent(in) :: K_loc
@@ -1249,8 +1251,8 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat
 
         !print *, 'mpi_id:', mpi_id, ' ---- end neigh loop', ie_loc, '----'
 
-        ! add forcing term and rescale
-        tmp = - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:) * time_function(t)
+        ! add forcing term and rescale, add damping
+        tmp = - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:)*time_function(t) - matmul(D_loc(E1,:,:), v0_loc(E1,:))
 
         ! mass linear system in matrix-free
         do i=1,DIM
@@ -1274,8 +1276,9 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat
 end subroutine FIRST_TIME_STEP_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
-subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, un_loc, usol_loc, un_mpi)
+subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, un_loc, usol_loc, un_mpi)
 
+    !!!!! PASS M_LOC
     !TODO consider different Np
     !DONE sides different for each row of K
 
@@ -1289,6 +1292,8 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
     integer(kind=4), intent(in) :: Np
     !> mass matrix factorization for E+
     real(kind=8), dimension(:,:,:,:), intent(in) :: R_M_loc
+    !>
+    real(kind=8), dimension(:,:,:), intent(in) :: D_loc
 
     !> stiffness matrix with contributions only from element E+ and neighbors E-
     real(kind=8), dimension(:,:,:,:), intent(in) :: K_loc
@@ -1307,6 +1312,7 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
     real(kind=8), dimension(PolyMesh%num_elem_inter_vec(mpi_id+1), DIM*Np), intent(in) :: un_mpi
 
     real(kind=8), dimension(DIM*Np) :: tmp
+    real(kind=8), dimension(DIM*Np, DIM*Np) :: tmp_mat
     integer(kind=4) :: ie_loc, E1, E2, iface, ie_neigh_loc, n_neigh
 
     !> partial result for contribution from stiffness and forcing term
@@ -1386,7 +1392,10 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, 
         !----
 
         ! add element forcing term and rescale
-        tmp = - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:) * time_function(t)
+        tmp = - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:)*time_function(t)
+        tmp_mat = -time_step/2.0d0*D_loc(E1,:,:)
+        tmp_mat = tmp_mat + M_loc(E1,:,:)
+        tmp = dt2*tmp + matmul(tmp_mat, u0_loc) + 2.0d0*matmul(M_loc(ie_loc,:,:), un_loc)
 
         ! element mass linear system - matrix-free in each dimension
         do i=1,DIM
