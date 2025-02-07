@@ -26,7 +26,7 @@ module matrix_free
 !> @brief Compute the mass, stiffness, dg, modal matrices for each element.
 !> The stiffness and dg matrices for the element E+ are rectangular and contain
 !> the contributions also from neighboring elements E-.
-subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, D_loc, max_faces)
+subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, max_faces)
 
     !TODO variable number of sides, do not count boundaries
     !TODO polytopal elements, face contribution to same matrices
@@ -92,7 +92,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
 
     ! process local matrices, rectangular for each element
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: K_loc
-    real(kind=8), dimension(:,:,:), allocatable, intent(inout) :: D_loc
+    !real(kind=8), dimension(:,:,:), allocatable, intent(inout) :: D_loc
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: A_dg_loc
 
     type(Element), pointer :: E1_ptr
@@ -100,6 +100,8 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
     integer(kind=4) :: row, col
 
     real(kind=8) :: t1, t2
+
+    E1_ptr => null()
 
     ! set the properties of the method (see problem_data_and_properties.f90)
     call set_properties(alpha, theta, c)
@@ -151,7 +153,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
     A_dg_loc = 0.0d0
     M_loc = 0.0d0
     M_modal_loc = 0.0d0
-    D_loc = 0.0d0
+    !D_loc = 0.0d0
 
     ! loop on the tetrahedra
     elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
@@ -278,15 +280,16 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
             E2 = PolyMesh%Elem_loc(E1)%neigh_el(iface,2)
             space_fun_tag = PolyMesh%Elem_loc(E1)%neigh_el(iface,5)
 
-            if (E2 == BC_ABSO) then
+            ! absorbin boundary conditions
+            ! if (E2 == BC_ABSO) then
 
-                call MAKE_DAMPING_FACE(Np, E1_ptr%normal(iface,:), E1_ptr%tangent1(iface,:), E1_ptr%tangent2(iface,:), E1_ptr%area(iface), &
-                weitria2, nq2, lambda, mu, phi_b, D_E1)
+            !     call MAKE_DAMPING_FACE(Np, E1_ptr%normal(iface,:), E1_ptr%tangent1(iface,:), E1_ptr%tangent2(iface,:), E1_ptr%area(iface), &
+            !     weitria2, nq2, lambda, mu, phi_b, D_E1)
 
-                D_loc(ie_loc,:,:) = D_loc(ie_loc,:,:) + D_E1
+            !     D_loc(ie_loc,:,:) = D_loc(ie_loc,:,:) + D_E1
 
-                cycle face_loop
-            endif
+            !     cycle face_loop
+            ! endif
 
             ! if iface is not a boundary face
             if (E2 /= BC_DIRI .and. E2 /= BC_NEUM .and. E2 /= BC_ABSO) then
@@ -531,7 +534,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
     integer(kind=4) :: ie_loc, ie_glob, ivert, id_node, ipoly_loc, ipoly_glob, ipoly2_loc, ipoly2_glob
     integer(kind=4) :: n_tet_in_poly, iface_poly
     integer(kind=4) :: Npoly
-    integer(kind=4) :: i, j, m
+    integer(kind=4) :: i, j, m, isism
 
     integer(kind=4) :: iface, E1, E2!, sides
     integer(kind=4), dimension(4) :: face_flag !! WHY VECTOR???
@@ -600,10 +603,73 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
     ! initialize output once
     rhs_loc = 0.0d0
 
-    point = (/ PolyData%val_sism_el(1,1), PolyData%val_sism_el(1,2), PolyData%val_sism_el(1,3) /)
-    call FIND_ELEM_FROM_POINT(PolyMesh, point, ie_couple, rank_id)
 
-    ! loop on the tetrahedra
+    ! loop on the seismic sources first
+    do isism = 1, PolyData%nload_sism_el
+
+        ! initialization of the rhs term on the volume rhs_tet_loc
+        rhs_tet_loc = 0.0d0
+
+        point = (/ PolyData%val_sism_el(isism,1), PolyData%val_sism_el(isism,2), PolyData%val_sism_el(isism,3) /)
+        call FIND_ELEM_FROM_POINT(PolyMesh, point, ie_couple, rank_id)
+
+        ! current element E+
+        ie_loc = ie_couple
+
+        ! computation of the coordinates of the tetrahedron
+        do ivert = 1, PolyMesh%Elem_loc(ie_loc)%num_vert
+
+            ! see MAKE_PARTITION_AND_MPI_FILES.f90
+            call FIND_POS_LOC_NODE(PolyMesh%node_loc2glo,PolyMesh%num_node_loc, &
+                                PolyMesh%Elem_loc(ie_loc)%vert(ivert),id_node)
+
+            x(ivert)=PolyMesh%coord_x(id_node)
+            y(ivert)=PolyMesh%coord_y(id_node)
+            z(ivert)=PolyMesh%coord_z(id_node)
+
+        enddo
+
+        ! computation of the reference map Fk, the inverse Jinv and the determinant Jdet of its jacobian (see Poly_ref_mappings.f90)
+        call jacobians(x, y, z, Fk, Jinv, Jdet)
+
+        ! find the polyhedron ipoly_glob that contains the tetrahedron ie_loc
+        ie_glob = PolyMesh%elem_loc2glo(ie_loc)
+        ipoly_glob = PolyMesh%elem_in_poly(ie_glob)
+
+        ! see subroutine local_search in Poly_global.f90
+        call GET_EL_LOC_FROM_EL_GLO(PolyMesh%poly_loc2glo, &
+                                    PolyMesh%num_poly_loc, &
+                                    ipoly_glob,ipoly_loc)
+
+        ! evaluation of the basis functions and their partial derivatives at the 3D quadrature nodes for a given polyhedral element contained in b_box
+        ! (see basis_functions.f90)
+        call basis(phi, dphi, PolyMesh%Poly(ipoly_loc)%b_box, Np, blist, Fk, nodtet3, nq3)
+
+        t1 = MPI_WTIME()
+
+        ! double couple
+        if (rank_id==mpi_id) then
+            ! volume
+            vol = volume(PolyMesh,ie_loc)
+            ! strike
+            s = (/ PolyData%val_sism_el(1,7), PolyData%val_sism_el(1,8), PolyData%val_sism_el(1,9) /)
+            ! normal
+            n = (/ PolyData%val_sism_el(1,10), PolyData%val_sism_el(1,11), PolyData%val_sism_el(1,12) /)
+            ! moment magnitude
+            M0 = PolyData%val_sism_el(1,14)
+            ! moment density
+            moment = moment_density(M0,vol,s,n)
+
+            call MAKE_DOUBLE_COUPLE(Np, Jdet, weitet3, nq3, dphi, moment, rhs_loc_couple)
+
+            rhs_loc(ie_loc,:) = rhs_loc(ie_loc,:) + rhs_loc_couple
+        endif
+
+        t2 = MPI_WTIME()
+        tp_setup_RHS = tp_setup_RHS + t2 - t1
+    enddo
+
+    ! loop on the tetrahedra and add forcing terms
     elem_loop: do ie_loc = 1, PolyMesh%num_elem_loc
 
         ! initialization of the rhs term on the volume rhs_tet_loc
@@ -655,24 +721,6 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
             row = (i-1)*Np
             rhs_loc(ie_loc, row+1:row+Np) = rhs_loc_tmp(ie_loc,i,:)
         enddo
-
-        ! double couple
-        if (ie_loc == ie_couple .and. rank_id==mpi_id) then
-            ! volume
-            vol = volume(PolyMesh,ie_loc)
-            ! strike
-            s = (/ PolyData%val_sism_el(1,7), PolyData%val_sism_el(1,8), PolyData%val_sism_el(1,9) /)
-            ! normal
-            n = (/ PolyData%val_sism_el(1,10), PolyData%val_sism_el(1,11), PolyData%val_sism_el(1,12) /)
-            ! moment magnitude
-            M0 = PolyData%val_sism_el(1,14)
-            ! moment density
-            moment = moment_density(M0,vol,s,n)
-
-            call MAKE_DOUBLE_COUPLE(Np, Jdet, weitet3, nq3, dphi, moment, rhs_loc_couple)
-
-            rhs_loc(ie_loc,:) = rhs_loc(ie_loc,:) + rhs_loc_couple
-        endif
 
         ! current element E+
         E1 = ie_loc
@@ -1055,7 +1103,7 @@ subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, u_loc, u_glo, gathered_sizes, disp
 end subroutine POST_PROCESS_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
-subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, v0_loc, usol_loc, u0_mpi)
+subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, v0_loc, usol_loc, u0_mpi)
 
     implicit none
 
@@ -1068,7 +1116,7 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, r
     !> mass matrix for E+
     real(kind=8), dimension(:,:,:,:), intent(in) :: R_M_loc
     ! damping matrix for E1
-    real(kind=8), dimension(:,:,:), intent(in) :: D_loc
+    !real(kind=8), dimension(:,:,:), intent(in) :: D_loc
 
     !> stiffness matrix with contributions only from element E+ and neighbors E-
     real(kind=8), dimension(:,:,:,:), intent(in) :: K_loc
@@ -1160,10 +1208,11 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, r
         !print *, 'mpi_id:', mpi_id, ' ---- end neigh loop', ie_loc, '----'
 
         ! add forcing term and rescale, add damping
-        tmp = - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:)*time_function(t) - matmul(D_loc(E1,:,:), v0_loc(E1,:))
+        tmp = - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:)*time_function(t)
 
         ! mass linear system in matrix-free
         do i=1,DIM
+            row = (i-1)*Np
 
             v_ptr = tmp(row+1:row+Np)
 
@@ -1184,7 +1233,7 @@ subroutine FIRST_TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, r
 end subroutine FIRST_TIME_STEP_MATRIX_FREE
 
 !> @brief solver for matrix free considering only one element with time dependence
-subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, un_loc, usol_loc, un_mpi)
+subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, R_M_loc, rhs_stat_loc, rhs_dyn_loc, u0_loc, un_loc, usol_loc, un_mpi)
 
     !!!!! PASS M_LOC
     !TODO consider different Np
@@ -1200,8 +1249,8 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, rhs_sta
     integer(kind=4), intent(in) :: Np
     !> mass matrix factorization for E+
     real(kind=8), dimension(:,:,:,:), intent(in) :: R_M_loc
-    !>
-    real(kind=8), dimension(:,:,:), intent(in) :: D_loc
+    !!
+    !real(kind=8), dimension(:,:,:), intent(in) :: D_loc
 
     !> stiffness matrix with contributions only from element E+ and neighbors E-
     real(kind=8), dimension(:,:,:,:), intent(in) :: K_loc
@@ -1220,7 +1269,6 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, rhs_sta
     real(kind=8), dimension(PolyMesh%num_elem_inter_vec(mpi_id+1), DIM*Np), intent(in) :: un_mpi
 
     real(kind=8), dimension(DIM*Np) :: tmp
-    real(kind=8), dimension(DIM*Np, DIM*Np) :: tmp_mat
     integer(kind=4) :: ie_loc, E1, E2, iface, ie_neigh_loc, n_neigh
 
     !> partial result for contribution from stiffness and forcing term
@@ -1301,9 +1349,6 @@ subroutine TIME_STEP_MATRIX_FREE(PolyMesh, Np, t, K_loc, D_loc, R_M_loc, rhs_sta
 
         ! add element forcing term and rescale
         tmp = - tmp + rhs_stat_loc(ie_loc,:) + rhs_dyn_loc(ie_loc,:)*time_function(t)
-        tmp_mat = -time_step/2.0d0*D_loc(E1,:,:)
-        tmp_mat = tmp_mat + M_loc(E1,:,:)
-        tmp = dt2*tmp + matmul(tmp_mat, u0_loc) + 2.0d0*matmul(M_loc(ie_loc,:,:), un_loc)
 
         ! element mass linear system - matrix-free in each dimension
         do i=1,DIM
