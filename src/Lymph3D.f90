@@ -34,11 +34,9 @@ program Lymph3D
     real(kind=8) :: err_L2
     real(kind=8) :: err_DG
     real(kind=8) :: hmax, hmax_mpi
-    real(kind=8), pointer :: sol_ptr(:)
     real(kind=8), dimension(:,:), allocatable :: u
     integer(kind=4), dimension(:), allocatable :: gathered_sizes, displacements
 
-    !real(kind=8) :: E, nu
     integer(kind=4) :: i, mat_id, ie_loc
 
     type(Data_Structure) :: PolyData
@@ -48,7 +46,6 @@ program Lymph3D
     real(kind=8) :: t             ! time variable
 
     real(kind=8), parameter :: one = 1.0
-
 
     ! each local has a matrix
 
@@ -62,7 +59,7 @@ program Lymph3D
 
     real(kind=8), dimension(:,:,:,:), allocatable :: M_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: M_modal_loc
-    real(kind=8), dimension(:,:,:), allocatable :: D_loc
+    !real(kind=8), dimension(:,:,:), allocatable :: D_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: K_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: A_dg_loc
     real(kind=8), dimension(:,:,:,:), allocatable :: R_M_loc
@@ -71,7 +68,6 @@ program Lymph3D
 
     integer(kind=4) :: n_neigh
 
-    integer(kind=4) :: unit_print
     type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
 
     real(kind=8) :: t1, t2
@@ -218,11 +214,11 @@ program Lymph3D
     print *, 'matrix-free - set matrices and vectors'
 
     n_neigh = PolyMesh%Elem_loc(1)%num_faces
-    !! WASTE OF MEMORY... MAKE SCATTERED SIZE VECTOR?
+
     allocate( K_loc(PolyMesh%num_elem_loc, n_neigh+1, DIM*Np, DIM*Np) )
     allocate( A_dg_loc(PolyMesh%num_elem_loc, n_neigh+1, DIM*Np, DIM*Np) )
 
-    allocate( D_loc(PolyMesh%num_elem_loc, DIM*Np, DIM*Np) )
+    !allocate( D_loc(PolyMesh%num_elem_loc, DIM*Np, DIM*Np) )
 
     allocate( M_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
     allocate( M_modal_loc(PolyMesh%num_elem_loc, DIM, Np, Np) )
@@ -260,7 +256,7 @@ program Lymph3D
     print *, 'assemble matrix-free matrices'
 
     ! make all matrices
-    call MAKE_MATRICES_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, D_loc, n_neigh)
+    call MAKE_MATRICES_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, n_neigh)
 
     do ie_loc=1,PolyMesh%num_elem_loc
         do i=1,DIM
@@ -291,7 +287,6 @@ program Lymph3D
 
     IsSave_output = .true.
 
-    !! CHECK IF START AT num_dt=0
     t = 0.0d0
     num_dt = 0
 
@@ -307,18 +302,16 @@ program Lymph3D
     dt2 = time_step*time_step
     half_dt2 = 0.5d0*dt2
 
-    ! --------------------- MATRIX FREE -----------------------
-
-    print *, 'matrix free solver'
     if(mpi_id == 0) print *, "                   TIME LOOP START                   "
 
     ! allocate nnod_num, gathered_sizes, displacements, u
     call PREPROCESS_SOLUTION_MATRIX_FREE(PolyMesh, local_dof, nnod_num, gathered_sizes, displacements, u)
 
+
     if(mpi_id == 0) write(*,'(A,I10,A,F14.5)') "Iteration: ", 0, " Time: ", t
 
-    if (mpi_id==0) print *, "Assemble initial conditions"
 
+    if (mpi_id==0) print *, "Assemble initial conditions"
     call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_displacement, u0_loc)
     ! call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_velocity, v0_loc)
     call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_displacement, v0_loc)
@@ -343,8 +336,6 @@ program Lymph3D
     num_dt = num_dt + 1
 
     ! u_1 = M^-1(dt^2/2 * f_0 - dt^2/2*A*u_0) + u0 + dt*v_0
-    !! refactor matrices
-    !! select correct u0_loc
 
     call FLUSH
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
@@ -353,9 +344,6 @@ program Lymph3D
     call FLUSH
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    !! computation on tetra or on poly??? solution dof on poly
-
-    ! SCALE FOR UNDERFLOW
     ! update interface solution for u^{0}
     if (mpi_np>1) then
         call MPI_EXCHANGE_DOF(PolyMesh, u0_loc, un_mpi, send_data, recv_data)
@@ -444,6 +432,7 @@ program Lymph3D
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     COMPUTE MODAL SOLUTION
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
     if (mpi_id == 0) then
         write(*,'(A)')
@@ -451,31 +440,25 @@ program Lymph3D
     endif
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-        print *, 'matrix-free exact solution'
+    t1 = MPI_WTIME()
+    ! u0_loc for exact solution - time dependent component
+    call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex, u0_loc)
+    ! v0_loc for exact solution - static component
+    call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex_stat, v0_loc)
 
-        t1 = MPI_WTIME()
-        ! u0_loc for exact solution - time dependent component
-        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex, u0_loc)
-        ! v0_loc for exact solution - static component
-        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex_stat, v0_loc)
+    ! check time dependence
+    if (IsTime_dependent .eqv. .true.) then
+        if (mpi_id == 0) write(*, '(A,F14.5)') 'Scale modal solution by time function at t = ', t
+        u0_loc = v0_loc*0.0d0 + u0_loc * time_function(t)
+    endif
+    t2 = MPI_WTIME()
+    tp_exact = t2-t1
 
-        ! check time dependence
-        if (IsTime_dependent .eqv. .true.) then
-            if (mpi_id == 0) write(*, '(A,F14.5)') 'Scale modal solution by time function at t = ', t
-            u0_loc = v0_loc*0.0d0 + u0_loc * time_function(t)
-        endif
-        t2 = MPI_WTIME()
-        tp_exact = t2-t1
-
-        if (mpi_np>1) then
-            call MPI_EXCHANGE_DOF(PolyMesh, u0_loc, uex_mpi, send_data, recv_data)
-        endif
+    if (mpi_np>1) then
+        call MPI_EXCHANGE_DOF(PolyMesh, u0_loc, uex_mpi, send_data, recv_data)
+    endif
 
     print *, 'Done with modal solutions'
-
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!     DESTROYING KSP SOLVERS AND VECTORS ON THE RIGHT HAND SIDE OF THE SYSTEMS
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     POST-PROCESSING: COMPUTING THE ERRORS
@@ -508,6 +491,7 @@ program Lymph3D
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
+    ! print final errors
     if (mpi_id == 0) then
         err_L2 = dsqrt(err_L2)
         err_DG = dsqrt(err_DG)
@@ -523,26 +507,19 @@ program Lymph3D
 
     !if (mpi_id == 0) call WRITE_ERRORS(p, err_DG, err_L2, hmax, PolyMesh, IsPoly)
 
-
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     DEALLOCATING MATRICES AND VECTORS
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        print *, 'matrix free destroy vector and matrices'
 
-        deallocate(u0_loc, un_loc, v0_loc, rhs_stat_loc, rhs_dyn_loc)
+    print *, 'Destroy vector and matrices'
 
-        do i=1,PolyMesh%num_elem_loc
-            !deallocate(K_loc(i)%values, A_dg_loc(i)%values, internal_neigh(i)%values)
-        end do
+    deallocate(u0_loc, un_loc, v0_loc, rhs_stat_loc, rhs_dyn_loc)
 
-        deallocate(K_loc, A_dg_loc)
+    do i=1,PolyMesh%num_elem_loc
+        !deallocate(K_loc(i)%values, A_dg_loc(i)%values, internal_neigh(i)%values)
+    end do
 
-
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-!     POST-PROCESSING: EXPORTING THE SOLUTION
-! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-    ! call EXPORT_SOLUTION(PolyMesh, u, IsPoly, mpi_id, num_dt)
+    deallocate(K_loc, A_dg_loc)
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !    END SETUP

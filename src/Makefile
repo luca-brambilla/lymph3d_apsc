@@ -9,7 +9,7 @@ DIR_METIS=/home/luca/metis-5.1.0/build/Linux-x86_64
 COMP_FC_FLAGS=-O5 -g -c -cpp -ffree-form -ffree-line-length-none -fopenmp -fbounds-check
 COMP_LD_FLAGS=-O5 -fopenmp
 
-DEBUG_FC_FLAGS = -Wunused -Wconversion -fcheck=all -fcheck-array-temporaries  -ffree-line-length-none -finit-real=snan -ffpe-trap=invalid -fbacktrace -ffpe-trap=underflow #-Wall -fcheck=all -fbacktrace
+DEBUG_FC_FLAGS = -Wunused -Wconversion -fcheck=all -fcheck-array-temporaries  -ffree-line-length-none -finit-real=snan -ffpe-trap=invalid -fbacktrace -ffpe-trap=underflow -Wuninitialized #-Wall -fcheck=all -fbacktrace
 
 METIS_FC_FLAGS=-I$(DIR_FMETIS)/include -I$(DIR_METIS)/include
 METIS_LD_FLAGS=-L$(DIR_FMETIS)/lib -lfmetis -L$(DIR_METIS)/libmetis -lmetis
