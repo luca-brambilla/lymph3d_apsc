@@ -70,3 +70,7 @@ run_sims.sh
 tmp.md
 .gitignore
 .vscode
+test_install
+compare.pvsm
+*.zip
+*.tar.gz

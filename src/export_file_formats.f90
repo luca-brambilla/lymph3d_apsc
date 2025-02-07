@@ -1337,7 +1337,7 @@ end subroutine ENSIGHT_WRITE_CASE
             ! only in parallel
             ! if(mpi_np > 1) then
             !     call MPI_AllGather(PolyMesh%num_elem_loc, 1, MPI_INTEGER, gathered_sizes, 1, &
-            !     MPI_INTEGER, MPI_COMM_WORLD, ierr)
+            !     MPI_INTEGER, MPI_COMM_WORLD, mpi_ierr)
             !     start_elem = gathered_sizes
             !     ! mpi process from 0
             !     do i = mpi_np,2,-1

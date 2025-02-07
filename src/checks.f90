@@ -29,7 +29,6 @@ module checks
                 print *, "!-------- FAIL CFL CONDITION --------!"
                 if (IS_failCFL .eqv. .true.) then
                     call LYMPH3D_BARRIER
-                    call PetscFinalize(mpi_ierr)
                     call MPI_FINALIZE(mpi_ierr)
                     call EXIT(EXIT_CFL)
                 endif

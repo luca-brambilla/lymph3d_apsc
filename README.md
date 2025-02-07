@@ -8,18 +8,19 @@ The library numerically computes volume and surface integrals using Gaussian qua
 ### Prerequisites
 
 - Fortran compiler `gfortran`
-- `PETSc`
 - `METIS`
 - `fMETIS`
 - `MPI`
 - `doxygen` (for documentation generation)
-- `GNUPLOT` (for plots)
 - `Paraview` (for solution visualization)
 
-Ensure that you have installed [PETSc](https://petsc.org/release/install/download/) (for solving the linear system), [METIS](https://github.com/KarypisLab/METIS) and [fMETIS](https://github.com/ivan-pi/fmetis) (for mesh agglomeration) and [MPI](https://www.open-mpi.org/software/ompi/v4.1/) (for message passing) on your computer.
+For a fast installation execute the `INSTALL.sh` script
 
--  During the installation of METIS and fMETIS, make sure to configure them with `INT=32` and `REAL=64` settings.
+Ensure that you have installed `METIS` from `metis-5.1.0.tar.gz` in the repo, [fMETIS](https://github.com/ivan-pi/fmetis) (for mesh agglomeration) and [MPI](https://www.open-mpi.org/software/ompi/v4.1/) (for message passing) on your computer.
 
+- During the installation of METIS and fMETIS, make sure to configure them with `INT=32` and `REAL=64` settings.
+
+- To install `METIS`
 ### Compilation
 Compile the program in the folder `src` with the command:
 ```

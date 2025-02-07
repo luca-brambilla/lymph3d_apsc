@@ -115,7 +115,7 @@ module find_tet
         local%rank = mpi_id
 
         ! pair of double and integer: distance and process
-        call MPI_ALLREDUCE(local, global, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD, ierr)
+        call MPI_ALLREDUCE(local, global, 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD, mpi_ierr)
 
         rank_id = global%rank
 

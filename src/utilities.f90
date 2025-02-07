@@ -1,7 +1,6 @@
 !> Utilities to save data to file, check FILES_MPI folder
 module utilities
 
-#include<petsc/finclude/petscmat.h>
 use Poly_setup_MPI
 
 implicit none
@@ -22,11 +21,7 @@ subroutine LYMPH3D_STOP
     if (mpi_id == 0) then
         write(*,'(A)')'--------------- SIMULATION WAS STOPPED ----------------'
         write(*,'(A)')
-        if (IS_MatrixFree .eqv. .true.) then
-            write(*,'(A)')'Matrix free'
-        else
-            write(*,'(A)')'PETSc full'
-        endif
+        write(*,'(A)')'Matrix free'
         call PRINT_PROFILING
         write(*,'(A)')
         write(*,'(A)')'-------------------------------------------------------'
@@ -38,46 +33,12 @@ subroutine LYMPH3D_STOP
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
     stop
-    call PetscFinalize(mpi_ierr)
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
     call MPI_FINALIZE(mpi_ierr)
     stop
     call exit(0)
 
 end subroutine LYMPH3D_STOP
-
-!> save full PETSc matrix to a file, row by row
-subroutine SAVE_MATRIX_PETSC(matrix, nrows, ncols, filename)
-    use petscmat
-
-    implicit none
-
-    Mat :: matrix
-    integer(kind=4), intent(in) :: nrows
-    integer(kind=4), intent(in) :: ncols
-    character(len=*), intent(in) :: filename
-
-    integer(kind=4) :: i, unit_print
-    PetscInt, dimension(:), allocatable :: cols
-    PetscInt :: row(1)
-    PetscScalar, dimension(:), allocatable :: values
-
-    allocate(cols(ncols))
-    allocate(values(ncols))
-    cols = [(i,i=0,ncols-1)]
-
-    open(newunit=unit_print, action='WRITE', file=filename, &
-    form='FORMATTED', status='replace')
-    do i=0,nrows-1
-        row(1) = i
-        call MatGetValues(matrix, 1, row, ncols, cols, values, ierr)
-        write(unit_print, *) values
-    enddo
-    close(unit=unit_print)
-
-    deallocate(cols, values)
-
-end subroutine SAVE_MATRIX_PETSC
 
 !> save Fortan matrices of an element to a file, ordered first by neighbour then by row
 subroutine SAVE_MATRIX_F90(matrix, nrows, filename)
@@ -156,12 +117,13 @@ subroutine DELETE_ALL_FILES
     implicit none
 
     character(len=200) :: command
+    integer(kind=4) :: ierr
 
     ! System command to delete all files
     command = "rm -f FILES_MPI/* MONITORS/*"
     call EXECUTE_COMMAND_LINE(command, wait=.true., exitstat=ierr)
 
-    if (ierr /= 0) then
+    if (mpi_ierr /= 0) then
         print *, "Error deleting files. Exit code:", ierr
     else
         print *, "All files deleted in FILES_MPI directory."

@@ -1,9 +1,6 @@
 !> @brief module for matrix free solution of DG FEM for elastodynamics
 module matrix_free
 
-#include<petsc/finclude/petscksp.h>
-
-    use petscksp
     use mpi
     use Poly_setup_mpi
     use problem_data_and_properties
@@ -22,88 +19,13 @@ module matrix_free
 
     implicit none
 
-    ! for stiffness matrix that has different sizes depending on neighbors
-    !! POINTER???????????
-    type :: KRowArray
-        real(kind=8), allocatable :: values(:,:,:,:,:)
-    end type KRowArray
-
-    type :: VecRowArray
-        integer(kind=4), allocatable :: values(:)
-    end type VecRowArray
-
-    type :: PetscRowMat
-        Mat :: values_x
-        Mat :: values_y
-        Mat :: values_z
-    end type PetscRowMat
-
-    type :: PetscRowVec
-        Vec :: values_x
-        Vec :: values_y
-        Vec :: values_z
-    end type PetscRowVec
-
-    !> typedef for PETSc Matrix - to construct arrays of matrices
-    !! maybe type(tMat), dimension(:,:)
-    type :: PetscMatStruct
-        Mat :: data
-    end type
-
-    !> typedef for PETSc Vector - to construct arrays of vectors
-    !! maybe type(tVec), dimension(:)
-    type :: PetscVecStruct
-        Vec :: data
-    end type
-
     contains
 
 
-!> set up 2D array of PETSc matrices
-subroutine SET_PETSC_MASS_MATRIX_FREE(ne_loc, Np, M)
-
-    integer(kind=4), intent(in) :: ne_loc   !< number of rows
-    integer(kind=4), intent(in) :: Np       !< PETSc square matrix size
-    !> 2D array, store each block of the diagonal in a 1D array for each element
-    type(PetscMatStruct), dimension(ne_loc,DIM), intent(out) :: M
-
-    integer(kind=4) :: ie_loc, i
-
-    do ie_loc=1,ne_loc
-        do i=1,DIM
-            PetscCall(MatCreateSeqDense(PETSC_COMM_SELF, Np, Np, PETSC_NULL_SCALAR_ARRAY, M(ie_loc,i)%data, mpi_ierr))
-
-            ! PetscCall(MatCreate(PETSC_COMM_SELF, M(ie_loc,i)%data, mpi_ierr))
-            ! PetscCall(MatSetSizes(M(ie_loc,i)%data, Np, Np, Np, Np, mpi_ierr))
-            ! PetscCall(MatSetFromOptions(M(ie_loc,i)%data, mpi_ierr))
-            ! PetscCall(MatSetUp(M(ie_loc,i)%data, mpi_ierr))
-        enddo
-    enddo
-
-end subroutine SET_PETSC_MASS_MATRIX_FREE
-
-!> set up array of PETSc vectors
-subroutine SET_PETSC_VECTOR_MATRIX_FREE(ne_loc, Np, V)
-
-    integer(kind=4), intent(in) :: ne_loc   !< number of rows
-    integer(kind=4), intent(in) :: Np       !< PETSc vector size
-    !> array of PETSc vectors
-    type(PetscVecStruct), dimension(ne_loc), intent(out) :: V
-
-    integer(kind=4) :: ie_loc
-
-    do ie_loc=1,ne_loc
-        PetscCall(VecCreate(PETSC_COMM_SELF, V(ie_loc)%data, mpi_ierr))
-        PetscCall(VecSetSizes(V(ie_loc)%data, Np, Np, mpi_ierr))
-        PetscCall(VecSetFromOptions(V(ie_loc)%data, mpi_ierr))
-    enddo
-
-end subroutine SET_PETSC_VECTOR_MATRIX_FREE
 
 !> @brief Compute the mass, stiffness, dg, modal matrices for each element.
 !> The stiffness and dg matrices for the element E+ are rectangular and contain
 !> the contributions also from neighboring elements E-.
-!> mass matrix is directly in PETSc for later to solve linear systems.
 subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_loc, M_loc, M_modal_loc, D_loc, max_faces)
 
     !TODO variable number of sides, do not count boundaries
@@ -116,9 +38,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
     type(Data_Structure), intent(in) :: PolyData    !< Data
     integer(kind=4), intent(in) :: Np               !< number of degrees of freedom of each element
     integer(kind=4), intent(in) :: num_elem_loc       !< Number of global dofs
-
-    !type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa
-    !type(PetscMatStruct), dimension(PolyMesh%num_elem_loc, DIM), intent(inout) :: massa_modale
 
     integer(kind=4) :: nq3, nq2, p
     real(kind=8) :: theta, alpha, c
@@ -305,10 +224,9 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
         !call MAKE_MASS_VOLUME(Np, Jdet, weitet3, nq3, phi, rho, M_loc(ie_loc,:,:,:,:))
 
         t1 = MPI_WTIME()
-        ! for petsc
         call MAKE_MASS_VOLUME(Np, Jdet, weitet3, nq3, phi, 1.0d0, mass_loc)
 
-        ! PETSc populate matrix
+        ! populate matrix
         ! insert the values of M_loc in the 3 blocks of the mass matrix
         do i=1,DIM
 
@@ -533,14 +451,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
     enddo elem_loop
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-    ! print *, 'Reaction coefficient c: ', c
-
-    ! Matrix operation petsc_stiff + c*petsc_mass
-    ! PetscCall(MatAXPY(petsc_stiff, c, petsc_mass, DIFFERENT_NONZERO_PATTERN, mpi_ierr))
-
-    ! Matrix operation mat_dg + c*petsc_mass
-    ! PetscCall(MatAXPY(mat_dg, c, petsc_mass, DIFFERENT_NONZERO_PATTERN, mpi_ierr))
 
     deallocate(phi)
     deallocate(dphi,phi_b)
@@ -891,7 +801,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
 end subroutine MAKE_RHS_FREE
 
 !> Matrix-free context, start from nodal solution and get modal solution coefficients.
-!> Data is scattered already, performed in series by each processor, local PETSc definition of vectors and matrix to use solver.
+!> Data is scattered already, performed in series by each processor, local definition of vectors and matrix to use solver.
 subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analytic, modal_coeff)
 
     implicit none
@@ -904,7 +814,6 @@ subroutine COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, f_analyt
         end function f_analytic
     end interface
 
-    !type(PetscMatStruct), dimension(:,:), intent(in):: massa_modale
     real(kind=8), dimension(:,:,:,:), intent(in) :: R_M_modal_loc
 
     type(Mesh_Structure) :: PolyMesh
@@ -1072,7 +981,7 @@ subroutine PREPROCESS_SOLUTION_MATRIX_FREE(PolyMesh, local_dof, nnod_num, gather
         allocate(gathered_sizes(mpi_np))
 
         call MPI_AllGather(Np*PolyMesh%num_poly_loc, 1, MPI_INTEGER, gathered_sizes, 1, &
-                    MPI_INTEGER, MPI_COMM_WORLD, ierr)
+                    MPI_INTEGER, MPI_COMM_WORLD, mpi_ierr)
 
         allocate(displacements(mpi_np))
         displacements(1) = 0
@@ -1111,7 +1020,6 @@ subroutine POST_PROCESS_MATRIX_FREE(PolyMesh, u_loc, u_glo, gathered_sizes, disp
     Npoly = PolyMesh%num_poly
     Npoly_loc = PolyMesh%num_poly_loc
 
-    ! SCATTER PETSC SOLUTION AND STORE IN A FORTRAN ARRAY
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
     if(mpi_np == 1) then
