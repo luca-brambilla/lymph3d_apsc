@@ -186,17 +186,15 @@ program Lymph3D
     PRINT *, 'Local number of degrees of freedom: ', local_dof
     call FLUSH
 
-    ! E = 32e9
-    ! nu = 0.2
 
     ! set the value of rho, lambda and mu
     do mat_id=1,PolyData%nmat
         ! PolyData%prop_mat(mat_id,1) = 2400
         ! PolyData%prop_mat(mat_id,2) = E*nu / ((1+nu)*(1-2*nu))
         ! PolyData%prop_mat(mat_id,3) = E / (2 * (1+nu))
-        PolyData%prop_mat(mat_id,1) = 10
-        PolyData%prop_mat(mat_id,2) = 1
-        PolyData%prop_mat(mat_id,3) = 1
+         PolyData%prop_mat(mat_id,1) = 1
+         PolyData%prop_mat(mat_id,2) = 1
+         PolyData%prop_mat(mat_id,3) = 1
     enddo
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -275,30 +273,40 @@ program Lymph3D
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     print *, 'assemble matrix-free RHS'
-    call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_stat_loc, f_null, gd_null, gn_null)
 
-    call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_dyn_loc, f_time, gd, gn)
+    ! analytical solution
+    if (test_num==1) then
+        call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_stat_loc, f_null, gd_null, gn_null)
 
-    rhs_dyn_loc = 0.0d0
+        call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_dyn_loc, f_time, gd, gn)
+
+    ! double couple
+    elseif (test_num==2) then
+        rhs_stat_loc = 0.0d0
+
+        call MAKE_RHS_FREE(PolyMesh, PolyData, PolyMesh%num_elem_loc, Np, rhs_dyn_loc, f_null, gd_null, gn_null)
+    endif
+
+    !rhs_dyn_loc = 0.0d0
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     CALLING SOLVER
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-    IsSave_output = .true.
+    ! IsSave_output = .true.
 
     t = 0.0d0
     num_dt = 0
 
     !stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
-    time_step = 1.0d-3
-    num_dt_mon = 20
+    ! time_step = 1.0d-3
+    ! num_dt_mon = 20
 
     !stop_time = SQRT2 / 4.0 + 9.0 * SQRT2 ! 10 peaks
-    stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
+    ! stop_time = SQRT2 / 4.0 + 1.0 * SQRT2
     !stop_time = 0.101
     !stop_time = 0.001
-    
+
     dt2 = time_step*time_step
     half_dt2 = 0.5d0*dt2
 
@@ -313,8 +321,8 @@ program Lymph3D
 
     if (mpi_id==0) print *, "Assemble initial conditions"
     call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_displacement, u0_loc)
-    ! call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_velocity, v0_loc)
-    call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_displacement, v0_loc)
+    call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_velocity, v0_loc)
+    !call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, ic_displacement, v0_loc)
 
     ! SAVE IC
     if (IsSave_output .eqv. .true.) then
@@ -434,31 +442,32 @@ program Lymph3D
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-    if (mpi_id == 0) then
-        write(*,'(A)')
-        write(*,'(A)')'---------------Compare with exact solution-------------'
+    if (test_num==1) then
+        if (mpi_id == 0) then
+            write(*,'(A)')
+            write(*,'(A)')'---------------Compare with exact solution-------------'
+        endif
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+        t1 = MPI_WTIME()
+        ! u0_loc for exact solution - time dependent component
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex, u0_loc)
+        ! v0_loc for exact solution - static component
+        call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex_stat, v0_loc)
+
+        ! check time dependence
+        if (IsTime_dependent .eqv. .true.) then
+            if (mpi_id == 0) write(*, '(A,F14.5)') 'Scale modal solution by time function at t = ', t
+            u0_loc = v0_loc*0.0d0 + u0_loc * time_function(t)
+        endif
+        t2 = MPI_WTIME()
+        tp_exact = t2-t1
+
+        if (mpi_np>1) then
+            call MPI_EXCHANGE_DOF(PolyMesh, u0_loc, uex_mpi, send_data, recv_data)
+        endif
     endif
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-    t1 = MPI_WTIME()
-    ! u0_loc for exact solution - time dependent component
-    call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex, u0_loc)
-    ! v0_loc for exact solution - static component
-    call COMPUTE_MODAL_COEFFICIENTS_FREE(PolyMesh, Np, R_M_modal_loc, uex_stat, v0_loc)
-
-    ! check time dependence
-    if (IsTime_dependent .eqv. .true.) then
-        if (mpi_id == 0) write(*, '(A,F14.5)') 'Scale modal solution by time function at t = ', t
-        u0_loc = v0_loc*0.0d0 + u0_loc * time_function(t)
-    endif
-    t2 = MPI_WTIME()
-    tp_exact = t2-t1
-
-    if (mpi_np>1) then
-        call MPI_EXCHANGE_DOF(PolyMesh, u0_loc, uex_mpi, send_data, recv_data)
-    endif
-
-    print *, 'Done with modal solutions'
+        print *, 'Done with modal solutions'
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     POST-PROCESSING: COMPUTING THE ERRORS
@@ -466,46 +475,48 @@ program Lymph3D
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    err_L2 = 0.0d0
-    err_DG = 0.0d0
+    if (test_num==1) then
+        err_L2 = 0.0d0
+        err_DG = 0.0d0
 
-    t1 = MPI_WTIME()
-        print *, 'Computing the errors...'
-        ! u0_loc for exact solution
-        call COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, un_loc, u0_loc, err_L2)
-        call COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, un_loc, u0_loc, un_mpi, uex_mpi, err_DG)
+        t1 = MPI_WTIME()
+            print *, 'Computing the errors...'
+            ! u0_loc for exact solution
+            call COMPUTE_ERROR_L2_MATRIX_FREE(PolyMesh, Np, M_modal_loc, un_loc, u0_loc, err_L2)
+            call COMPUTE_ERROR_DG_MATRIX_FREE(PolyMesh, Np, A_dg_loc, un_loc, u0_loc, un_mpi, uex_mpi, err_DG)
 
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
-    if (mpi_id == 0) then
-        call MPI_REDUCE(MPI_IN_PLACE, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-                    0, MPI_COMM_WORLD, mpi_ierr)
-        call MPI_REDUCE(MPI_IN_PLACE, err_DG, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-                    0, MPI_COMM_WORLD, mpi_ierr)
-    else
-        call MPI_REDUCE(err_L2, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-                    0, MPI_COMM_WORLD, mpi_ierr)
-        call MPI_REDUCE(err_DG, err_DG, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-                    0, MPI_COMM_WORLD, mpi_ierr)
+        if (mpi_id == 0) then
+            call MPI_REDUCE(MPI_IN_PLACE, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+            call MPI_REDUCE(MPI_IN_PLACE, err_DG, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        else
+            call MPI_REDUCE(err_L2, err_L2, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+            call MPI_REDUCE(err_DG, err_DG, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        endif
+
+        call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+        ! print final errors
+        if (mpi_id == 0) then
+            err_L2 = dsqrt(err_L2)
+            err_DG = dsqrt(err_DG)
+            print *, 'Done with the errors'
+
+            print *, 'GRID SIZE: ', hmax
+            print *, 'ERROR IN NORM L2: ', err_L2
+            print *, 'ERROR IN NORM DG: ', err_DG
+        endif
+
+        t2 = MPI_WTIME()
+        tp_error = t2 - t1
+
+        !if (mpi_id == 0) call WRITE_ERRORS(p, err_DG, err_L2, hmax, PolyMesh, IsPoly)
     endif
-
-    call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
-
-    ! print final errors
-    if (mpi_id == 0) then
-        err_L2 = dsqrt(err_L2)
-        err_DG = dsqrt(err_DG)
-        print *, 'Done with the errors'
-
-        print *, 'GRID SIZE: ', hmax
-        print *, 'ERROR IN NORM L2: ', err_L2
-        print *, 'ERROR IN NORM DG: ', err_DG
-    endif
-
-    t2 = MPI_WTIME()
-    tp_error = t2 - t1
-
-    !if (mpi_id == 0) call WRITE_ERRORS(p, err_DG, err_L2, hmax, PolyMesh, IsPoly)
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     DEALLOCATING MATRICES AND VECTORS

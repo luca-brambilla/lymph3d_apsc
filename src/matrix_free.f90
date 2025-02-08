@@ -21,8 +21,6 @@ module matrix_free
 
     contains
 
-
-
 !> @brief Compute the mass, stiffness, dg, modal matrices for each element.
 !> The stiffness and dg matrices for the element E+ are rectangular and contain
 !> the contributions also from neighboring elements E-.
@@ -95,13 +93,11 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
     !real(kind=8), dimension(:,:,:), allocatable, intent(inout) :: D_loc
     real(kind=8), dimension(:,:,:,:), allocatable, intent(inout) :: A_dg_loc
 
-    type(Element), pointer :: E1_ptr
+    !type(Element), pointer :: E1_ptr
 
     integer(kind=4) :: row, col
 
     real(kind=8) :: t1, t2
-
-    E1_ptr => null()
 
     ! set the properties of the method (see problem_data_and_properties.f90)
     call set_properties(alpha, theta, c)
@@ -161,7 +157,7 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
         ! count neighbor element contribution only to allocate K_loc
         ! current element E+
         E1 = ie_loc
-        E1_ptr = PolyMesh%Elem_loc(ie_loc)
+        !E1_ptr = PolyMesh%Elem_loc(ie_loc)
 
         ! sides = PolyMesh%Elem_loc(E1)%num_faces ! could vary for each element
         !n_neigh = 0     ! could vary for each element
@@ -204,7 +200,6 @@ subroutine MAKE_MATRICES_FREE(PolyMesh, PolyData, num_elem_loc, Np, K_loc, A_dg_
             z(ivert)=PolyMesh%coord_z(id_node)
 
         enddo
-
         ! computation of the reference map Fk, the inverse Jinv and the determinant Jdet of its jacobian (see Poly_ref_mappings.f90)
         call jacobians(x, y, z, Fk, Jinv, Jdet)
 
@@ -603,7 +598,6 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
     ! initialize output once
     rhs_loc = 0.0d0
 
-
     ! loop on the seismic sources first
     do isism = 1, PolyData%nload_sism_el
 
@@ -714,7 +708,7 @@ subroutine MAKE_RHS_FREE(PolyMesh, PolyData, num_elem_loc, Np, rhs_loc, f_forcin
 
         t1 = MPI_WTIME()
 
-        call MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_loc_tmp(ie_loc,:,:), rho*present, f_forcing)
+        call MAKE_RHS_VOLUME(Np, Fk, Jdet, nodtet3, weitet3, nq3, lambda, mu, phi, rhs_loc_tmp(ie_loc,:,:), rho, f_forcing)
 
         ! copy to output in correct format
         do i=1,DIM

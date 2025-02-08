@@ -113,6 +113,8 @@ module Poly_global
     !>  logical variable to save outputs
     logical :: IsSave_output
 
+    !> test number: 1 analytical solution, 2 double couple
+    integer(kind=4) :: test_num
 
 end module Poly_global
 
@@ -203,6 +205,7 @@ module Poly_default_codes
 
     ! Default values
     integer(kind=4), parameter :: damping_type_default = 1
+    integer(kind=4), parameter :: test_num_default = 1
 
     real(kind=8), parameter :: start_time_default = 0.d0
 
@@ -215,7 +218,7 @@ module Poly_default_codes
     logical, parameter :: IS_failCFL_default = .false.
     logical, parameter :: IS_instabilitycontrol_default = .false.
 
-    logical, parameter :: IS_timedependent_default = .false.
+    logical, parameter :: IS_timedependent_default = .true.
     logical, parameter :: IS_saveoutput_default = .false.
     logical, parameter :: IS_MatrixFree_default = .false.
 

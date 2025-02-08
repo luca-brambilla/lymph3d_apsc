@@ -14,7 +14,7 @@ subroutine READ_HEADER(header_file)
                                 time_step, start_time, stop_time, time_restart, &
                                 num_dt_mon, Is_Restart, Is_Debug, &
                                 depth_search_mon_lst, IS_mon_lst, &
-                                IsTime_dependent, IsSave_output, IS_MatrixFree
+                                IsTime_dependent, IsSave_output, test_num
 
 
     use Poly_exit_codes
@@ -31,7 +31,7 @@ subroutine READ_HEADER(header_file)
     integer(kind=4)   :: i, status, ileft, iright, arglen, val_mon_lst
     integer(kind=4)   :: file_row = 0
 
-    integer(kind=4) :: IS_dynamic, IS_save, IS_free
+    integer(kind=4) :: IS_dynamic, IS_save
 
 
     !Setup default values
@@ -47,7 +47,7 @@ subroutine READ_HEADER(header_file)
     IS_instabilitycontrol   = IS_instabilitycontrol_default
     IsTime_dependent        = IS_timedependent_default
     IsSave_output           = IS_saveoutput_default
-    IS_MatrixFree           = IS_MatrixFree_default
+    test_num                = test_num_default
 
     !! deafault value in subroutine
     !num_dt_mon = 0
@@ -137,9 +137,8 @@ subroutine READ_HEADER(header_file)
                 read(inline(ileft:iright),*) IS_save
                 if(IS_save /= 0) IsSave_output = .true.
 
-            case('MATFREE')
-                read(inline(ileft:iright),*) IS_free
-                if(IS_free /= 0) IS_MatrixFree = .true.
+            case('TESTNUM')
+                read(inline(ileft:iright),*) test_num
 
             case('DAMPING')
                 read(inline(ileft:iright),*) damping_type
