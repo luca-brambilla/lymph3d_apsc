@@ -10,15 +10,23 @@ The solution is computed in a matrix-free paradigm.
 ### Prerequisites
 
 - Fortran compiler `gfortran`
+- `make` and `cmake`
 - `METIS` (for mesh agglomeration)
 - `fMETIS` (METIS Fortran interface)
 - `MPI`   (parallelization)
 - `doxygen` (for documentation generation)
 - `Paraview` (for solution visualization)
 
-For a fast installation execute the `INSTALL.sh` script.
+Iinstall dependencies:
+```
+apt-get update
+apt-get install -y python3 make cmake g++ gfortran openmpi-bin openmpi-common libopenmpi-dev
+```
+
+For a fast installation of METIS and fMETIS execute the `INSTALL.sh` script.
 
 For manual installation follow the instructions in `metis-5.1.0` and [`fMETIS`](https://github.com/ivan-pi/fmetis) directories in the repo and install [MPI](https://www.open-mpi.org/software/ompi/v4.1/) (for message passing) on your machine.
+
 
 - During the installation of METIS and fMETIS, make sure to configure them with `INT=32` and `REAL=64` settings. For METIS, the header file has already been modified. For fMETIS consider the following `cmake .. -DMETIS_LIB="path/to/libmetis.a" -DREAL=64` in the `build` directory.
 
