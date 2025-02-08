@@ -111,6 +111,24 @@ subroutine CHECK_MPI_FILES
 
 end subroutine CHECK_MPI_FILES
 
+subroutine CREATE_FOLDERS
+    implicit none
+
+    character(len=200) :: command
+    integer(kind=4) :: ierr
+
+    ! System command to delete all files
+    command = "mkdir -p FILES_MPI MONITORS mesh_visualization POST-PROC POST-PROC/DIFF_EQ POST-PROC/DIFF_EQ/CONVERGENCE_TEST_TET POST-PROC/DIFF_EQ/ERRORS_TET"
+    call EXECUTE_COMMAND_LINE(command, wait=.true., exitstat=ierr)
+    
+    if (ierr /= 0) then
+        print *, "Error creating directories. Exit code:", ierr
+    else
+        print *, "All directories were created."
+    end if
+
+end subroutine CREATE_FOLDERS
+
 !> Delete all files in the FILES_MPI directory
 subroutine DELETE_ALL_FILES
 
@@ -123,11 +141,12 @@ subroutine DELETE_ALL_FILES
     command = "rm -f FILES_MPI/* MONITORS/*"
     call EXECUTE_COMMAND_LINE(command, wait=.true., exitstat=ierr)
 
-    if (mpi_ierr /= 0) then
+    if (ierr /= 0) then
         print *, "Error deleting files. Exit code:", ierr
     else
-        print *, "All files deleted in FILES_MPI directory."
+        print *, "All files deleted in FILES_MPI directory, if applicable."
     end if
+
 end subroutine DELETE_ALL_FILES
 
 !> Alias for MPI barrier

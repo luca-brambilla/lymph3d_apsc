@@ -93,7 +93,12 @@ program Lymph3D
     endif
 
     ! check FILES_MPI directory
-    if (mpi_id == 0) call CHECK_MPI_FILES
+    if (mpi_id == 0) then
+        call CREATE_FOLDERS
+        call CHECK_MPI_FILES
+    endif
+
+    call LYMPH3D_BARRIER
 
 ! >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 !     READ INPUT FILES AND ALLOCATE VARIABLES
