@@ -14,13 +14,14 @@ The solution is computed in a matrix-free paradigm.
 - `METIS` (for mesh agglomeration)
 - `fMETIS` (METIS Fortran interface)
 - `MPI`   (parallelization)
+- `makedepf90` (automatically update dependencies in `src` directory)
 - `doxygen` (for documentation generation)
 - `Paraview` (for solution visualization)
 
 Install dependencies:
 ```
 apt-get update
-apt-get install -y python3 make cmake g++ gfortran openmpi-bin openmpi-common libopenmpi-dev
+apt-get install -y python3 make cmake g++ gfortran openmpi-bin openmpi-common libopenmpi-dev makedepf90
 ```
 
 For a fast installation of METIS and fMETIS execute the `INSTALL.sh` script.
