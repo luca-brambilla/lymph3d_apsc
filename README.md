@@ -17,7 +17,7 @@ The solution is computed in a matrix-free paradigm.
 - `doxygen` (for documentation generation)
 - `Paraview` (for solution visualization)
 
-Iinstall dependencies:
+Install dependencies:
 ```
 apt-get update
 apt-get install -y python3 make cmake g++ gfortran openmpi-bin openmpi-common libopenmpi-dev
@@ -42,23 +42,21 @@ make
 
 
 ## User-Guide
-Then you can perform the following steps:
+Then you can perform the following steps in a specific test folder (e.g. `tests/analytical/tet_125`):
 1. Modify the file `Poly.input` to change the mesh file to read
 2. Modify the file `test1.mate` to modify the total degree of basis function
 3. Modify the file `problem_data_and_properties.f90` to modify the forcing term
 4. Modify the file `problem_data_and_properties.f90` to change alpha (the coefficient in the definition of the penalty function) or theta to change the method
 5. In case modification to the source code, recompile with
 ```sh
-make
+make -C ../../..
 ```
-6. Run the parallel program in a specific test folder (e.g. `tests/analytical/tet_125`) with the following command:
+6. Run the parallel program with the following command:
 ```sh
 mpirun -np 4 ../../../Lymph3D
 ```
 where the number of processes is set to 4 in this case.
 
-## Notes
-- Remember to remove the file convergence_test.vtk before performing a new convergence test!
 
 ## Structure
 
