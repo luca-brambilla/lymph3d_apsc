@@ -1,0 +1,37 @@
+language: c
+sudo: false
+
+matrix:
+  include:
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - libmetis5
+            - libmetis-dev
+            - metis
+            - cmake
+            - gfortran-8
+
+      script:
+        - mkdir build && pushd build
+        - FC=gfortran-8 cmake -DCMAKE_INSTALL_PREFIX=~/.local/ ..
+        - make install && ctest --output-on-failure
+
+    - os: osx
+      addons:
+        homebrew:
+          update: true
+          packages:
+            - gcc
+            - cmake
+            - metis
+      before_install:
+        - brew link gcc
+
+      script:
+        - mkdir build && pushd build
+        - FC=gfortran cmake -DCMAKE_INSTALL_PREFIX=~/.local ..
+        - make install && ctest --output-on-failure
