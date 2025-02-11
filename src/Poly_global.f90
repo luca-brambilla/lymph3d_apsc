@@ -21,6 +21,9 @@ module Poly_global
 
     implicit none
 
+    ! MPI OPERATIONS
+    integer(kind=4), allocatable :: requests(:), statuses(:,:)  ! For tracking operations
+
     ! header file names
     !> Name of the header file for simulation options
     character(len = 14) :: head_file = 'Poly.input'
@@ -88,7 +91,6 @@ module Poly_global
     real(kind=8)    :: tp_linear_system = 0.d0
     real(kind=8)    :: tp_KU = 0.d0
     real(kind=8)    :: tp_copy_vector = 0.d0
-    real(kind=8)    :: tp_system_setup = 0.d0
     real(kind=8)    :: tp_setup_K = 0.d0
     real(kind=8)    :: tp_setup_M = 0.d0
     real(kind=8)    :: tp_setup_RHS = 0.d0
@@ -96,6 +98,7 @@ module Poly_global
     real(kind=8)    :: tp_export = 0.d0
     real(kind=8)    :: tp_exact = 0.d0
     real(kind=8)    :: tp_error = 0.d0
+    real(kind=8)    :: tp_exchange = 0.d0
 
 
     !file found

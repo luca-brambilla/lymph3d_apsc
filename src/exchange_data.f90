@@ -156,6 +156,7 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
     use Poly_setup_mpi
     use Poly_mesh
     use global_parameters
+    use Poly_global 
 
     implicit none
 
@@ -170,16 +171,17 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
     integer(kind=4) :: row_send, row_recv
 
     type(ScatteredArray), dimension(mpi_np, mpi_np), intent(inout) :: send_data, recv_data
-    integer(kind=4), allocatable :: requests(:), statuses(:,:)  ! For tracking operations
+
+    real(kind=8) :: t1,t2
 
     ! real(kind=8) :: factor, ifactor
 
     ! factor = 1.0d0
     ! ifactor = 1.0d0
 
-    allocate(requests(2 * mpi_np), statuses(2 * mpi_np, MPI_STATUS_SIZE))
-
     Np = PolyMesh%Elem_loc(1)%NDof_elem
+
+    t1 = MPI_WTIME()
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
 
@@ -249,6 +251,9 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
     call MPI_WAITALL(ireq, requests, statuses, mpi_ierr)
 
     call MPI_BARRIER(MPI_COMM_WORLD, mpi_ierr)
+
+    t2 = MPI_WTIME()
+    tp_exchange = tp_exchange + t2 - t1
 
 end subroutine MPI_EXCHANGE_DOF
 

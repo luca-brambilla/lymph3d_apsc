@@ -170,8 +170,6 @@ subroutine PRINT_PROFILING
                         0, MPI_COMM_WORLD, mpi_ierr)
         call MPI_REDUCE(MPI_IN_PLACE, tp_copy_vector, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                         0, MPI_COMM_WORLD, mpi_ierr)
-        call MPI_REDUCE(MPI_IN_PLACE, tp_system_setup, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-                        0, MPI_COMM_WORLD, mpi_ierr)
         call MPI_REDUCE(MPI_IN_PLACE, tp_setup_K, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                         0, MPI_COMM_WORLD, mpi_ierr)
         call MPI_REDUCE(MPI_IN_PLACE, tp_setup_M, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
@@ -186,6 +184,8 @@ subroutine PRINT_PROFILING
                         0, MPI_COMM_WORLD, mpi_ierr)
         call MPI_REDUCE(MPI_IN_PLACE, tp_error, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                         0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(MPI_IN_PLACE, tp_exchange, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
     else
         call MPI_REDUCE(tp_copy_matrix, tp_copy_matrix, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                         0, MPI_COMM_WORLD, mpi_ierr)
@@ -194,8 +194,6 @@ subroutine PRINT_PROFILING
         call MPI_REDUCE(tp_KU, tp_KU, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                         0, MPI_COMM_WORLD, mpi_ierr)
         call MPI_REDUCE(tp_copy_vector, tp_copy_vector, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
-                        0, MPI_COMM_WORLD, mpi_ierr)
-        call MPI_REDUCE(tp_system_setup, tp_system_setup, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                         0, MPI_COMM_WORLD, mpi_ierr)
         call MPI_REDUCE(tp_setup_K, tp_setup_K, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                         0, MPI_COMM_WORLD, mpi_ierr)
@@ -210,6 +208,8 @@ subroutine PRINT_PROFILING
         call MPI_REDUCE(tp_exact, tp_exact, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                         0, MPI_COMM_WORLD, mpi_ierr)
         call MPI_REDUCE(tp_error, tp_error, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
+                        0, MPI_COMM_WORLD, mpi_ierr)
+        call MPI_REDUCE(tp_exchange, tp_exchange, 1, MPI_DOUBLE_PRECISION, MPI_SUM, &
                         0, MPI_COMM_WORLD, mpi_ierr)
     endif
 
@@ -241,9 +241,9 @@ subroutine PRINT_PROFILING
         ! assign pointer to temp vector
         call calc_time(time_hour, time_min, time_sec, int(tp_copy_vector))
         print *, 'tp_copy_vector   = ', time_hour,' h ', time_min,' m ', time_sec,' s'
-        ! setup Krylov solver
-        call calc_time(time_hour, time_min, time_sec, int(tp_system_setup))
-        print *, 'tp_system_setup  = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        ! exchange data
+        call calc_time(time_hour, time_min, time_sec, int(tp_exchange))
+        print *, 'tp_exchange      = ', time_hour,' h ', time_min,' m ', time_sec,' s'
         ! export
         call calc_time(time_hour, time_min, time_sec, int(tp_export))
         print *, 'tp_export        = ', time_hour,' h ', time_min,' m ', time_sec,' s'
@@ -252,7 +252,7 @@ subroutine PRINT_PROFILING
         print *, 'tp_exact         = ', time_hour,' h ', time_min,' m ', time_sec,' s'
         ! compute error
         call calc_time(time_hour, time_min, time_sec, int(tp_exact))
-        print *, 'tp_exact         = ', time_hour,' h ', time_min,' m ', time_sec,' s'
+        print *, 'tp_error         = ', time_hour,' h ', time_min,' m ', time_sec,' s'
     endif
     
 end subroutine

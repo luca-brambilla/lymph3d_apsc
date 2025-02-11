@@ -75,4 +75,15 @@ compare.pvsm
 *.zip
 *.tar.gz
 
+*.pdf
+*.py
+*.csv
+*.txt
+*.input
+*.mate
+*.mesh
+
 *MONITORS
+
+fmetis/build
+metis-5.1.0/build

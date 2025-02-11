@@ -32,6 +32,8 @@ subroutine INITIALIZATION()
 
      ! MPI INITIALIZATION
 
+     use Poly_global
+     
      call MPI_INIT(mpi_ierr)
      call MPI_Initialized(flag,mpi_ierr)
      call MPI_COMM_RANK(MPI_COMM_WORLD, mpi_id, mpi_ierr)
@@ -43,6 +45,9 @@ subroutine INITIALIZATION()
      ! Error occured on rank number: ....
           write(*,*)'MPI Initialization error - proc : ',mpi_id
      endif
+
+
+     allocate(requests(2 * mpi_np), statuses(2 * mpi_np, MPI_STATUS_SIZE))
 
 end subroutine INITIALIZATION
 
