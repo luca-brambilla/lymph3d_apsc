@@ -19,8 +19,8 @@ subroutine CHECK_MPI_EXCHANGE(PolyMesh, Np)
     integer(kind=4), intent(in) :: Np               !< number of element dofs per direction
     real(kind=8), dimension(PolyMesh%num_elem_loc,DIM*Np) :: check_in
     real(kind=8), dimension(PolyMesh%num_elem_loc,DIM*Np) :: check_out
-    type(ScatteredArray), dimension(:,:), allocatable:: send_data !< variable size send buffers
-    type(ScatteredArray), dimension(:,:), allocatable :: recv_data !< variable size receive buffers
+    type(StaggeredArray), dimension(:,:), allocatable:: send_data !< variable size send buffers
+    type(StaggeredArray), dimension(:,:), allocatable :: recv_data !< variable size receive buffers
 
     integer(kind=4) :: ie_loc,i
 
@@ -70,8 +70,8 @@ subroutine MPI_EXCHANGE_ALLOCATE(PolyMesh, send_data, recv_data)
     implicit none
 
     type(Mesh_Structure), intent(in) :: PolyMesh !< mesh
-    type(ScatteredArray), dimension(:,:), allocatable, intent(out) :: send_data !< variable size send buffers
-    type(ScatteredArray), dimension(:,:), allocatable, intent(out) :: recv_data !< variable size receive buffers
+    type(StaggeredArray), dimension(:,:), allocatable, intent(out) :: send_data !< variable size send buffers
+    type(StaggeredArray), dimension(:,:), allocatable, intent(out) :: recv_data !< variable size receive buffers
 
     integer(kind=4) :: id_send
     integer(kind=4) :: id_recv
@@ -120,8 +120,8 @@ subroutine MPI_EXCHANGE_DEALLOCATE(PolyMesh, send_data, recv_data)
     implicit none
 
     type(Mesh_Structure), intent(in) :: PolyMesh !< mesh
-    type(ScatteredArray), dimension(:, :), allocatable, intent(inout) :: send_data !< variable size send buffers
-    type(ScatteredArray), dimension(:, :), allocatable, intent(inout) :: recv_data !< variable size receive buffers
+    type(StaggeredArray), dimension(:, :), allocatable, intent(inout) :: send_data !< variable size send buffers
+    type(StaggeredArray), dimension(:, :), allocatable, intent(inout) :: recv_data !< variable size receive buffers
 
     integer(kind=4) :: id_send
     integer(kind=4) :: id_recv
@@ -170,7 +170,7 @@ subroutine MPI_EXCHANGE_DOF(PolyMesh, input_sol, output_sol, send_data, recv_dat
     integer(kind=4) :: Np, ie_glob, k, ireq, ie_send_loc, ie_recv_loc, el_sum
     integer(kind=4) :: row_send, row_recv
 
-    type(ScatteredArray), dimension(mpi_np, mpi_np), intent(inout) :: send_data, recv_data
+    type(StaggeredArray), dimension(mpi_np, mpi_np), intent(inout) :: send_data, recv_data
 
     real(kind=8) :: t1,t2
 

@@ -404,9 +404,9 @@ module global_parameters
 
     implicit none
 
-    type :: ScatteredArray
+    type :: StaggeredArray
         real(kind=8), dimension(:), allocatable :: data
-    end type ScatteredArray
+    end type StaggeredArray
 
     integer(kind=4), parameter :: DIM = 3               !< dimension of the problem
     integer(kind=4), parameter :: NVERT_TRIA = 3        !< number of vertices of a triangle

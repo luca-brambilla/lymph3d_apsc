@@ -68,7 +68,7 @@ program Lymph3D
 
     integer(kind=4) :: n_neigh
 
-    type(ScatteredArray), dimension(:,:), allocatable :: send_data, recv_data
+    type(StaggeredArray), dimension(:,:), allocatable :: send_data, recv_data
 
     real(kind=8) :: t1, t2
 
