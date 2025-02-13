@@ -144,7 +144,7 @@ subroutine DELETE_ALL_FILES
     if (ierr /= 0) then
         print *, "Error deleting files. Exit code:", ierr
     else
-        print *, "All files deleted in FILES_MPI directory, if applicable."
+        print *, "All files deleted in FILES_MPI, MONITORS and mesh_visualization directories, if applicable."
     end if
 
 end subroutine DELETE_ALL_FILES
